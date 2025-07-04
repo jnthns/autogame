@@ -1,16 +1,25 @@
 import UIKit
+import Foundation
 
 class ExpensesViewController: UIViewController {
     
     // MARK: - Properties
     private var expenseGroup: ExpenseGroup
-    private var filteredExpenses: [Expense] = []
-    private var activeFilters: Set<ExpenseFilter> = []
-    private var tripId: String = ""
     private var selectedExpenses: Set<UUID> = []
     // Holds the trip chosen in the New-Expense alert
-    private var selectedTripForNewExpense: Itinerary?
+    var selectedTripForNewExpense: Itinerary?
+    private var pickerAdapters: [ExpenseFormPickerAdapter] = []
+    // Currently-selected trip context
+    private var tripId: String = ""
+    // Bridge remaining legacy table-view helpers to the new view-model
+    private var filteredExpenses: [Expense] { viewModel.filteredExpenses }
+    private enum Section { case main }
+    private var viewModel: ExpenseListViewModel!
+    private var dataSource: UITableViewDiffableDataSource<Section, UUID>!
     
+    // Enum for text-field indices in expense forms
+    private enum Field: Int { case title, amount, category, payer, payment, trip }
+
     struct Column: Codable {
         let id: String
         let title: String
@@ -131,7 +140,14 @@ class ExpensesViewController: UIViewController {
         
         super.init(nibName: nil, bundle: nil)
         tabBarItem = UITabBarItem(title: "Expenses", image: UIImage(systemName: "dollarsign.circle"), tag: 2)
-        filteredExpenses = expenseGroup.expenses
+        viewModel = ExpenseListViewModel(group: expenseGroup)
+        viewModel.onUpdate = { [weak self] in
+            guard let self = self else { return }
+            // Keep local copy in sync so currency & other callers stay correct
+            self.expenseGroup = self.viewModel.expenseGroup
+            self.applySnapshot()
+            self.updateSummaryView()
+        }
         loadColumnSettings()
         
         // Add targets for buttons
@@ -168,30 +184,27 @@ class ExpensesViewController: UIViewController {
     }
     
     @objc private func saveExpenseGroup() {
-        ExpensesService.shared.updateExpenseGroup(expenseGroup, forTrip: tripId)
+        ExpensesService.shared.updateExpenseGroup(viewModel.expenseGroup, forTrip: tripId)
     }
     
     // Update addExpense to save after adding
     private func saveAndAddExpense(_ expense: Expense) {
-        expenseGroup.expenses.append(expense)
-        applyFilters()
-        updateSummaryView()
-        tableView.reloadData()
-        
-        // Save changes
-        saveExpenseGroup()
+        viewModel.add(expense)
+        // Notify if expense date is outside trip range
+        if expense.date < expenseGroup.startDate || expense.date > expenseGroup.endDate {
+            let alert = UIAlertController(
+                title: "Date Outside Trip Range",
+                message: "This expense's date doesn't fall within your trip dates (\(FormatterCache.dateShort.string(from: expenseGroup.startDate)) - \(FormatterCache.dateShort.string(from: expenseGroup.endDate))). It has still been saved.",
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+        }
     }
     
     // Update deleteExpense to save after deleting
     private func deleteExpense(at indexPath: IndexPath) {
-        let expense = filteredExpenses[indexPath.row]
-        expenseGroup.expenses.removeAll { $0.id == expense.id }
-        applyFilters()
-        updateSummaryView()
-        tableView.reloadData()
-        
-        // Save changes
-        saveExpenseGroup()
+        let expense = viewModel.filteredExpenses[indexPath.row]
+        viewModel.delete(ids: [expense.id])
     }
     
     // MARK: - UI Setup
@@ -227,9 +240,23 @@ class ExpensesViewController: UIViewController {
     
     private func setupTableView() {
         tableView.delegate = self
-        tableView.dataSource = self
+        dataSource = UITableViewDiffableDataSource<Section, UUID>(tableView: tableView) { [weak self] table, indexPath, expenseId in
+            guard let self = self,
+                  let expense = self.viewModel.expense(for: expenseId) else { return UITableViewCell() }
+            let cell = table.dequeueReusableCell(withIdentifier: ExpenseCell.identifier, for: indexPath) as! ExpenseCell
+            cell.configure(with: expense, columns: self.columns.filter{$0.isVisible}.map{$0.actualKeyPath})
+            return cell
+        }
         tableView.register(ExpenseCell.self, forCellReuseIdentifier: ExpenseCell.identifier)
         tableView.register(HeaderCell.self, forHeaderFooterViewReuseIdentifier: HeaderCell.identifier)
+        applySnapshot()
+    }
+    
+    private func applySnapshot() {
+        var snap = NSDiffableDataSourceSnapshot<Section, UUID>()
+        snap.appendSections([.main])
+        snap.appendItems(viewModel.filteredExpenses.map{ $0.id })
+        dataSource.apply(snap, animatingDifferences: true)
     }
     
     private func setupNavigationBar() {
@@ -259,13 +286,12 @@ class ExpensesViewController: UIViewController {
         formatter.numberStyle = .currency
         formatter.currencySymbol = expenseGroup.currency.symbol
         
-        let filteredTotal = filteredExpenses.reduce(Decimal(0)) { $0 + $1.amount }
+        let filteredTotal = viewModel.total
         totalLabel.text = formatter.string(from: NSDecimalNumber(decimal: filteredTotal))
         
         categoryStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
-        let categoryTotals = Dictionary(grouping: filteredExpenses, by: { $0.category })
-            .mapValues { expenses in expenses.reduce(Decimal(0)) { $0 + $1.amount } }
+        let categoryTotals = viewModel.categoryTotals
         
         for category in Expense.Category.allCases {
             let total = categoryTotals[category] ?? 0
@@ -280,9 +306,7 @@ class ExpensesViewController: UIViewController {
     
     // MARK: - Settings
     private func loadColumnSettings() {
-        if let data = UserDefaults.standard.data(forKey: "ExpenseColumnSettings"),
-           let savedColumns = try? JSONDecoder().decode([Column].self, from: data) {
-            // Update only visibility settings to preserve column order and other properties
+        if let savedColumns = SettingsService.shared.loadColumns() {
             for savedColumn in savedColumns {
                 if let index = columns.firstIndex(where: { $0.id == savedColumn.id }) {
                     columns[index].isVisible = savedColumn.isVisible
@@ -292,9 +316,7 @@ class ExpensesViewController: UIViewController {
     }
     
     private func saveColumnSettings() {
-        if let data = try? JSONEncoder().encode(columns) {
-            UserDefaults.standard.set(data, forKey: "ExpenseColumnSettings")
-        }
+        SettingsService.shared.saveColumns(columns)
     }
     
     @objc private func showSettings() {
@@ -326,6 +348,8 @@ class ExpensesViewController: UIViewController {
             guard let self = self else { return }
             self.columns = updatedColumns
             self.saveColumnSettings()
+            // Refresh both data and header
+            self.applySnapshot()
             self.tableView.reloadData()
         }
         let nav = UINavigationController(rootViewController: vc)
@@ -354,8 +378,7 @@ class ExpensesViewController: UIViewController {
             var currentPayers = DraftsService.shared.fetchPayers()
             currentPayers.append(Expense.Payer(name: name))
             DraftsService.shared.savePayers(currentPayers)
-            
-            self.tableView.reloadData()
+            self.applySnapshot()
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
@@ -364,73 +387,21 @@ class ExpensesViewController: UIViewController {
     }
     
     private func exportToCSV() {
-        var csvString = "Date,Title,Amount,Category,Payer,Payment Method,Currency,Notes\n"
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .short
-        
-        for expense in expenseGroup.expenses {
-            let row = [
-                dateFormatter.string(from: expense.date),
-                expense.title,
-                String(describing: expense.amount),
-                expense.category.rawValue,
-                expense.payer.name,
-                expense.paymentMethod.rawValue,
-                expense.currency.rawValue,
-                expense.notes ?? ""
-            ].map { "\"\($0)\"" }.joined(separator: ",")
-            
-            csvString.append(row + "\n")
-        }
-        
-        guard let data = csvString.data(using: .utf8) else { return }
-        
-        let activityVC = UIActivityViewController(
-            activityItems: [data],
-            applicationActivities: nil
-        )
-        
+        guard let data = ExportService.csvData(for: expenseGroup.expenses) else { return }
+        let activityVC = UIActivityViewController(activityItems: [data], applicationActivities: nil)
         if let popoverController = activityVC.popoverPresentationController {
             popoverController.barButtonItem = navigationItem.rightBarButtonItems?.last
         }
-        
         present(activityVC, animated: true)
     }
     
     // MARK: - Filtering
     private func toggleFilter(_ filter: ExpenseFilter) {
-        if activeFilters.contains(filter) {
-            activeFilters.remove(filter)
-        } else {
-            // Remove other filters of the same type
-            activeFilters = activeFilters.filter { !$0.isSameType(as: filter) }
-            activeFilters.insert(filter)
-        }
-        applyFilters()
+        viewModel.toggle(filter: filter)
     }
     
     private func clearFilters() {
-        activeFilters.removeAll()
-        applyFilters()
-    }
-    
-    private func applyFilters() {
-        if activeFilters.isEmpty {
-            filteredExpenses = expenseGroup.expenses
-        } else {
-            filteredExpenses = expenseGroup.expenses.filter { expense in
-                activeFilters.allSatisfy { filter in
-                    switch filter {
-                    case .category(let category): return expense.category == category
-                    case .payer(let payer): return expense.payer == payer
-                    case .paymentMethod(let method): return expense.paymentMethod == method
-                    }
-                }
-            }
-        }
-        updateSummaryView()
-        tableView.reloadData()
+        viewModel.clearFilters()
     }
     
     @objc private func addExpenseTapped() {
@@ -446,10 +417,13 @@ class ExpensesViewController: UIViewController {
             textField.keyboardType = .decimalPad
         }
         
+        pickerAdapters.removeAll()
+
         let categoryPicker = UIPickerView()
-        categoryPicker.delegate = self
-        categoryPicker.dataSource = self
-        categoryPicker.tag = 0
+        let catAdapter = ExpenseFormPickerAdapter(kind: .category, fieldIndex: Field.category.rawValue, alert: alert, controller: self)
+        categoryPicker.delegate = catAdapter
+        categoryPicker.dataSource = catAdapter
+        pickerAdapters.append(catAdapter)
         
         alert.addTextField { textField in
             textField.placeholder = "Category"
@@ -462,9 +436,10 @@ class ExpensesViewController: UIViewController {
         }
         
         let payerPicker = UIPickerView()
-        payerPicker.delegate = self
-        payerPicker.dataSource = self
-        payerPicker.tag = 1
+        let payAdapter = ExpenseFormPickerAdapter(kind: .payer, fieldIndex: Field.payer.rawValue, alert: alert, controller: self)
+        payerPicker.delegate = payAdapter
+        payerPicker.dataSource = payAdapter
+        pickerAdapters.append(payAdapter)
         
         alert.addTextField { textField in
             textField.placeholder = "Payer"
@@ -480,9 +455,10 @@ class ExpensesViewController: UIViewController {
         }
         
         let paymentPicker = UIPickerView()
-        paymentPicker.delegate = self
-        paymentPicker.dataSource = self
-        paymentPicker.tag = 2
+        let payMAdapter = ExpenseFormPickerAdapter(kind: .payment, fieldIndex: Field.payment.rawValue, alert: alert, controller: self)
+        paymentPicker.delegate = payMAdapter
+        paymentPicker.dataSource = payMAdapter
+        pickerAdapters.append(payMAdapter)
         
         alert.addTextField { textField in
             textField.placeholder = "Payment Method"
@@ -496,9 +472,10 @@ class ExpensesViewController: UIViewController {
         
         // Trip selection via picker
         let tripPicker = UIPickerView()
-        tripPicker.delegate = self
-        tripPicker.dataSource = self
-        tripPicker.tag = 3
+        let tripAdapter = ExpenseFormPickerAdapter(kind: .trip, fieldIndex: Field.trip.rawValue, alert: alert, controller: self)
+        tripPicker.delegate = tripAdapter
+        tripPicker.dataSource = tripAdapter
+        pickerAdapters.append(tripAdapter)
         
         alert.addTextField { [weak self] textField in
             guard let self = self else { return }
@@ -518,14 +495,14 @@ class ExpensesViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Add", style: .default) { [weak self] _ in
             guard let self = self,
-                  let title = alert.textFields?[0].text,
-                  let amountText = alert.textFields?[1].text,
+                  let title = alert.textFields?[Field.title.rawValue].text,
+                  let amountText = alert.textFields?[Field.amount.rawValue].text,
                   let amount = Decimal(string: amountText),
-                  let categoryText = alert.textFields?[2].text,
+                  let categoryText = alert.textFields?[Field.category.rawValue].text,
                   let category = Expense.Category.allCases.first(where: { $0.rawValue == categoryText }),
-                  let payerText = alert.textFields?[3].text,
+                  let payerText = alert.textFields?[Field.payer.rawValue].text,
                   let payer = UserDefaults.standard.payers.first(where: { $0.name == payerText }),
-                  let paymentText = alert.textFields?[4].text,
+                  let paymentText = alert.textFields?[Field.payment.rawValue].text,
                   let paymentMethod = Expense.PaymentMethod.allCases.first(where: { $0.rawValue == paymentText }) else { return }
             
             guard let trip = self.selectedTripForNewExpense else {
@@ -606,10 +583,13 @@ class ExpensesViewController: UIViewController {
             textField.keyboardType = .decimalPad
         }
         
+        pickerAdapters.removeAll()
+
         let categoryPicker = UIPickerView()
-        categoryPicker.delegate = self
-        categoryPicker.dataSource = self
-        categoryPicker.tag = 0
+        let catAdapter = ExpenseFormPickerAdapter(kind: .category, fieldIndex: Field.category.rawValue, alert: alert, controller: self)
+        categoryPicker.delegate = catAdapter
+        categoryPicker.dataSource = catAdapter
+        pickerAdapters.append(catAdapter)
         
         alert.addTextField { textField in
             textField.text = expense.category.rawValue
@@ -623,9 +603,10 @@ class ExpensesViewController: UIViewController {
         }
         
         let payerPicker = UIPickerView()
-        payerPicker.delegate = self
-        payerPicker.dataSource = self
-        payerPicker.tag = 1
+        let payAdapter = ExpenseFormPickerAdapter(kind: .payer, fieldIndex: Field.payer.rawValue, alert: alert, controller: self)
+        payerPicker.delegate = payAdapter
+        payerPicker.dataSource = payAdapter
+        pickerAdapters.append(payAdapter)
         
         alert.addTextField { textField in
             textField.text = expense.payer.name
@@ -639,9 +620,10 @@ class ExpensesViewController: UIViewController {
         }
         
         let paymentPicker = UIPickerView()
-        paymentPicker.delegate = self
-        paymentPicker.dataSource = self
-        paymentPicker.tag = 2
+        let payMAdapter = ExpenseFormPickerAdapter(kind: .payment, fieldIndex: Field.payment.rawValue, alert: alert, controller: self)
+        paymentPicker.delegate = payMAdapter
+        paymentPicker.dataSource = payMAdapter
+        pickerAdapters.append(payMAdapter)
         
         alert.addTextField { textField in
             textField.text = expense.paymentMethod.rawValue
@@ -656,9 +638,10 @@ class ExpensesViewController: UIViewController {
         
         // Trip picker
         let tripPicker = UIPickerView()
-        tripPicker.delegate = self
-        tripPicker.dataSource = self
-        tripPicker.tag = 3
+        let tripAdapter = ExpenseFormPickerAdapter(kind: .trip, fieldIndex: Field.trip.rawValue, alert: alert, controller: self)
+        tripPicker.delegate = tripAdapter
+        tripPicker.dataSource = tripAdapter
+        pickerAdapters.append(tripAdapter)
         
         alert.addTextField { [weak self] textField in
             guard let self = self else { return }
@@ -675,8 +658,8 @@ class ExpensesViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Save", style: .default) { [weak self] _ in
             guard let self = self,
-                  let title = alert.textFields?[0].text,
-                  let amountText = alert.textFields?[1].text,
+                  let title = alert.textFields?[Field.title.rawValue].text,
+                  let amountText = alert.textFields?[Field.amount.rawValue].text,
                   let amount = Decimal(string: amountText),
                   let categoryText = alert.textFields?[2].text,
                   let category = Expense.Category.allCases.first(where: { $0.rawValue == categoryText }),
@@ -703,10 +686,9 @@ class ExpensesViewController: UIViewController {
                 updatedExpense.tripName = nil
             }
             
-            self.expenseGroup.expenses[index] = updatedExpense
-            self.applyFilters()
+            self.viewModel.replace(id: expense.id, with: updatedExpense)
+            self.applySnapshot()
             self.updateSummaryView()
-            self.tableView.reloadData()
         })
         
         present(alert, animated: true)
@@ -739,18 +721,8 @@ class ExpensesViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
             guard let self = self else { return }
             
-            // Remove selected expenses
-            self.expenseGroup.expenses.removeAll { self.selectedExpenses.contains($0.id) }
-            
-            // Update UI
-            self.applyFilters()
-            self.updateSummaryView()
-            self.tableView.reloadData()
-            
-            // Save changes
-            self.saveExpenseGroup()
-            
-            // Exit selection mode
+            self.viewModel.delete(ids: self.selectedExpenses)
+            self.selectedExpenses.removeAll()
             self.toggleSelection()
         })
         
@@ -762,11 +734,15 @@ class ExpensesViewController: UIViewController {
         
         let alert = UIAlertController(title: "Edit Expenses", message: nil, preferredStyle: .alert)
         
+        // Reset adapters for this alert
+        pickerAdapters.removeAll()
+
         // Only show fields that make sense to bulk edit
         let categoryPicker = UIPickerView()
-        categoryPicker.delegate = self
-        categoryPicker.dataSource = self
-        categoryPicker.tag = 0
+        let bulkCatAdapter = ExpenseFormPickerAdapter(kind: .category, fieldIndex: 0, alert: alert, controller: self)
+        categoryPicker.delegate = bulkCatAdapter
+        categoryPicker.dataSource = bulkCatAdapter
+        pickerAdapters.append(bulkCatAdapter)
         
         alert.addTextField { textField in
             textField.placeholder = "Category (optional)"
@@ -774,9 +750,10 @@ class ExpensesViewController: UIViewController {
         }
         
         let payerPicker = UIPickerView()
-        payerPicker.delegate = self
-        payerPicker.dataSource = self
-        payerPicker.tag = 1
+        let bulkPayerAdapter = ExpenseFormPickerAdapter(kind: .payer, fieldIndex: 1, alert: alert, controller: self)
+        payerPicker.delegate = bulkPayerAdapter
+        payerPicker.dataSource = bulkPayerAdapter
+        pickerAdapters.append(bulkPayerAdapter)
         
         alert.addTextField { textField in
             textField.placeholder = "Payer (optional)"
@@ -784,9 +761,10 @@ class ExpensesViewController: UIViewController {
         }
         
         let paymentPicker = UIPickerView()
-        paymentPicker.delegate = self
-        paymentPicker.dataSource = self
-        paymentPicker.tag = 2
+        let bulkPayAdapter = ExpenseFormPickerAdapter(kind: .payment, fieldIndex: 2, alert: alert, controller: self)
+        paymentPicker.delegate = bulkPayAdapter
+        paymentPicker.dataSource = bulkPayAdapter
+        pickerAdapters.append(bulkPayAdapter)
         
         alert.addTextField { textField in
             textField.placeholder = "Payment Method (optional)"
@@ -795,8 +773,9 @@ class ExpensesViewController: UIViewController {
         
         // Add trip selection
         let tripPicker = UIPickerView()
-        tripPicker.delegate = self
-        tripPicker.dataSource = self
+        let bulkTripAdapter = ExpenseFormPickerAdapter(kind: .trip, fieldIndex: 3, alert: alert, controller: self)
+        tripPicker.delegate = bulkTripAdapter
+        tripPicker.dataSource = bulkTripAdapter
         tripPicker.tag = 3
         
         alert.addTextField { textField in
@@ -813,47 +792,33 @@ class ExpensesViewController: UIViewController {
             let paymentText = alert.textFields?[2].text
             let tripText = alert.textFields?[3].text
             
-            // Update all selected expenses
-            for id in selectedExpenses {
-                if let index = self.expenseGroup.expenses.firstIndex(where: { $0.id == id }) {
-                    // Only update fields that were filled in
-                    if let categoryText = categoryText,
-                       !categoryText.isEmpty,
-                       let category = Expense.Category.allCases.first(where: { $0.rawValue == categoryText }) {
-                        self.expenseGroup.expenses[index].category = category
-                    }
-                    
-                    if let payerText = payerText,
-                       !payerText.isEmpty,
-                       let payer = DraftsService.shared.fetchPayers().first(where: { $0.name == payerText }) {
-                        self.expenseGroup.expenses[index].payer = payer
-                    }
-                    
-                    if let paymentText = paymentText,
-                       !paymentText.isEmpty,
-                       let paymentMethod = Expense.PaymentMethod.allCases.first(where: { $0.rawValue == paymentText }) {
-                        self.expenseGroup.expenses[index].paymentMethod = paymentMethod
-                    }
-                    
-                    if let tripText = tripText, !tripText.isEmpty {
-                        let drafts = DraftsService.shared.fetchDrafts()
-                        if let trip = drafts.first(where: { $0.destination.city == tripText }) {
-                            self.expenseGroup.expenses[index].tripId = trip.id
-                            self.expenseGroup.expenses[index].tripName = trip.destination.city
-                        }
+            for id in self.selectedExpenses {
+                guard var updated = self.viewModel.expense(for: id) else { continue }
+                if let categoryText = categoryText,
+                   !categoryText.isEmpty,
+                   let category = Expense.Category.allCases.first(where: { $0.rawValue == categoryText }) {
+                    updated.category = category
+                }
+                if let payerText = payerText,
+                   !payerText.isEmpty,
+                   let payer = DraftsService.shared.fetchPayers().first(where: { $0.name == payerText }) {
+                    updated.payer = payer
+                }
+                if let paymentText = paymentText,
+                   !paymentText.isEmpty,
+                   let paymentMethod = Expense.PaymentMethod.allCases.first(where: { $0.rawValue == paymentText }) {
+                    updated.paymentMethod = paymentMethod
+                }
+                if let tripText = tripText, !tripText.isEmpty {
+                    let drafts = DraftsService.shared.fetchDrafts()
+                    if let trip = drafts.first(where: { $0.destination.city == tripText }) {
+                        updated.tripId = trip.id
+                        updated.tripName = trip.destination.city
                     }
                 }
+                self.viewModel.replace(id: id, with: updated)
             }
-            
-            // Update UI
-            self.applyFilters()
-            self.updateSummaryView()
-            self.tableView.reloadData()
-            
-            // Save changes
-            self.saveExpenseGroup()
-            
-            // Exit selection mode
+            self.selectedExpenses.removeAll()
             self.toggleSelection()
         })
         
@@ -862,18 +827,7 @@ class ExpensesViewController: UIViewController {
 }
 
 // MARK: - UITableViewDataSource & Delegate
-extension ExpensesViewController: UITableViewDataSource, UITableViewDelegate {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return filteredExpenses.count
-    }
-    
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: ExpenseCell.identifier, for: indexPath) as! ExpenseCell
-        let expense = filteredExpenses[indexPath.row]
-        cell.configure(with: expense, columns: columns.filter { $0.isVisible }.map { $0.actualKeyPath })
-        return cell
-    }
-    
+extension ExpensesViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let header = tableView.dequeueReusableHeaderFooterView(withIdentifier: HeaderCell.identifier) as! HeaderCell
         header.configure(with: columns.filter { $0.isVisible }.map { $0.title })
@@ -889,7 +843,7 @@ extension ExpensesViewController: UITableViewDataSource, UITableViewDelegate {
     }
     
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        let expense = filteredExpenses[indexPath.row]
+        let expense = viewModel.filteredExpenses[indexPath.row]
         
         let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
             self?.deleteExpense(at: indexPath)
@@ -909,7 +863,7 @@ extension ExpensesViewController: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         if tableView.isEditing {
-            let expense = filteredExpenses[indexPath.row]
+            let expense = viewModel.filteredExpenses[indexPath.row]
             if selectedExpenses.contains(expense.id) {
                 selectedExpenses.remove(expense.id)
             } else {
@@ -983,126 +937,6 @@ extension ExpensesViewController: UIPickerViewDelegate, UIPickerViewDataSource {
     }
 }
 
-// MARK: - Custom Views
-class ExpenseCell: UITableViewCell {
-    static let identifier = "ExpenseCell"
-    
-    private var stackView: UIStackView!
-    private var labels: [UILabel] = []
-    
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: style, reuseIdentifier: reuseIdentifier)
-        setupUI()
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    private func setupUI() {
-        stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.distribution = .fillEqually
-        stackView.spacing = 1
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        
-        contentView.addSubview(stackView)
-        
-        NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
-        ])
-    }
-    
-    func configure(with expense: Expense, columns: [KeyPath<Expense, String>]) {
-        // Remove existing labels
-        stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        // Create new labels for each column
-        for column in columns {
-            let label = UILabel()
-            label.font = .systemFont(ofSize: 14)
-            label.textAlignment = .left
-            label.text = expense[keyPath: column]
-            label.adjustsFontSizeToFitWidth = true
-            label.minimumScaleFactor = 0.8
-            
-            let container = UIView()
-            container.addSubview(label)
-            label.translatesAutoresizingMaskIntoConstraints = false
-            
-            NSLayoutConstraint.activate([
-                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
-                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-                label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
-                label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4)
-            ])
-            
-            stackView.addArrangedSubview(container)
-        }
-    }
-}
-
-class HeaderCell: UITableViewHeaderFooterView {
-    static let identifier = "HeaderCell"
-    
-    private var stackView: UIStackView!
-    
-    override init(reuseIdentifier: String?) {
-        super.init(reuseIdentifier: reuseIdentifier)
-        setupUI()
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    private func setupUI() {
-        stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.distribution = .fillEqually
-        stackView.spacing = 1
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        
-        contentView.backgroundColor = .systemGray6
-        
-        contentView.addSubview(stackView)
-        
-        NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
-        ])
-    }
-    
-    func configure(with titles: [String]) {
-        stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        for title in titles {
-            let label = UILabel()
-            label.font = .systemFont(ofSize: 14, weight: .medium)
-            label.textAlignment = .left
-            label.text = title
-            
-            let container = UIView()
-            container.addSubview(label)
-            label.translatesAutoresizingMaskIntoConstraints = false
-            
-            NSLayoutConstraint.activate([
-                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
-                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-                label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
-                label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4)
-            ])
-            
-            stackView.addArrangedSubview(container)
-        }
-    }
-}
-
 // MARK: - Expense Extensions
 extension Expense {
     var formattedDate: String {
@@ -1144,314 +978,29 @@ enum ExpenseFilter: Hashable {
     }
 }
 
-// MARK: - Category Summary View
-class CategorySummaryView: UIView {
-    private let iconView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
-        iv.tintColor = .white
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
-    
-    private let amountLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 10, weight: .medium)
-        label.textAlignment = .center
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    init(category: Expense.Category, amount: Decimal, currency: Expense.Currency) {
-        super.init(frame: .zero)
-        
-        addSubview(iconView)
-        addSubview(amountLabel)
-        
-        NSLayoutConstraint.activate([
-            iconView.topAnchor.constraint(equalTo: topAnchor),
-            iconView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 20),
-            iconView.heightAnchor.constraint(equalToConstant: 20),
-            
-            amountLabel.topAnchor.constraint(equalTo: iconView.bottomAnchor, constant: 2),
-            amountLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
-            amountLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
-            amountLabel.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-        
-        iconView.image = UIImage(systemName: category.icon)
-        iconView.backgroundColor = category.color
-        iconView.layer.cornerRadius = 10
-        iconView.clipsToBounds = true
-        
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencySymbol = currency.symbol
-        amountLabel.text = formatter.string(from: NSDecimalNumber(decimal: amount))
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
-// MARK: - Column Configuration View Controller
-class ColumnConfigurationViewController: UITableViewController {
-    private var columns: [ExpensesViewController.Column]
-    private let onUpdate: ([ExpensesViewController.Column]) -> Void
-    
-    init(columns: [ExpensesViewController.Column], onUpdate: @escaping ([ExpensesViewController.Column]) -> Void) {
-        self.columns = columns
-        self.onUpdate = onUpdate
-        super.init(style: .grouped)
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        
-        title = "Configure Columns"
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "Cell")
-        
-        navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(done)),
-            UIBarButtonItem(title: "Reorder", style: .plain, target: self, action: #selector(toggleReordering))
-        ]
-    }
-    
-    @objc private func done() {
-        onUpdate(columns)
-        dismiss(animated: true)
-    }
-    
-    @objc private func toggleReordering() {
-        tableView.isEditing.toggle()
-        navigationItem.rightBarButtonItems?[1].title = tableView.isEditing ? "Done" : "Reorder"
-    }
-    
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return columns.count
-    }
-    
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
-        let column = columns[indexPath.row]
-        
-        cell.textLabel?.text = column.title
-        cell.accessoryType = column.isVisible ? .checkmark : .none
-        
-        return cell
-    }
-    
-    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        
-        columns[indexPath.row].isVisible.toggle()
-        
-        if let cell = tableView.cellForRow(at: indexPath) {
-            cell.accessoryType = columns[indexPath.row].isVisible ? .checkmark : .none
-        }
-    }
-    
-    override func tableView(_ tableView: UITableView, canMoveRowAt indexPath: IndexPath) -> Bool {
-        return true
-    }
-    
-    override func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath) {
-        let column = columns.remove(at: sourceIndexPath.row)
-        columns.insert(column, at: destinationIndexPath.row)
-    }
-}
-
-// MARK: - Trip Selection View Controller
-class TripExpensesViewController: UITableViewController {
-    private var drafts: [Itinerary] = []
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        
-        title = "Select Trip"
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "Cell")
-        
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            title: "Back",
-            style: .plain,
-            target: self,
-            action: #selector(backTapped)
-        )
-        
-        loadDrafts()
-    }
-    
-    private func loadDrafts() {
-        drafts = DraftsService.shared.fetchDrafts()
-        tableView.reloadData()
-    }
-    
-    @objc private func backTapped() {
-        navigationController?.popViewController(animated: true)
-    }
-    
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return drafts.count
-    }
-    
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
-        let draft = drafts[indexPath.row]
-        cell.textLabel?.text = draft.destination.city
-        cell.accessoryType = .disclosureIndicator
-        return cell
-    }
-    
-    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let draft = drafts[indexPath.row]
-        let expensesVC = ExpensesViewController(tripId: draft.id, tripTitle: draft.destination.city)
-        navigationController?.pushViewController(expensesVC, animated: true)
-    }
-}
-
-// Update ExpensesViewController initialization
 extension ExpensesViewController {
+    /// Alternate initializer used by TripExpensesViewController
     convenience init(tripId: String, tripTitle: String) {
         self.init()
+        // Store context
         self.tripId = tripId
         self.title = tripTitle
-        
-        // Load expenses for this trip
-        self.expenseGroup = ExpensesService.shared.fetchExpenseGroup(forTrip: tripId) ?? ExpenseGroup(
+        // Load or create an ExpenseGroup for this trip
+        let loadedGroup = ExpensesService.shared.fetchExpenseGroup(forTrip: tripId) ?? ExpenseGroup(
             title: tripTitle,
             startDate: Date(),
             endDate: Date(),
             expenses: [],
             currency: .usd
         )
-        
-        // Add back button
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            title: "Back",
-            style: .plain,
-            target: self,
-            action: #selector(backTapped)
-        )
-    }
-    
-    @objc private func backTapped() {
-        // Save current state before going back
-        ExpensesService.shared.updateExpenseGroup(expenseGroup, forTrip: tripId)
-        navigationController?.popViewController(animated: true)
+        // Replace backing model objects
+        self.expenseGroup = loadedGroup
+        self.viewModel = ExpenseListViewModel(group: loadedGroup)
+        self.viewModel.onUpdate = { [weak self] in
+            guard let self = self else { return }
+            self.expenseGroup = self.viewModel.expenseGroup
+            self.applySnapshot()
+            self.updateSummaryView()
+        }
     }
 }
-
-// MARK: - Payer Management View Controller
-class PayerManagementViewController: UITableViewController {
-    private var payers: [Expense.Payer] {
-        get { UserDefaults.standard.payers }
-        set { UserDefaults.standard.payers = newValue }
-    }
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        
-        title = "Manage Payers"
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "Cell")
-        
-        navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addPayer)),
-            UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(done))
-        ]
-    }
-    
-    @objc private func done() {
-        dismiss(animated: true)
-    }
-    
-    @objc private func addPayer() {
-        let alert = UIAlertController(title: "New Payer", message: nil, preferredStyle: .alert)
-        
-        alert.addTextField { textField in
-            textField.placeholder = "Name"
-        }
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Add", style: .default) { [weak self] _ in
-            guard let self = self,
-                  let name = alert.textFields?.first?.text,
-                  !name.isEmpty else { return }
-            
-            let payer = Expense.Payer(name: name)
-            self.payers.append(payer)
-            self.tableView.reloadData()
-        })
-        
-        present(alert, animated: true)
-    }
-    
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return payers.count
-    }
-    
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
-        let payer = payers[indexPath.row]
-        
-        cell.textLabel?.text = payer.name
-        cell.imageView?.image = UIImage(systemName: payer.icon)
-        
-        return cell
-    }
-    
-    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        return true
-    }
-    
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-        if editingStyle == .delete {
-            payers.remove(at: indexPath.row)
-            tableView.deleteRows(at: [indexPath], with: .fade)
-        }
-    }
-    
-    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        
-        let payer = payers[indexPath.row]
-        let alert = UIAlertController(title: "Edit Payer", message: nil, preferredStyle: .alert)
-        
-        alert.addTextField { textField in
-            textField.text = payer.name
-            textField.placeholder = "Name"
-        }
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Save", style: .default) { [weak self] _ in
-            guard let self = self,
-                  let name = alert.textFields?.first?.text,
-                  !name.isEmpty else { return }
-            
-            let updatedPayer = Expense.Payer(id: payer.id, name: name, icon: payer.icon)
-            self.payers[indexPath.row] = updatedPayer
-            self.tableView.reloadRows(at: [indexPath], with: .automatic)
-        })
-        
-        present(alert, animated: true)
-    }
-}
-
-// Remove the UserDefaults extension for expense management
-extension UserDefaults {
-    private static let columnSettingsKey = "expenseColumnSettings"
-    
-    func saveColumnSettings(_ columns: [ExpensesViewController.Column]) {
-        set(try? JSONEncoder().encode(columns), forKey: Self.columnSettingsKey)
-    }
-    
-    func loadColumnSettings() -> [ExpensesViewController.Column]? {
-        guard let data = data(forKey: Self.columnSettingsKey) else { return nil }
-        return try? JSONDecoder().decode([ExpensesViewController.Column].self, from: data)
-    }
-} 

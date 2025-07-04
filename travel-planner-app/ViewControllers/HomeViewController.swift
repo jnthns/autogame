@@ -297,7 +297,17 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let width = collectionView.bounds.width - 40 // Full width minus padding
-        return CGSize(width: width, height: 100) // Reduced height for rectangle shape
+        let draft = drafts[indexPath.row]
+        
+        // Calculate height based on content
+        let baseHeight: CGFloat = 90 // Base height for city and date
+        var additionalHeight: CGFloat = 0
+        
+        if draft.flight != nil {
+            additionalHeight += 44 // Height for two lines of flight info
+        }
+        
+        return CGSize(width: width, height: baseHeight + additionalHeight)
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
@@ -387,7 +397,18 @@ class TripCell: UICollectionViewCell {
         let label = UILabel()
         label.font = .systemFont(ofSize: 14)
         label.textColor = .secondaryLabel
+        label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let flightLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14)
+        label.textColor = .secondaryLabel
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isHidden = true
         return label
     }()
     
@@ -405,25 +426,31 @@ class TripCell: UICollectionViewCell {
         containerView.addSubview(iconView)
         containerView.addSubview(cityLabel)
         containerView.addSubview(dateLabel)
+        containerView.addSubview(flightLabel)
         
         NSLayoutConstraint.activate([
-            containerView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            containerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             containerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
             
             iconView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            iconView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            iconView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 16),
             iconView.widthAnchor.constraint(equalToConstant: 24),
             iconView.heightAnchor.constraint(equalToConstant: 24),
             
-            cityLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 16),
+            cityLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
             cityLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 16),
             cityLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
             
             dateLabel.leadingAnchor.constraint(equalTo: cityLabel.leadingAnchor),
             dateLabel.topAnchor.constraint(equalTo: cityLabel.bottomAnchor, constant: 4),
-            dateLabel.trailingAnchor.constraint(equalTo: cityLabel.trailingAnchor)
+            dateLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            
+            flightLabel.leadingAnchor.constraint(equalTo: dateLabel.leadingAnchor),
+            flightLabel.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: 4),
+            flightLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            flightLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -16)
         ])
     }
     
@@ -432,8 +459,39 @@ class TripCell: UICollectionViewCell {
         
         let df = DateFormatter()
         df.dateStyle = .medium
-        let dateText = "\(df.string(from: itinerary.startDate)) - \(df.string(from: itinerary.endDate))"
+        let dateText: String
+        if Calendar.current.isDate(itinerary.startDate, inSameDayAs: itinerary.endDate) {
+            dateText = df.string(from: itinerary.startDate)
+        } else {
+            dateText = "\(df.string(from: itinerary.startDate)) - \(df.string(from: itinerary.endDate))"
+        }
         dateLabel.text = dateText
+        
+        // Configure flight information if available
+        if let flight = itinerary.flight {
+            let tf = DateFormatter()
+            tf.dateFormat = "HH:mm"
+            
+            var flightText = ""
+            if let flightNumber = flight.flightNumber {
+                flightText += "\(flightNumber): "
+            }
+            flightText += "\(flight.origin) → \(flight.destination)"
+            flightText += "\nDeparture: \(tf.string(from: flight.departureDate))"
+            
+            if let duration = flight.durationText {
+                flightText += " (\(duration))"
+            }
+            
+            flightLabel.text = flightText
+            flightLabel.isHidden = false
+        } else {
+            flightLabel.isHidden = true
+        }
+        
+        // Let the cell layout naturally based on content
+        setNeedsLayout()
+        layoutIfNeeded()
     }
     
     // Add interaction configuration for swipe actions

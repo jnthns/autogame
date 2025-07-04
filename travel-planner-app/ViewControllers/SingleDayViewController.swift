@@ -433,3 +433,4 @@ extension SingleDayViewController: UITableViewDragDelegate, UITableViewDropDeleg
         saveActivitiesToDraft()
     }
 }
+ 

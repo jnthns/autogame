@@ -1,3 +1,4 @@
+import Foundation
 import UIKit
 
 // Models for expense tracking
@@ -159,12 +160,64 @@ struct ExpenseTable: Codable {
     }
 }
 
-struct Activity: Codable {
-    enum Section: String, CaseIterable, Codable {
+struct Activity: Codable, Hashable {
+    let id: String
+    var title: String
+    var notes: String?
+    var section: Section
+    var priority: Priority
+    var duration: TimeInterval?
+    var location: String?
+    var url: URL?
+    var colorHex: String?
+    
+    init(id: String = UUID().uuidString,
+         title: String,
+         notes: String? = nil,
+         section: Section,
+         priority: Priority = .medium,
+         duration: TimeInterval? = nil,
+         location: String? = nil,
+         url: URL? = nil,
+         colorHex: String? = nil) {
+        self.id = id
+        self.title = title
+        self.notes = notes
+        self.section = section
+        self.priority = priority
+        self.duration = duration
+        self.location = location
+        self.url = url
+        self.colorHex = colorHex
+    }
+    
+    // Compatibility initializer matching legacy parameter order
+    init(id: String = UUID().uuidString,
+         section: Section,
+         title: String,
+         notes: String? = nil,
+         durationMinutes: Int? = nil,
+         colorHex: String? = nil) {
+        self.id = id
+        self.section = section
+        self.title = title
+        self.notes = notes
+        self.priority = .medium
+        if let mins = durationMinutes {
+            self.duration = TimeInterval(mins * 60)
+        } else {
+            self.duration = nil
+        }
+        self.location = nil
+        self.url = nil
+        self.colorHex = colorHex
+    }
+    
+    enum Section: String, CaseIterable, Codable, Hashable {
         case morning = "Morning"
         case afternoon = "Afternoon"
         case evening = "Evening"
-
+        
         var order: Int {
             switch self {
             case .morning: return 0
@@ -172,36 +225,61 @@ struct Activity: Codable {
             case .evening: return 2
             }
         }
+        
+        var title: String { rawValue }
     }
-
-    enum Priority: String, Codable {
-        case priority = "Priority"
-        case normal = "Normal"
-        case skippable = "Skippable"
-
-        var color: UIColor {
-            switch self {
-            case .priority: return .systemRed
-            case .normal: return .systemGreen
-            case .skippable: return .systemYellow
+    
+    enum Priority: String, CaseIterable, Codable, Hashable {
+        case low = "Low"
+        case medium = "Medium"
+        case high = "High"
+    }
+    
+    // Update uiColor to fallback to colorHex if provided
+    var uiColor: UIColor {
+        if let hex = colorHex, let color = UIColor(hex: hex) { return color }
+        switch priority {
+        case .low: return .systemGreen
+        case .medium: return .systemOrange
+        case .high: return .systemRed
+        }
+    }
+    
+    // Backwards compatibility: allow access via durationMinutes in minutes
+    var durationMinutes: Int? {
+        get {
+            guard let dur = duration else { return nil }
+            return Int(dur / 60)
+        }
+        set {
+            if let newVal = newValue {
+                duration = TimeInterval(newVal * 60)
+            } else {
+                duration = nil
             }
         }
     }
+    
+    // MARK: - Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: Activity, rhs: Activity) -> Bool {
+        lhs.id == rhs.id
+    }
+}
 
-    var id: UUID = UUID()
-    var section: Section
-    var title: String
-    var notes: String?
-    var priority: Priority = .normal
-
-    // Expected time in minutes (increments of 30)
-    var durationMinutes: Int?
-
-    // Color coding (stored as hex string)
-    var colorHex: String?
-
-    var uiColor: UIColor {
-        return priority.color
+extension UIColor {
+    convenience init?(hex: String) {
+        var hexString = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if hexString.hasPrefix("#") { hexString.removeFirst() }
+        guard hexString.count == 6,
+              let rgb = UInt32(hexString, radix: 16) else { return nil }
+        let r = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
+        let g = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
+        let b = CGFloat(rgb & 0x0000FF) / 255.0
+        self.init(red: r, green: g, blue: b, alpha: 1.0)
     }
 }
 

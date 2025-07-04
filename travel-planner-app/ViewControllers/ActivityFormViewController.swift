@@ -357,7 +357,7 @@ class ActivityFormViewController: UIViewController {
         let finalNotes = notes.isEmpty ? nil : notes
         
         return Activity(
-            id: activity?.id ?? UUID(),
+            id: activity?.id ?? UUID().uuidString,
             section: section,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             notes: finalNotes,
@@ -399,6 +399,20 @@ extension ActivityFormViewController: UITextViewDelegate {
     }
 }
 
+// MARK: - UIPickerViewDataSource/Delegate
+extension ActivityFormViewController: UIPickerViewDataSource, UIPickerViewDelegate {
+    func numberOfComponents(in pickerView: UIPickerView) -> Int { 1 }
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+        durationOptions.count
+    }
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+        "\(durationOptions[row]) min"
+    }
+    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+        selectedDuration = durationOptions[row]
+    }
+} 
+
 // MARK: - UIColor Extension
 extension UIColor {
     func toHexString() -> String {
@@ -412,19 +426,5 @@ extension UIColor {
     
     func isEqual(_ color: UIColor) -> Bool {
         return self.toHexString() == color.toHexString()
-    }
-}
-
-// MARK: - UIPickerViewDataSource/Delegate
-extension ActivityFormViewController: UIPickerViewDataSource, UIPickerViewDelegate {
-    func numberOfComponents(in pickerView: UIPickerView) -> Int { 1 }
-    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
-        durationOptions.count
-    }
-    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
-        "\(durationOptions[row]) min"
-    }
-    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
-        selectedDuration = durationOptions[row]
     }
 } 

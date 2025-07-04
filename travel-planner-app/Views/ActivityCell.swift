@@ -86,7 +86,7 @@ class ActivityCell: UITableViewCell {
         }
         notesLabel.isHidden = activity.notes?.isEmpty ?? true
     }
-}
+} 
 
 extension ActivityCell: DateRangePickerDelegate {
     func dateRangePicker(_ vc: DateRangePickerViewController,
