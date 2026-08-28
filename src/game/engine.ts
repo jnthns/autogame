@@ -3,6 +3,15 @@ import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
+import {
+  getBossEncounter,
+  isBossRound,
+  lossDamage,
+  makeBossUnits,
+  roundIncome,
+  shopWeight,
+  unitPower,
+} from './hyperRoll';
 import type {
   ActiveTrait,
   Combatant,
@@ -24,11 +33,23 @@ export function resetUidCounter() {
   uidCounter = 0;
 }
 
-export function createGame(mode: GameMode, opts?: { speed?: CombatSpeed }): GameState {
+export function pickBotDraft(): string[] {
+  const low = HEROES.filter((h) => h.cost <= 2).sort(() => Math.random() - 0.5);
+  const mid = HEROES.filter((h) => h.cost === 3).sort(() => Math.random() - 0.5);
+  const high = HEROES.filter((h) => h.cost >= 4).sort(() => Math.random() - 0.5);
+  const pick = (arr: typeof HEROES, n: number) => arr.slice(0, Math.min(n, arr.length));
+  return [...pick(low, 2), ...pick(mid, 2), ...pick(high, 2)].map((h) => h.id);
+}
+
+export function createGame(
+  mode: GameMode,
+  opts?: { speed?: CombatSpeed; startRound?: number; draft?: string[] },
+): GameState {
   const hp = MATCH_DEFAULTS.startHealth;
   const speed = opts?.speed === 2 || opts?.speed === 4 ? opts.speed : 1;
-  return {
+  const g: GameState = {
     mode,
+    matchRounds: MATCH_DEFAULTS.matchRounds,
     round: 1,
     gold: mode === 'practice' ? 999 : 14,
     myHp: hp,
@@ -39,24 +60,68 @@ export function createGame(mode: GameMode, opts?: { speed?: CombatSpeed }): Game
     bench: [],
     board: [],
     foe: [],
+    foeBench: [],
+    foeGold: mode === 'practice' ? 0 : 14,
+    foeDraft: mode === 'practice' ? [] : pickBotDraft(),
+    foeShop: [],
     shop: [],
+    freeRerolls: 0,
     sel: null,
     speed,
     phase: 'plan',
     log: '',
     lastResult: null,
   };
+  if (mode === 'bot') {
+    runBotTurn(g);
+    const target = opts?.startRound;
+    if (target && target > 1) {
+      fastForwardMatch(g, target);
+      seedDebugPlayer(g, opts.draft ?? [], target);
+    }
+  }
+  return g;
+}
+
+function seedDebugPlayer(g: GameState, draft: string[], round: number): void {
+  const pool = (draft.length ? draft : HEROES.slice(0, 6).map((h) => h.id)).slice(0, 6);
+  const n = Math.min(cap(round, g.matchRounds), Math.max(3, pool.length));
+  const star: 1 | 2 = round >= 8 ? 2 : 1;
+  for (let i = 0; i < n; i++) {
+    g.board.push({
+      u: uid(),
+      hid: pool[i % pool.length],
+      star,
+      relics: [],
+      r: 4 + Math.floor(i / 4),
+      c: i % 4,
+    });
+  }
+  g.gold = Math.max(g.gold, 18);
+}
+
+function fastForwardMatch(g: GameState, target: number): void {
+  const capR = Math.min(target, g.matchRounds);
+  for (let r = 1; r < capR; r++) {
+    g.round++;
+    g.gold += roundIncome(g.round, false);
+    g.foeGold += roundIncome(g.round, null);
+    runBotTurn(g);
+  }
+  g.phase = 'plan';
+  g.sel = null;
+  g.lastResult = null;
 }
 
 export function cap(round: number, maxR: number = MATCH_DEFAULTS.matchRounds): number {
   return CAPS[Math.min(round, maxR) - 1] ?? CAPS[CAPS.length - 1];
 }
 
-export function rollShop(g: GameState, draft: string[], silent = false): void {
+export function rollShopOffers(draft: string[]): (string | null)[] {
   const pool = draft.length ? draft : HEROES.slice(0, 6).map((h) => h.id);
-  const w = pool.map((id) => Math.max(1, 7 - HERO_MAP[id].cost));
+  const w = pool.map((id) => shopWeight(HERO_MAP[id].cost));
   const tot = w.reduce((a, b) => a + b, 0);
-  g.shop = [0, 0, 0, 0, 0].map(() => {
+  return [0, 0, 0, 0, 0].map(() => {
     let r = Math.random() * tot;
     for (let i = 0; i < pool.length; i++) {
       r -= w[i];
@@ -64,6 +129,10 @@ export function rollShop(g: GameState, draft: string[], silent = false): void {
     }
     return pool[0];
   });
+}
+
+export function rollShop(g: GameState, draft: string[], silent = false): void {
+  g.shop = rollShopOffers(draft);
   void silent;
 }
 
@@ -181,16 +250,20 @@ function swapUnits(
   }
 }
 
-export function mergeUnits(g: GameState, onPop?: (r: number, c: number, text: string) => void): void {
+export function mergeUnitLists(
+  board: Unit[],
+  bench: Unit[],
+  onPop?: (r: number, c: number, text: string) => void,
+): void {
   let changed = true;
   while (changed) {
     changed = false;
     for (const star of [1, 2] as const) {
       const groups: Record<string, { u: Unit; on: 'bench' | 'board' }[]> = {};
-      g.bench.forEach((u) => {
+      bench.forEach((u) => {
         if (u.star === star) (groups[u.hid] = groups[u.hid] || []).push({ u, on: 'bench' });
       });
-      g.board.forEach((u) => {
+      board.forEach((u) => {
         if (u.star === star) (groups[u.hid] = groups[u.hid] || []).push({ u, on: 'board' });
       });
       for (const hid in groups) {
@@ -207,7 +280,7 @@ export function mergeUnits(g: GameState, onPop?: (r: number, c: number, text: st
         );
         const spot = host.on === 'board' ? { r: host.u.r!, c: host.u.c! } : null;
         take.forEach((x) => {
-          const l = x.on === 'bench' ? g.bench : g.board;
+          const l = x.on === 'bench' ? bench : board;
           const i = l.findIndex((y) => y.u === x.u.u);
           if (i >= 0) l.splice(i, 1);
         });
@@ -215,9 +288,9 @@ export function mergeUnits(g: GameState, onPop?: (r: number, c: number, text: st
         if (spot) {
           nu.r = spot.r;
           nu.c = spot.c;
-          g.board.push(nu);
+          board.push(nu);
         } else {
-          g.bench.push(nu);
+          bench.push(nu);
         }
         onPop?.(
           spot ? spot.r : 7,
@@ -232,9 +305,151 @@ export function mergeUnits(g: GameState, onPop?: (r: number, c: number, text: st
   }
 }
 
+export function mergeUnits(g: GameState, onPop?: (r: number, c: number, text: string) => void): void {
+  mergeUnitLists(g.board, g.bench, onPop);
+}
+
+/** TFT/DAC-style: 1★ refunds full cost; combined units pay a small combine tax. */
 export function sellValue(u: Unit): number {
   const cost = HERO_MAP[u.hid].cost;
-  return Math.max(1, cost * (u.star === 3 ? 5 : u.star === 2 ? 3 : 1) - (u.star === 1 ? 0 : 1));
+  if (u.star === 1) return cost;
+  if (u.star === 2) return Math.max(1, cost * 3 - 1);
+  return Math.max(1, cost * 5 - 1);
+}
+
+export function combatOpponents(g: GameState): Unit[] {
+  if (g.mode === 'bot' && isBossRound(g.round)) return makeBossUnits(g.round);
+  return g.foe;
+}
+
+function placeBotBoard(units: Unit[], capN: number): { board: Unit[]; bench: Unit[] } {
+  const ranked = units.slice().sort((a, b) => unitPower(b) - unitPower(a));
+  const board = ranked.slice(0, capN);
+  const bench = ranked.slice(capN);
+  const tanks = board.filter((u) => (HERO_MAP[u.hid]?.range ?? 1) <= 1);
+  const ranged = board.filter((u) => (HERO_MAP[u.hid]?.range ?? 1) > 1);
+  const cells: { r: number; c: number }[] = [];
+  for (const r of [3, 2, 1, 0]) {
+    for (const c of [1, 2, 0, 3]) cells.push({ r, c });
+  }
+  const backCells: { r: number; c: number }[] = [];
+  for (const r of [0, 1, 2, 3]) {
+    for (const c of [1, 2, 0, 3]) backCells.push({ r, c });
+  }
+  const used = new Set<string>();
+  const takeCell = (pool: { r: number; c: number }[]) => {
+    const cell = pool.find((p) => !used.has(`${p.r},${p.c}`));
+    return cell ?? cells.find((p) => !used.has(`${p.r},${p.c}`));
+  };
+  tanks.forEach((u) => {
+    const pos = takeCell(cells);
+    if (!pos) return;
+    used.add(`${pos.r},${pos.c}`);
+    u.r = pos.r;
+    u.c = pos.c;
+  });
+  ranged.forEach((u) => {
+    const pos = takeCell(backCells);
+    if (!pos) return;
+    used.add(`${pos.r},${pos.c}`);
+    u.r = pos.r;
+    u.c = pos.c;
+  });
+  bench.forEach((u) => {
+    delete u.r;
+    delete u.c;
+  });
+  return { board, bench };
+}
+
+function botOwns(g: GameState, hid: string): boolean {
+  return g.foe.some((u) => u.hid === hid) || g.foeBench.some((u) => u.hid === hid);
+}
+
+function botBuy(g: GameState, i: number): boolean {
+  const hid = g.foeShop[i];
+  if (!hid) return false;
+  const cost = HERO_MAP[hid].cost;
+  if (g.foeGold < cost || g.foeBench.length >= 8) return false;
+  g.foeGold -= cost;
+  g.foeShop = g.foeShop.map((s, j) => (j === i ? null : s));
+  g.foeBench.push({ u: uid(), hid, star: 1, relics: [] });
+  return true;
+}
+
+function botWanted(g: GameState, hid: string): boolean {
+  if (botOwns(g, hid)) return true;
+  const cost = HERO_MAP[hid].cost;
+  const capN = cap(g.round, g.matchRounds);
+  const onField = g.foe.length + g.foeBench.length;
+  if (onField < capN) return true;
+  if (cost <= 2 && g.round <= 4) return true;
+  if (cost >= 4 && g.round >= 7 && g.foeGold >= cost + MATCH_DEFAULTS.rerollCost) return true;
+  return false;
+}
+
+function botSellWeakest(g: GameState): boolean {
+  const pool = g.foeBench.length ? g.foeBench : g.foe.filter((u) => u.star === 1);
+  if (!pool.length) return false;
+  let worst = pool[0];
+  let worstP = unitPower(worst);
+  pool.forEach((u) => {
+    const p = unitPower(u);
+    if (p < worstP || (p === worstP && u.star < worst.star)) {
+      worst = u;
+      worstP = p;
+    }
+  });
+  const list = g.foeBench.includes(worst) ? g.foeBench : g.foe;
+  const idx = list.findIndex((x) => x.u === worst.u);
+  if (idx < 0) return false;
+  g.foeGold += sellValue(worst);
+  list.splice(idx, 1);
+  return true;
+}
+
+export function runBotTurn(g: GameState): void {
+  if (g.mode !== 'bot') return;
+  g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id));
+
+  const tryBuys = () => {
+    let bought = false;
+    for (let i = 0; i < g.foeShop.length; i++) {
+      const hid = g.foeShop[i];
+      if (!hid || !botWanted(g, hid)) continue;
+      if (g.foeBench.length >= 8) botSellWeakest(g);
+      if (botBuy(g, i)) bought = true;
+    }
+    mergeUnitLists(g.foe, g.foeBench);
+    return bought;
+  };
+
+  for (let pass = 0; pass < 5; pass++) {
+    if (!tryBuys()) break;
+  }
+
+  const usefulLeft = g.foeShop.some((hid) => hid && botOwns(g, hid));
+  if (!usefulLeft && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
+    g.foeGold -= MATCH_DEFAULTS.rerollCost;
+    g.foeShop = rollShopOffers(g.foeDraft);
+    tryBuys();
+    tryBuys();
+  }
+
+  while (g.foeBench.length > 8) botSellWeakest(g);
+
+  const placed = placeBotBoard([...g.foe, ...g.foeBench], cap(g.round, g.matchRounds));
+  g.foe = placed.board;
+  g.foeBench = placed.bench;
+
+  if (!g.foe.length) {
+    const hid = g.foeDraft[0] || 'golem';
+    const cost = HERO_MAP[hid].cost;
+    if (g.foeGold >= cost || g.foeGold >= 1) {
+      g.foeGold = Math.max(0, g.foeGold - Math.min(g.foeGold, cost));
+      g.foe.push({ u: uid(), hid, star: 1, relics: [], r: 3, c: 1 });
+    }
+  }
 }
 
 const FOE_SCALE: Record<Difficulty, { hp: number; atk: number; extra: number }> = {
@@ -286,6 +501,8 @@ export function scaleFoeCombatants(list: Combatant[], difficulty: Difficulty): v
 export function combatant(u: Unit, side: 'me' | 'foe'): Combatant {
   const h = HERO_MAP[u.hid];
   const m = STARMUL[u.star];
+  const hpScale = u.scaleHp ?? 1;
+  const atkScale = u.scaleAtk ?? 1;
   const o: Combatant = {
     u: u.u,
     hid: u.hid,
@@ -294,10 +511,10 @@ export function combatant(u: Unit, side: 'me' | 'foe'): Combatant {
     r: u.r!,
     c: u.c!,
     glyph: h.glyph,
-    name: h.name,
-    maxHp: Math.round(h.hp * m),
+    name: u.boss ? `${h.name}` : h.name,
+    maxHp: Math.round(h.hp * m * hpScale),
     hp: 0,
-    atk: h.dmg * m,
+    atk: h.dmg * m * atkScale,
     as: h.as,
     range: h.range,
     crit: h.crit,
@@ -318,6 +535,7 @@ export function combatant(u: Unit, side: 'me' | 'foe'): Combatant {
     mv: 0.4,
     alive: true,
     cast2: false,
+    boss: !!u.boss,
   };
   o.hp = o.maxHp;
   (u.relics || []).forEach((rid) => {
@@ -854,6 +1072,7 @@ export class CombatEngine {
 
 export const gameActions = {
   buy(g: GameState, i: number) {
+    if (g.phase !== 'plan') return;
     const hid = g.shop[i];
     if (!hid) return;
     const cost = HERO_MAP[hid].cost;
@@ -864,7 +1083,7 @@ export const gameActions = {
   },
 
   sell(g: GameState) {
-    if (!g.sel) return;
+    if (g.phase !== 'plan' || !g.sel) return;
     const list = g.sel.from === 'bench' ? g.bench : g.board;
     const idx = list.findIndex((x) => x.u === g.sel!.u);
     if (idx < 0) return;
@@ -875,7 +1094,17 @@ export const gameActions = {
   },
 
   reroll(g: GameState, draft: string[]) {
-    const cost = g.mode === 'practice' ? 0 : MATCH_DEFAULTS.rerollCost;
+    if (g.phase !== 'plan') return;
+    if (g.mode === 'practice') {
+      rollShop(g, draft);
+      return;
+    }
+    if (g.freeRerolls > 0) {
+      g.freeRerolls--;
+      rollShop(g, draft);
+      return;
+    }
+    const cost = MATCH_DEFAULTS.rerollCost;
     if (g.gold < cost) return;
     g.gold -= cost;
     rollShop(g, draft);
@@ -919,22 +1148,52 @@ export const gameActions = {
   resolveRound(g: GameState, win: boolean, maxR: number): OverlayKind {
     g.phase = 'result';
     if (g.mode === 'practice') {
-      g.foe = [];
       return { kind: 'spar' as const, win };
     }
+    const boss = getBossEncounter(g.round);
     let dmg = 0;
+    if (boss) {
+      if (win) {
+        g.lossStreak = 0;
+        g.gold += boss.reward.gold;
+        g.freeRerolls += boss.reward.freeRerolls;
+        g.lastResult = { win: true, dmg: 0, boss: true };
+        const over = g.myHp <= 0 || g.foeHp <= 0 || g.round >= maxR;
+        if (over) return { kind: 'over' as const, win: g.foeHp <= 0 || (g.myHp > 0 && g.foeHp < g.myHp) };
+        return {
+          kind: 'result' as const,
+          win: true,
+          dmg: 0,
+          offer: boss.reward.relic,
+          boss: { name: boss.name, period: boss.period, reward: boss.reward },
+        };
+      }
+      g.lossStreak++;
+      dmg = lossDamage(g.round, g.lossStreak);
+      g.myHp = Math.max(0, g.myHp - dmg);
+      g.lastResult = { win: false, dmg, boss: true };
+      const over = g.myHp <= 0 || g.foeHp <= 0 || g.round >= maxR;
+      if (over) return { kind: 'over' as const, win: false };
+      return {
+        kind: 'result' as const,
+        win: false,
+        dmg,
+        offer: false,
+        boss: { name: boss.name, period: boss.period },
+      };
+    }
     if (win) {
       g.foeLossStreak++;
       g.lossStreak = 0;
-      dmg = 8 + 4 * (g.foeLossStreak - 1) + Math.floor(g.round / 3) * 2;
+      dmg = lossDamage(g.round, g.foeLossStreak);
       g.foeHp = Math.max(0, g.foeHp - dmg);
     } else {
       g.lossStreak++;
       g.foeLossStreak = 0;
-      dmg = 8 + 4 * (g.lossStreak - 1) + Math.floor(g.round / 3) * 2;
+      dmg = lossDamage(g.round, g.lossStreak);
       g.myHp = Math.max(0, g.myHp - dmg);
     }
-    g.lastResult = { win, dmg };
+    g.lastResult = { win, dmg, boss: false };
     const over = g.myHp <= 0 || g.foeHp <= 0 || g.round >= maxR;
     if (over) return { kind: 'over' as const, win: g.foeHp <= 0 || (g.myHp > 0 && g.foeHp < g.myHp) };
     const offer = win && (g.round % 2 === 1 || g.round >= 7);
@@ -942,14 +1201,20 @@ export const gameActions = {
   },
 
   nextRound(g: GameState, draft: string[]) {
+    const pvpWin = g.lastResult && !g.lastResult.boss ? g.lastResult.win : null;
+    const botPvpWin = g.lastResult && !g.lastResult.boss ? !g.lastResult.win : null;
     g.round++;
-    g.foe = [];
     g.phase = 'plan';
-    g.gold +=
-      g.mode === 'practice'
-        ? 0
-        : 5 + (g.lastResult?.win ? 2 : 0) + Math.min(3, Math.floor(g.round / 4));
+    g.sel = null;
+    if (g.mode === 'practice') {
+      g.foe = [];
+      rollShop(g, draft, true);
+      return;
+    }
+    g.gold += roundIncome(g.round, pvpWin);
+    g.foeGold += roundIncome(g.round, botPvpWin);
     rollShop(g, draft, true);
+    runBotTurn(g);
   },
 
   bindRelic(_g: GameState, rid: string, u: Unit) {

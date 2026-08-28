@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, MATCH_DEFAULTS, RUST, SAF } from '../data/constants';
+import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, RUST, SAF } from '../data/constants';
 import {
   battlegroundUnlocked,
   newlyUnlockedBattlegrounds,
@@ -18,6 +18,7 @@ import {
   cap,
   CombatEngine,
   combatant,
+  combatOpponents,
   createGame,
   gameActions,
   makeFoeBoard,
@@ -27,6 +28,7 @@ import {
   rollShop,
   scaleFoeCombatants,
 } from '../game/engine';
+import { debugRoundFromUrl } from '../game/hyperRoll';
 import type {
   Combatant,
   CombatFx,
@@ -151,7 +153,11 @@ export function useGame() {
       resetUidCounter();
       engineRef.current = null;
       setCombatants(null);
-      const g = createGame(mode, { speed: settingsRef.current.defaultSpeed });
+      const g = createGame(mode, {
+        speed: settingsRef.current.defaultSpeed,
+        startRound: mode === 'bot' ? debugRoundFromUrl() : undefined,
+        draft,
+      });
       rollShop(g, draft, true);
       setGame(g);
       setOverlay(null);
@@ -179,7 +185,7 @@ export function useGame() {
     (win: boolean) => {
       const g = gameRef.current;
       if (!g) return;
-      let result = gameActions.resolveRound(g, win, MATCH_DEFAULTS.matchRounds);
+      let result = gameActions.resolveRound(g, win, g.matchRounds);
       if (result.kind === 'over' && g.mode === 'bot') {
         const before = progressRef.current;
         let next: ProgressState = { ...before, botMatches: before.botMatches + 1 };
@@ -215,9 +221,9 @@ export function useGame() {
       return;
     }
     const difficulty = g.mode === 'bot' ? settingsRef.current.difficulty : 'normal';
-    makeFoeBoard(g, difficulty);
+    if (g.mode === 'practice') makeFoeBoard(g, difficulty);
     const mine = g.board.map((u) => combatant(u, 'me'));
-    const theirs = g.foe.map((u) => combatant(u, 'foe'));
+    const theirs = combatOpponents(g).map((u) => combatant(u, 'foe'));
     applyTraits(mine);
     applyTraits(theirs);
     if (g.mode === 'bot') scaleFoeCombatants(theirs, difficulty);
@@ -280,7 +286,7 @@ export function useGame() {
     (u: Parameters<typeof gameActions.tapUnit>[1], from: 'bench' | 'board') => {
       const g = gameRef.current;
       if (!g) return;
-      gameActions.tapUnit(g, u, from, MATCH_DEFAULTS.matchRounds);
+      gameActions.tapUnit(g, u, from, g.matchRounds);
       syncGame(g);
     },
     [syncGame],
@@ -290,7 +296,7 @@ export function useGame() {
     (r: number, c: number) => {
       const g = gameRef.current;
       if (!g) return;
-      gameActions.tapCell(g, r, c, MATCH_DEFAULTS.matchRounds, (text) =>
+      gameActions.tapCell(g, r, c, g.matchRounds, (text) =>
         pop(6, 1, text, RUST, '12px'),
       );
       syncGame(g);
@@ -390,7 +396,7 @@ export function useGame() {
     chooseRelic,
     bindRelic,
     autoDraft,
-    cap: game ? cap(game.round) : 3,
+    cap: game ? cap(game.round, game.matchRounds) : 3,
   };
 }
 

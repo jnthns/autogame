@@ -88,15 +88,15 @@ export function ModesScreen({ onBack, onPractice, onBot, difficulty }: ModesScre
             }}
           >
             <span className="slab" style={{ fontSize: 24, lineHeight: 1, color: BONE }}>
-              BOT MATCH
+              HYPER ROLL
             </span>
             <span style={{ fontSize: 25, color: SAF }}>☳</span>
           </div>
           <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
-            Twelve rounds against the Adversary. Match wins unseal sealed omens — some ask for a synergy, not just a count.
+            Thirteen rounds against the Adversary. Period bosses on 4, 8 and 12; round 13 is the final fight. Wins unseal sealed omens — some ask for a synergy, not just a count.
           </div>
           <div style={{ display: 'flex', gap: 7, padding: '0 16px 16px', flexWrap: 'wrap' }}>
-            {['Hyper roll', 'Relics', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
+            {['Hyper roll', 'Period bosses', 'Relics', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
               <span
                 key={tag}
                 style={{
