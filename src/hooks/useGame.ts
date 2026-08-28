@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, RUST, SAF } from '../data/constants';
+import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, PLAYER_ROW_START, RUST, SAF } from '../data/constants';
 import {
   battlegroundUnlocked,
   newlyUnlockedBattlegrounds,
@@ -220,7 +220,7 @@ export function useGame() {
     const g = gameRef.current;
     if (!g || g.phase !== 'plan') return;
     if (!g.board.length) {
-      pop(6, 1, 'PLACE A CREATURE', RUST, '12px');
+      pop(PLAYER_ROW_START + 1, 1, 'PLACE A CREATURE', RUST, '12px');
       return;
     }
     const difficulty = isRankedMode(g.mode) ? settingsRef.current.difficulty : 'normal';
@@ -303,7 +303,7 @@ export function useGame() {
       const g = gameRef.current;
       if (!g) return;
       gameActions.tapCell(g, r, c, g.matchRounds, (text) =>
-        pop(6, 1, text, RUST, '12px'),
+        pop(PLAYER_ROW_START + 1, 1, text, RUST, '12px'),
       );
       mergeUnits(g, (r2, c2, text) => pop(r2, c2, text));
       syncGame(g);
@@ -403,7 +403,7 @@ export function useGame() {
     chooseRelic,
     bindRelic,
     autoDraft,
-    cap: game ? cap(game.round, game.matchRounds) : 3,
+    cap: game ? cap(game.round, game.matchRounds, game.mode) : 3,
   };
 }
 

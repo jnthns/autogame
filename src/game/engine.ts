@@ -1,4 +1,17 @@
-import { CAPS, MARATHON, MATCH_DEFAULTS, SAF, STARMUL } from '../data/constants';
+import {
+  BOARD_COLS,
+  BOARD_ROWS,
+  BOARD_SIDE_ROWS,
+  BOSS_FOOTPRINT,
+  BOT_BOARD_CAPS,
+  MARATHON,
+  MARATHON_BOARD_CAPS,
+  MATCH_DEFAULTS,
+  PLAYER_ROW_START,
+  PRACTICE_BOARD_CAP,
+  SAF,
+  STARMUL,
+} from '../data/constants';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
@@ -126,8 +139,29 @@ function fastForwardMatch(g: GameState, target: number): void {
   g.lastResult = null;
 }
 
-export function cap(round: number, maxR: number = MATCH_DEFAULTS.matchRounds): number {
-  return CAPS[Math.min(round, maxR) - 1] ?? CAPS[CAPS.length - 1];
+export function cap(round: number, maxR: number = MATCH_DEFAULTS.matchRounds, mode: GameMode = 'bot'): number {
+  if (mode === 'practice') return PRACTICE_BOARD_CAP;
+  const table =
+    mode === 'marathon' || maxR > MATCH_DEFAULTS.matchRounds ? MARATHON_BOARD_CAPS : BOT_BOARD_CAPS;
+  return table[Math.min(round, maxR) - 1] ?? table[table.length - 1];
+}
+
+export function unitFootprint(u: { footprint?: number; boss?: boolean }): number {
+  return u.footprint ?? (u.boss ? BOSS_FOOTPRINT : 1);
+}
+
+export function occupiesCell(u: { r: number; c: number; footprint?: number; boss?: boolean }, r: number, c: number): boolean {
+  const fp = unitFootprint(u);
+  return r >= u.r && r < u.r + fp && c >= u.c && c < u.c + fp;
+}
+
+function unitCenter(u: { r: number; c: number; footprint?: number; boss?: boolean }) {
+  const fp = unitFootprint(u);
+  return { r: u.r + (fp - 1) / 2, c: u.c + (fp - 1) / 2 };
+}
+
+function cellBlocked(C: Combatant[], r: number, c: number, skip?: string): boolean {
+  return C.some((o) => o.alive && o.u !== skip && occupiesCell(o, r, c));
 }
 
 export function rollShopOffers(draft: string[]): (string | null)[] {
@@ -225,7 +259,7 @@ function moveToBench(g: GameState, u: Unit): void {
 function moveToBoard(g: GameState, u: Unit, r: number, c: number, maxR: number): boolean {
   const i = g.bench.findIndex((x) => x.u === u.u);
   if (i >= 0) {
-    if (g.board.length >= cap(g.round, maxR)) return false;
+    if (g.board.length >= cap(g.round, maxR, g.mode)) return false;
     g.bench.splice(i, 1);
     g.board.push(u);
   }
@@ -385,12 +419,12 @@ function placeBotBoard(units: Unit[], capN: number): { board: Unit[]; bench: Uni
   const tanks = board.filter((u) => (HERO_MAP[u.hid]?.range ?? 1) <= 1);
   const ranged = board.filter((u) => (HERO_MAP[u.hid]?.range ?? 1) > 1);
   const cells: { r: number; c: number }[] = [];
-  for (const r of [3, 2, 1, 0]) {
-    for (const c of [1, 2, 0, 3]) cells.push({ r, c });
+  for (const r of [5, 4, 3, 2, 1, 0]) {
+    for (const c of [2, 3, 1, 4, 0, 5]) cells.push({ r, c });
   }
   const backCells: { r: number; c: number }[] = [];
-  for (const r of [0, 1, 2, 3]) {
-    for (const c of [1, 2, 0, 3]) backCells.push({ r, c });
+  for (const r of [0, 1, 2, 3, 4, 5]) {
+    for (const c of [2, 3, 1, 4, 0, 5]) backCells.push({ r, c });
   }
   const used = new Set<string>();
   const takeCell = (pool: { r: number; c: number }[]) => {
@@ -514,14 +548,20 @@ const FOE_SCALE: Record<Difficulty, { hp: number; atk: number; extra: number }> 
   mythic: { hp: 1.4, atk: 1.28, extra: 1 },
 };
 
+const BOSS_ATK_SCALE: Record<Difficulty, number> = {
+  normal: 1,
+  hard: 1.12,
+  mythic: 1.28,
+};
+
 export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal'): void {
   const extra = g.mode === 'bot' ? FOE_SCALE[difficulty].extra : 0;
-  const n = Math.min(2 + Math.floor(g.round * 0.45) + extra, 7);
+  const n = Math.min(3 + Math.floor(g.round * 0.7) + extra, 12);
   const ids = HEROES.map((h) => h.id)
     .sort(() => Math.random() - 0.5)
     .slice(0, n);
   const cells: { r: number; c: number }[] = [];
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) cells.push({ r, c });
+  for (let r = 0; r < BOARD_SIDE_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) cells.push({ r, c });
   cells.sort(() => Math.random() - 0.5);
   g.foe = ids.map((hid, i) => {
     let star: 1 | 2 | 3 =
@@ -548,6 +588,10 @@ export function scaleFoeCombatants(list: Combatant[], difficulty: Difficulty): v
   const s = FOE_SCALE[difficulty];
   if (s.hp === 1 && s.atk === 1) return;
   list.forEach((c) => {
+    if (c.boss) {
+      c.atk = Math.round(c.atk * BOSS_ATK_SCALE[difficulty]);
+      return;
+    }
     c.maxHp = Math.round(c.maxHp * s.hp);
     c.hp = c.maxHp;
     c.atk = Math.round(c.atk * s.atk);
@@ -559,6 +603,7 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
   const m = STARMUL[u.star];
   const hpScale = u.scaleHp ?? 1;
   const atkScale = u.scaleAtk ?? 1;
+  const fp = u.boss && hpScale >= 1.5 ? BOSS_FOOTPRINT : 1;
   const o: Combatant = {
     u: u.u,
     hid: u.hid,
@@ -567,7 +612,7 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
     r: u.r!,
     c: u.c!,
     glyph: h.glyph,
-    name: u.boss ? `${h.name}` : h.name,
+    name: h.name,
     maxHp: Math.round(h.hp * m * hpScale * heroHpMul),
     hp: 0,
     atk: h.dmg * m * atkScale,
@@ -592,6 +637,7 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
     alive: true,
     cast2: false,
     boss: !!u.boss,
+    footprint: fp,
   };
   o.hp = o.maxHp;
   (u.relics || []).forEach((rid) => {
@@ -603,13 +649,15 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
 
 export function applyTraits(list: Combatant[]): void {
   const c: Record<string, number> = {};
-  list.forEach((u) =>
+  list.forEach((u) => {
+    if (u.boss) return;
     HERO_MAP[u.hid].traits.forEach((t: string) => {
       c[t] = (c[t] || 0) + 1;
-    }),
-  );
+    });
+  });
   const lvl = (n: string) => c[n] || 0;
   list.forEach((u) => {
+    if (u.boss) return;
     const tr = HERO_MAP[u.hid].traits;
     if (tr.includes('Serpent'))
       u.lifesteal += lvl('Serpent') >= 4 ? 0.35 : lvl('Serpent') >= 2 ? 0.15 : 0;
@@ -645,6 +693,7 @@ export function applyTraits(list: Combatant[]): void {
 
   const cc: Record<string, number> = {};
   list.forEach((u) => {
+    if (u.boss) return;
     const cls = HERO_MAP[u.hid].heroClass;
     cc[cls] = (cc[cls] || 0) + 1;
   });
@@ -738,8 +787,10 @@ export class CombatEngine {
     });
   }
 
-  dist(a: { r: number; c: number }, b: { r: number; c: number }) {
-    return Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c));
+  dist(a: { r: number; c: number; footprint?: number; boss?: boolean }, b: { r: number; c: number; footprint?: number; boss?: boolean }) {
+    const ac = unitCenter(a);
+    const bc = unitCenter(b);
+    return Math.max(Math.abs(ac.r - bc.r), Math.abs(ac.c - bc.c));
   }
 
   target(u: Combatant): Combatant | null {
@@ -757,6 +808,15 @@ export class CombatEngine {
     return best;
   }
 
+  private bossBasicAttack(u: Combatant) {
+    const crit = Math.random() < u.crit;
+    const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
+    const kind = crit ? 'crit' : 'phys';
+    this.enemiesOf(u).forEach((o) => {
+      if (this.dist(u, o) <= u.range) this.hurt(u, o, dmg, kind);
+    });
+  }
+
   hurt(src: Combatant | null, t: Combatant, amount: number, kind: string): number {
     if (!t.alive) return 0;
     let dmg = amount * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
@@ -769,9 +829,10 @@ export class CombatEngine {
     t.hp -= dmg;
     t.mana = Math.min(100, t.mana + 5);
     if (dmg > 0) {
+      const popPos = unitCenter(t);
       this.onPop(
-        t.r,
-        t.c,
+        popPos.r,
+        popPos.c,
         `-${Math.round(dmg)}`,
         kind === 'magic' ? '#4C7BD1' : kind === 'crit' ? SAF : '#F2E9D4',
         '13px',
@@ -787,7 +848,8 @@ export class CombatEngine {
     if (t.hp <= 0) {
       t.alive = false;
       t.hp = 0;
-      this.onPop(t.r, t.c, '✕', '#B4442B', '16px');
+      const popPos = unitCenter(t);
+      this.onPop(popPos.r, popPos.c, '✕', '#B4442B', '16px');
     }
     return dmg;
   }
@@ -807,7 +869,8 @@ export class CombatEngine {
     const got = Math.min(u.maxHp - u.hp, amt);
     if (got <= 0) return;
     u.hp += got;
-    this.onPop(u.r, u.c, `+${Math.round(got)}`, '#1B6B52', '13px');
+    const popPos = unitCenter(u);
+    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, '#1B6B52', '13px');
   }
 
   enemiesOf(u: Combatant) {
@@ -829,8 +892,8 @@ export class CombatEngine {
     for (const [a, b] of tries) {
       const nr = u.r + a;
       const nc = u.c + b;
-      if (nr < 0 || nr > 7 || nc < 0 || nc > 3) continue;
-      if (this.C.some((o) => o.alive && o.r === nr && o.c === nc)) continue;
+      if (nr < 0 || nr > BOARD_ROWS - 1 || nc < 0 || nc > BOARD_COLS - 1) continue;
+      if (cellBlocked(this.C, nr, nc, u.u)) continue;
       u.r = nr;
       u.c = nc;
       return;
@@ -841,7 +904,6 @@ export class CombatEngine {
     u.mana = 0;
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
-    if (u.side === 'me') this.onBanner(HERO_MAP[u.hid].ability);
     this.emitFx(u, t, 'cast');
     const E = this.enemiesOf(u);
     const A = this.alliesOf(u);
@@ -851,6 +913,11 @@ export class CombatEngine {
         .slice(0, n);
 
     switch (u.hid) {
+      case 'boss': {
+        const slam = 220 + sp + u.star * 40;
+        E.forEach((o) => this.hurt(u, o, slam, 'magic'));
+        break;
+      }
       case 'jorm': {
         let tot = 0;
         E.forEach((o) => {
@@ -1074,6 +1141,8 @@ export class CombatEngine {
       const t = this.target(u);
       if (!t) return;
       if (u.mana >= 100 && u.silence <= 0) {
+        if (u.boss) this.onBanner('Cataclysm — all allies struck');
+        else if (u.side === 'me') this.onBanner(HERO_MAP[u.hid].ability);
         this.cast(u, t);
         return;
       }
@@ -1082,9 +1151,13 @@ export class CombatEngine {
         u.cd -= dt;
         if (u.cd <= 0) {
           u.cd = 1 / u.as;
-          const crit = Math.random() < u.crit;
-          const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
-          this.hurt(u, t, dmg, crit ? 'crit' : 'phys');
+          if (u.boss) {
+            this.bossBasicAttack(u);
+          } else {
+            const crit = Math.random() < u.crit;
+            const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
+            this.hurt(u, t, dmg, crit ? 'crit' : 'phys');
+          }
           u.mana = Math.min(100, u.mana + 12);
           if (u.scorch) {
             this.C.forEach((o) => {
@@ -1185,8 +1258,8 @@ export const gameActions = {
   },
 
   tapCell(g: GameState, r: number, c: number, maxR: number, onPop: (text: string) => void) {
-    if (g.phase !== 'plan' || r < 4) return;
-    const occ = g.board.find((u) => u.r === r && u.c === c);
+    if (g.phase !== 'plan' || r < PLAYER_ROW_START) return;
+    const occ = g.board.find((u) => u.r != null && u.c != null && occupiesCell(u as Unit & { r: number; c: number }, r, c));
     if (!g.sel) {
       if (occ) gameActions.tapUnit(g, occ, 'board', maxR);
       return;

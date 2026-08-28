@@ -143,6 +143,8 @@ export interface Combatant {
   buffT?: number;
   buffAs?: number;
   dmgBuff?: number;
+  /** Grid footprint in cells (1 = normal, 3 = multi-tile boss). */
+  footprint?: number;
   boss?: boolean;
 }
 

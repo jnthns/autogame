@@ -5,20 +5,41 @@ export interface SpriteDef {
 
 export const SPRITES: Record<string, SpriteDef> = {
   jorm: {
-    p: { k: '#14120E', g: '#1E6B45', l: '#5CC08A', y: '#F5D547', r: '#D9452B' },
+    p: {
+      k: '#14120E',
+      d: '#0F2E24',
+      g: '#143D30',
+      m: '#1B6B52',
+      l: '#4A9E7A',
+      w: '#B8D4C8',
+      y: '#C9A227',
+      r: '#8B2E1A',
+    },
     d: [
-      '....kkkk....',
-      '..kkggggkk..',
-      '.kkgllllggk.',
-      '.kgll..llgk.',
-      '.kgl.kk.lgk.',
-      '.kgl.kk.lgk.',
-      '.kgll..llgk.',
-      '.kkgllllgkk.',
-      '..kkggggkk..',
-      '...kglgk....',
-      '..kgyllygk..',
-      '...k.rr.k...',
+      'kkkkkk...................',
+      'kgmddgk..................',
+      'kgmyylmdggk..............',
+      'kgdmrrmdggk..............',
+      'kggdmmmdggk..............',
+      'kggddddggkk..............',
+      '.kggdmmmdggk.............',
+      '..kggdmwllmdggk..........',
+      '...kggdmggllmdggk........',
+      '....kggdmwllllmdggk......',
+      '.....kggdggmmggdggk......',
+      '......kggdmwllllmdggk....',
+      '.....kggdmwllllwmdggk....',
+      '....kggdggmmllmmggdggk...',
+      '...kggdmwllllllwmdggk....',
+      '..kggdmmmmdggk...........',
+      '...kggdmwllmdggk.........',
+      '....kggdggmmggdggk.......',
+      '.....kggdmwllllmdggk.....',
+      '......kggdmmmmdggk.......',
+      '.......kggddddggk........',
+      '........kgddgk...........',
+      '.........kggk............',
+      '..........kk.............',
     ],
   },
   quetz: {
@@ -412,6 +433,41 @@ export const SPRITES: Record<string, SpriteDef> = {
       '.....nn.....',
     ],
   },
+  boss: {
+    p: {
+      k: '#14120E',
+      d: '#2A1210',
+      r: '#8B1A1A',
+      m: '#B4442B',
+      o: '#E8A317',
+      y: '#F5C518',
+      w: '#F2E9D4',
+      g: '#4A3A2A',
+    },
+    d: [
+      '........kkkkkkkkkkkk........',
+      '......kkddddddddddkk......',
+      '....kkddrrrrrrrrrrddkk....',
+      '....kddrrrrwwwwrrrrddk....',
+      '...kddrrrwwyyyywwrrrddk...',
+      '...kddrrwwyokkkkoywwrrddk..',
+      '..kddrrwwyokkkkkkoywwrrddk.',
+      '..kddrrwwyokkkkkkoywwrrddk.',
+      '..kddrrwwyokkkkkkoywwrrddk.',
+      '..kddrrwwyokkkkkkoywwrrddk.',
+      '...kddrrwwyokkkkoywwrrddk..',
+      '...kddrrrwwyyyywwrrrddk...',
+      '....kddrrrrwwwwrrrrddk....',
+      '....kkddrrrrrrrrrrddkk....',
+      '......kkddddddddddkk......',
+      '........kkkkkkkkkkkk........',
+      '...........kkkk...........',
+      '..........kggggk..........',
+      '.........kg....gk.........',
+      '.........kg....gk.........',
+      '..........kggggk..........',
+    ],
+  },
 };
 
 const cache: Record<string, string> = {};
@@ -421,14 +477,15 @@ export function spriteCss(id: string): string {
   if (!s) return '';
   if (cache[id]) return cache[id];
 
+  const size = s.d.length;
   const cv = document.createElement('canvas');
-  cv.width = 12;
-  cv.height = 12;
+  cv.width = size;
+  cv.height = size;
   const cx = cv.getContext('2d');
   if (!cx) return '';
 
   s.d.forEach((row, y) => {
-    for (let x = 0; x < 12; x++) {
+    for (let x = 0; x < size; x++) {
       const ch = row[x];
       if (!ch || ch === '.') continue;
       const col = s.p[ch];

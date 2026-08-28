@@ -1,8 +1,12 @@
 import { HERO_MAP } from '../data/heroes';
+import { BOARD_CELL_HEIGHT_PCT, BOARD_CELL_WIDTH_PCT } from '../data/constants';
 import type { CombatFxKind } from './types';
 
 export function cellCenterPct(r: number, c: number) {
-  return { left: c * 25 + 12.5, top: r * 12.5 + 6.25 };
+  return {
+    left: c * BOARD_CELL_WIDTH_PCT + BOARD_CELL_WIDTH_PCT / 2,
+    top: r * BOARD_CELL_HEIGHT_PCT + BOARD_CELL_HEIGHT_PCT / 2,
+  };
 }
 
 export function attackGeometry(fromR: number, fromC: number, toR: number, toC: number) {

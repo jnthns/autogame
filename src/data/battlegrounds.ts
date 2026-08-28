@@ -15,6 +15,8 @@ export interface BattlegroundDef {
   theme: string;
   group: BattlegroundGroup;
   unlock: BattlegroundUnlock;
+  /** Static image path relative to public/ (e.g. img/kitsune-battleground.png). */
+  image?: string;
   p: Record<string, string>;
   d: string[];
 }
@@ -70,6 +72,7 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Kitsune',
     group: 'Starter',
     unlock: { kind: 'always' },
+    image: 'img/kitsune-battleground.png',
     p: { d: '#2A1A12', s: '#3E2A18', e: '#E07A2F', g: '#F0C13B', k: '#14120E' },
     d: [
       'dsdsdsdsdsds',
@@ -202,6 +205,7 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Ifrit',
     group: 'Mastery',
     unlock: { kind: 'wins', n: 50 },
+    image: 'img/ifrit-battleground.png',
     p: { k: '#14120E', a: '#2A1410', r: '#B4442B', o: '#FF6B35', y: '#F5C518' },
     d: [
       'kakakakakaka',
@@ -248,6 +252,20 @@ export const BATTLEGROUND_MAP = Object.fromEntries(BATTLEGROUNDS.map((b) => [b.i
 >;
 
 const tileCache: Record<string, string> = {};
+
+export function battlegroundImageUrl(id: string): string | undefined {
+  const s = BATTLEGROUND_MAP[id];
+  if (!s?.image) return undefined;
+  return `${import.meta.env.BASE_URL}${s.image}`;
+}
+
+export function battlegroundBackgroundUrl(id: string): string {
+  return battlegroundImageUrl(id) ?? battlegroundTileUrl(id);
+}
+
+export function battlegroundUsesImage(id: string): boolean {
+  return Boolean(BATTLEGROUND_MAP[id]?.image);
+}
 
 export function battlegroundTileUrl(id: string): string {
   if (tileCache[id]) return tileCache[id];
