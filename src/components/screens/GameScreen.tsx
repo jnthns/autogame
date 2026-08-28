@@ -1,0 +1,1182 @@
+import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL } from '../../data/constants';
+import { HERO_MAP } from '../../data/heroes';
+import { RELIC_MAP } from '../../data/relics';
+import { spriteCss } from '../../data/sprites';
+import { activeTraits, sellValue, traitCard } from '../../game/engine';
+import type { Combatant, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
+import { PixelSprite } from '../PixelSprite';
+
+interface GameScreenProps {
+  game: GameState;
+  combatants: Combatant[] | null;
+  floaters: Floater[];
+  banner: string;
+  boardCap: number;
+  onQuit: () => void;
+  onTapCell: (r: number, c: number) => void;
+  onTapBench: (u: GameState['bench'][0]) => void;
+  onTapBoard: (u: GameState['board'][0]) => void;
+  onBuy: (i: number) => void;
+  onReroll: () => void;
+  onStartCombat: () => void;
+  onSell: () => void;
+  onInfo: () => void;
+  onToggleSpeed: () => void;
+  onOpenTraits: () => void;
+  onOpenSheet: (u: GameState['board'][0]) => void;
+}
+
+export function GameScreen({
+  game: g,
+  combatants,
+  floaters,
+  banner,
+  boardCap,
+  onQuit,
+  onTapCell,
+  onTapBench,
+  onTapBoard,
+  onBuy,
+  onReroll,
+  onStartCombat,
+  onSell,
+  onInfo,
+  onToggleSpeed,
+  onOpenTraits,
+  onOpenSheet,
+}: GameScreenProps) {
+  const plan = g.phase === 'plan';
+  const combat = g.phase === 'combat';
+  const src: Combatant[] =
+    combatants ??
+    g.board
+      .concat(g.foe)
+      .map((u) => {
+        const h = HERO_MAP[u.hid];
+        const m = STARMUL[u.star];
+        return {
+          u: u.u,
+          hid: u.hid,
+          star: u.star,
+          side: g.foe.some((f) => f.u === u.u) ? ('foe' as const) : ('me' as const),
+          r: u.r!,
+          c: u.c!,
+          glyph: h.glyph,
+          name: h.name,
+          maxHp: Math.round(h.hp * m),
+          hp: Math.round(h.hp * m),
+          atk: h.dmg * m,
+          as: h.as,
+          range: h.range,
+          crit: h.crit,
+          critDmg: 0.8,
+          mana: 0,
+          startMana: 0,
+          sp: 0,
+          dr: 0,
+          lifesteal: 0,
+          shield: 0,
+          amp: 0,
+          stun: 0,
+          silence: 0,
+          snare: 0,
+          burn: 0,
+          burnT: 0,
+          cd: 0,
+          mv: 0,
+          alive: true,
+          cast2: false,
+        };
+      });
+
+  const selUnit = g.sel
+    ? (g.sel.from === 'bench' ? g.bench : g.board).find((x) => x.u === g.sel!.u)
+    : null;
+  const sv = selUnit ? sellValue(selUnit) : 0;
+  const shown = activeTraits(g.board.map((u) => u.hid)).filter((t) => t.count >= 1);
+  const rerollCost = MATCH_DEFAULTS.rerollCost;
+  const canReroll = g.mode === 'practice' || g.gold >= rerollCost;
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: BONE }}>
+      <div style={{ padding: '42px 12px 8px', borderBottom: '3px solid #14120E', background: INK, color: BONE }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={onQuit}
+            style={{
+              width: 28,
+              height: 28,
+              border: '2px solid #6b6455',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              color: BONE,
+            }}
+          >
+            ‹
+          </button>
+          <div className="slab" style={{ fontSize: 15, letterSpacing: '0.02em', color: SAF }}>
+            {g.mode === 'practice' ? 'SANDBOX' : `ROUND ${g.round} / ${MATCH_DEFAULTS.matchRounds}`}
+          </div>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, border: '2px solid #E8A317', padding: '2px 8px' }}>
+            <span style={{ color: SAF, fontSize: 13 }}>◈</span>
+            <span className="mono" style={{ fontWeight: 700, fontSize: 15, color: SAF }}>
+              {g.mode === 'practice' ? '∞' : g.gold}
+            </span>
+          </div>
+          <div className="mono" style={{ border: '2px solid #6b6455', padding: '2px 8px', fontWeight: 700, fontSize: 13 }}>
+            {g.board.length}/{boardCap}
+          </div>
+        </div>
+        {g.mode === 'bot' && (
+          <>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', width: 34, color: '#8f8878' }}>
+                YOU
+              </span>
+              <div style={{ flex: 1, height: 12, border: `2px solid ${BONE}`, background: '#2a2721', position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: `${(g.myHp / g.maxHp) * 100}%`,
+                    background: JADE,
+                    transition: 'width 0.4s',
+                  }}
+                />
+              </div>
+              <span className="mono" style={{ fontSize: 12, width: 26, textAlign: 'right' }}>
+                {g.myHp}
+              </span>
+            </div>
+            <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', width: 34, color: '#8f8878' }}>
+                FOE
+              </span>
+              <div style={{ flex: 1, height: 12, border: `2px solid ${BONE}`, background: '#2a2721', position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: `${(g.foeHp / g.maxHp) * 100}%`,
+                    background: RUST,
+                    transition: 'width 0.4s',
+                  }}
+                />
+              </div>
+              <span className="mono" style={{ fontSize: 12, width: 26, textAlign: 'right' }}>
+                {g.foeHp}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 5,
+          padding: '7px 10px',
+          borderBottom: '2px solid #14120E',
+          background: '#e7dcc2',
+          overflowX: 'auto',
+          minHeight: 34,
+          alignItems: 'center',
+        }}
+      >
+        {shown.map((t) => (
+          <button
+            key={t.name}
+            type="button"
+            onClick={onOpenTraits}
+            style={{
+              flex: '0 0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              border: '2px solid #14120E',
+              padding: '2px 6px',
+              background: t.lvl > 1 ? SAF : t.lvl ? INK : BONE,
+            }}
+          >
+            <span style={{ fontSize: 12, color: t.lvl ? (t.lvl > 1 ? INK : BONE) : '#8a8271' }}>{t.glyph}</span>
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: 10,
+                letterSpacing: '0.07em',
+                textTransform: 'uppercase',
+                color: t.lvl ? (t.lvl > 1 ? INK : BONE) : '#8a8271',
+              }}
+            >
+              {t.name} {t.count}
+            </span>
+          </button>
+        ))}
+        {shown.length === 0 && (
+          <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8271' }}>
+            No synergies active
+          </span>
+        )}
+      </div>
+
+      <div
+        style={{
+          position: 'relative',
+          margin: 0,
+          borderBottom: '3px solid #14120E',
+          background: '#dfd3b6',
+          overflow: 'hidden',
+          flex: '1 1 auto',
+          minHeight: 230,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4,1fr)',
+            gridTemplateRows: 'repeat(8,1fr)',
+          }}
+        >
+          {Array.from({ length: 32 }, (_, i) => {
+            const r = Math.floor(i / 4);
+            const c = i % 4;
+            const mine = r >= 4;
+            const occupied = src.some((u) => u.alive !== false && u.r === r && u.c === c);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onTapCell(r, c)}
+                style={{
+                  borderRight: '1px solid rgba(20,18,14,.16)',
+                  borderBottom: '1px solid rgba(20,18,14,.16)',
+                  background: mine
+                    ? g.sel && !occupied
+                      ? 'rgba(232,163,23,.28)'
+                      : 'rgba(27,107,82,.10)'
+                    : 'rgba(180,68,43,.10)',
+                }}
+              />
+            );
+          })}
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: '50%',
+            height: 3,
+            background: INK,
+            opacity: 0.55,
+            pointerEvents: 'none',
+          }}
+        />
+        {src
+          .filter((u) => u.alive !== false)
+          .map((u) => {
+            const me = u.side === 'me';
+            const sel = g.sel && g.sel.u === u.u;
+            const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
+            const boardUnit = g.board.find((x) => x.u === u.u);
+            return (
+              <div
+                key={u.u}
+                style={{
+                  position: 'absolute',
+                  width: '25%',
+                  height: '12.5%',
+                  left: `${u.c * 25}%`,
+                  top: `${u.r * 12.5}%`,
+                  transition: 'left 0.3s, top 0.3s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  zIndex: sel ? 20 : 10,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!plan || !me) {
+                      if (boardUnit) onOpenSheet(boardUnit);
+                      return;
+                    }
+                    if (boardUnit) {
+                      if (sel) onOpenSheet(boardUnit);
+                      else onTapBoard(boardUnit);
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    width: 38,
+                    height: 38,
+                    border: '2px solid #14120E',
+                    background: me ? INK : '#7a2d1d',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'auto',
+                    boxShadow: sel
+                      ? `0 0 0 3px ${SAF}`
+                      : u.stun > 0
+                        ? '0 0 0 3px #4C7BD1'
+                        : '2px 2px 0 rgba(20,18,14,.35)',
+                  }}
+                >
+                  <PixelSprite src={spriteCss(u.hid)} size={30} />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: -8,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize: 8,
+                      fontWeight: 700,
+                      letterSpacing: '-0.5px',
+                      color: INK,
+                      background: u.star === 3 ? SAF : u.star === 2 ? BONE : '#cfc3a6',
+                      border: '1px solid #14120E',
+                      padding: '0 3px',
+                      lineHeight: '11px',
+                    }}
+                  >
+                    {'★'.repeat(u.star)}
+                  </span>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: -2,
+                      right: -2,
+                      bottom: -7,
+                      height: 5,
+                      background: INK,
+                      border: '1px solid #14120E',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'block',
+                        height: '100%',
+                        width: `${pct * 100}%`,
+                        background: me ? JADE : '#D0553A',
+                      }}
+                    />
+                  </span>
+                  {combat && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: -2,
+                        right: -2,
+                        bottom: -13,
+                        height: 4,
+                        background: INK,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'block',
+                          height: '100%',
+                          width: `${u.mana || 0}%`,
+                          background: '#4C7BD1',
+                        }}
+                      />
+                    </span>
+                  )}
+                  {sel && (
+                    <span
+                      className="slab"
+                      style={{
+                        position: 'absolute',
+                        top: -10,
+                        right: -12,
+                        background: SAF,
+                        border: '2px solid #14120E',
+                        width: 19,
+                        height: 19,
+                        fontWeight: 700,
+                        fontSize: 12,
+                        lineHeight: '15px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      i
+                    </span>
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        {floaters.map((f) => (
+          <div
+            key={f.k}
+            className="mono"
+            style={{
+              position: 'absolute',
+              left: `${f.c * 25}%`,
+              top: `${f.r * 12.5}%`,
+              width: '25%',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              animation: 'omFloat 0.9s ease-out forwards',
+              fontWeight: 700,
+              fontSize: f.size,
+              color: f.color,
+              textShadow: '0 1px 0 #14120E',
+              zIndex: 30,
+            }}
+          >
+            {f.text}
+          </div>
+        ))}
+        {banner && (
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 8, textAlign: 'center', pointerEvents: 'none', zIndex: 31 }}>
+            <span
+              className="slab"
+              style={{
+                display: 'inline-block',
+                background: INK,
+                color: SAF,
+                border: '2px solid #E8A317',
+                padding: '3px 10px',
+                fontSize: 13,
+                animation: 'omStamp 0.3s both',
+              }}
+            >
+              {banner}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 4,
+          padding: '8px 10px',
+          borderBottom: '2px solid #14120E',
+          background: '#e7dcc2',
+          overflowX: 'auto',
+          minHeight: 56,
+          alignItems: 'center',
+        }}
+      >
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+          const u = g.bench[i];
+          if (!u) {
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: '0 0 auto',
+                  width: 40,
+                  height: 40,
+                  border: '2px solid #14120E',
+                  background: BONE,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <span style={{ fontSize: 16, color: '#c3b99e' }}>·</span>
+              </div>
+            );
+          }
+          const sel = g.sel && g.sel.u === u.u;
+          return (
+            <button
+              key={u.u}
+              type="button"
+              onClick={() => onTapBench(u)}
+              style={{
+                flex: '0 0 auto',
+                width: 40,
+                height: 40,
+                border: '2px solid #14120E',
+                background: INK,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                boxShadow: sel ? `0 0 0 3px ${SAF}` : '2px 2px 0 rgba(20,18,14,.3)',
+              }}
+            >
+              <PixelSprite src={spriteCss(u.hid)} size={30} />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -8,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontSize: 8,
+                  fontWeight: 700,
+                  letterSpacing: '-0.5px',
+                  background: u.star === 3 ? SAF : BONE,
+                  border: '1px solid #14120E',
+                  padding: '0 3px',
+                  lineHeight: '11px',
+                }}
+              >
+                {'★'.repeat(u.star)}
+              </span>
+            </button>
+          );
+        })}
+        <div style={{ flex: 1 }} />
+        {selUnit && (
+          <>
+            <button
+              type="button"
+              onClick={onInfo}
+              style={{
+                flex: '0 0 auto',
+                border: '2px solid #14120E',
+                padding: '8px 9px',
+                fontWeight: 700,
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              ⓘ Info
+            </button>
+            <button
+              type="button"
+              onClick={onSell}
+              style={{
+                flex: '0 0 auto',
+                border: '2px solid #B4442B',
+                color: RUST,
+                padding: '8px 9px',
+                fontWeight: 700,
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Sell ◈{sv}
+            </button>
+          </>
+        )}
+      </div>
+
+      <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', background: BONE }}>
+        {plan && (
+          <>
+            <div style={{ display: 'flex', gap: 5, padding: '8px 10px 6px', alignItems: 'stretch' }}>
+              {g.shop.map((hid, i) => {
+                if (!hid) {
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        border: '2px solid #14120E',
+                        background: '#e2d8bf',
+                        padding: '5px 3px 6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 2,
+                        opacity: 0.5,
+                      }}
+                    >
+                      <span style={{ fontSize: 18, lineHeight: '30px', color: '#b3a98f' }}>·</span>
+                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: '#b3a98f' }}>sold</span>
+                    </div>
+                  );
+                }
+                const h = HERO_MAP[hid];
+                const afford = g.gold >= h.cost && g.bench.length < 8;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className="btn-active-sm"
+                    onClick={() => onBuy(i)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      border: '2px solid #14120E',
+                      background: BONE,
+                      padding: '5px 3px 6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 2,
+                      opacity: afford ? 1 : 0.55,
+                    }}
+                  >
+                    <PixelSprite src={spriteCss(hid)} size={30} />
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        textTransform: 'uppercase',
+                        color: INK,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      {h.name.split(' ')[0]}
+                    </span>
+                    <span
+                      className="mono"
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: INK,
+                        background: afford ? SAF : '#cfc3a6',
+                        padding: '0 4px',
+                      }}
+                    >
+                      ◈{h.cost}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 8, padding: '2px 10px 12px' }}>
+              <button
+                type="button"
+                className="btn-active-sm"
+                onClick={onReroll}
+                style={{
+                  flex: 1,
+                  border: '3px solid #14120E',
+                  background: canReroll ? BONE : '#e2d8bf',
+                  boxShadow: '3px 3px 0 #14120E',
+                  padding: 10,
+                  fontFamily: "'Alfa Slab One', serif",
+                  fontSize: 15,
+                  color: canReroll ? INK : '#a99f86',
+                }}
+              >
+                ↻ {g.mode === 'practice' ? 'FREE ROLL' : `ROLL ◈${rerollCost}`}
+              </button>
+              <button
+                type="button"
+                className="btn-active-sm"
+                onClick={onStartCombat}
+                style={{
+                  flex: 1.2,
+                  border: '3px solid #14120E',
+                  background: g.board.length ? RUST : '#cfc3a6',
+                  boxShadow: '3px 3px 0 #14120E',
+                  padding: 10,
+                  fontFamily: "'Alfa Slab One', serif",
+                  fontSize: 15,
+                  color: g.board.length ? BONE : '#8a8271',
+                }}
+              >
+                {g.mode === 'practice' ? 'SPAR' : 'FIGHT'}
+              </button>
+            </div>
+          </>
+        )}
+        {combat && (
+          <div style={{ padding: '12px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="slab" style={{ fontSize: 17, color: RUST, animation: 'omPulse 1s infinite' }}>
+              COMBAT
+            </span>
+            <span style={{ flex: 1, fontSize: 13, color: '#6b6455', lineHeight: 1.3 }}>
+              {g.log || 'Creatures act on their own.'}
+            </span>
+            <button
+              type="button"
+              onClick={onToggleSpeed}
+              className="mono"
+              style={{ border: '2px solid #14120E', padding: '6px 9px', fontWeight: 700, fontSize: 12 }}
+            >
+              ×{g.speed}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function SheetModal({
+  sheet,
+  game,
+  onClose,
+}: {
+  sheet: SheetState;
+  game: GameState;
+  onClose: () => void;
+}) {
+  if (!sheet) return null;
+  const counts: Record<string, number> = {};
+  game.board.forEach((u) => HERO_MAP[u.hid].traits.forEach((t) => (counts[t] = (counts[t] || 0) + 1)));
+
+  if (sheet.kind === 'traits') {
+    const names = Object.keys(counts).sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(14,13,10,.66)',
+          display: 'flex',
+          alignItems: 'flex-end',
+          zIndex: 45,
+        }}
+        onClick={onClose}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxHeight: '86%',
+            overflowY: 'auto',
+            background: BONE,
+            borderTop: '3px solid #14120E',
+            animation: 'omRise 0.2s ease both',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <SheetHeader title="SYNERGIES" subtitle={`Board of ${game.board.length}`} onClose={onClose} isTraits />
+          <div style={{ padding: '14px 16px 20px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {names.map((n) => {
+              const t = traitCard(n, counts);
+              return <TraitCardBlock key={n} card={t} showDesc />;
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const h = HERO_MAP[sheet.hid];
+  const m = STARMUL[sheet.star as 1 | 2 | 3];
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'rgba(14,13,10,.66)',
+        display: 'flex',
+        alignItems: 'flex-end',
+        zIndex: 45,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxHeight: '86%',
+          overflowY: 'auto',
+          background: BONE,
+          borderTop: '3px solid #14120E',
+          animation: 'omRise 0.2s ease both',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <SheetHeader
+          title={`${h.name} ${'★'.repeat(sheet.star)}`}
+          subtitle={`${sheet.side === 'foe' ? 'Adversary · ' : ''}${h.origin} · ${h.creature}`}
+          onClose={onClose}
+          sprite={spriteCss(sheet.hid)}
+        />
+        <div style={{ padding: '14px 16px 20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
+            {[
+              { k: 'HP', v: Math.round(h.hp * m) },
+              { k: 'ATK', v: Math.round(h.dmg * m) },
+              { k: 'SPD', v: h.as.toFixed(2) },
+              { k: 'CRIT', v: `${Math.round(h.crit * 100)}%` },
+            ].map((st) => (
+              <StatBox key={st.k} label={st.k} value={String(st.v)} />
+            ))}
+          </div>
+          <div style={{ marginTop: 12, border: '3px solid #14120E', background: INK, color: BONE, padding: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span className="slab" style={{ fontSize: 16, color: SAF }}>
+                ✦ {h.ability}
+              </span>
+              <span className="mono" style={{ fontSize: 11, color: '#4C7BD1', border: '1px solid #4C7BD1', padding: '1px 5px' }}>
+                100 MANA
+              </span>
+            </div>
+            <div style={{ marginTop: 7, fontSize: 14, lineHeight: 1.4, color: '#d8cfb8', textWrap: 'pretty' }}>{h.abilityText}</div>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #3a352b', fontSize: 13, lineHeight: 1.35, color: SAF }}>
+              At ★{sheet.star} every number above is multiplied by {m}× · range {h.range} · {h.quirk}
+            </div>
+          </div>
+          <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+            Synergies on this creature
+          </div>
+          <div style={{ marginTop: 7, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {h.traits.map((t) => (
+              <TraitCardBlock key={t} card={traitCard(t, counts)} />
+            ))}
+          </div>
+          {sheet.relics.length > 0 && (
+            <>
+              <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+                Relics carried
+              </div>
+              <div style={{ marginTop: 7, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {sheet.relics.map((r) => {
+                  const rel = RELIC_MAP[r];
+                  return (
+                    <div
+                      key={r}
+                      style={{
+                        display: 'flex',
+                        gap: 8,
+                        alignItems: 'center',
+                        border: '2px solid #14120E',
+                        padding: '6px 9px',
+                        background: '#e7dcc2',
+                      }}
+                    >
+                      <span style={{ fontSize: 16, color: JADE }}>{rel.glyph}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{rel.name}</span>
+                      <span style={{ flex: 1, fontSize: 12, color: '#6b6455', textAlign: 'right' }}>{rel.desc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SheetHeader({
+  title,
+  subtitle,
+  onClose,
+  sprite,
+  isTraits,
+}: {
+  title: string;
+  subtitle: string;
+  onClose: () => void;
+  sprite?: string;
+  isTraits?: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '16px 16px 12px', background: INK }}>
+      <div
+        style={{
+          width: 60,
+          height: 60,
+          flex: '0 0 auto',
+          border: '2px solid #E8A317',
+          background: '#221f19',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {isTraits ? (
+          <span style={{ fontSize: 26, color: SAF }}>✦</span>
+        ) : (
+          sprite && <PixelSprite src={sprite} size={48} />
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="slab" style={{ fontSize: 21, lineHeight: 1.05, color: BONE }}>
+          {title}
+        </div>
+        <div style={{ marginTop: 4, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#a99f86' }}>
+          {subtitle}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        style={{
+          width: 28,
+          height: 28,
+          border: '2px solid #6b6455',
+          color: BONE,
+          fontSize: 15,
+          flex: '0 0 auto',
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ border: '2px solid #14120E', padding: '6px 4px', textAlign: 'center', background: '#e7dcc2' }}>
+      <div className="mono" style={{ fontWeight: 700, fontSize: 15 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6b6455', marginTop: 1 }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function TraitCardBlock({
+  card,
+  showDesc,
+}: {
+  card: ReturnType<typeof traitCard>;
+  showDesc?: boolean;
+}) {
+  return (
+    <div style={{ border: '2px solid #14120E', background: card.cardBg }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 7,
+          padding: '7px 9px',
+          background: card.headBg,
+        }}
+      >
+        <span style={{ fontSize: 14, color: card.headFg }}>{card.glyph}</span>
+        <span className="slab" style={{ flex: 1, fontSize: 14, color: card.headFg }}>
+          {card.name}
+        </span>
+        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: card.headFg }}>
+          {card.countLabel}
+        </span>
+      </div>
+      <div style={{ padding: '7px 9px 8px' }}>
+        {showDesc && <div style={{ fontSize: 12, color: '#6b6455', lineHeight: 1.3, marginBottom: 5 }}>{card.desc}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {card.tiers.map((tr) => (
+            <div key={tr.n} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.3, color: tr.fg }}>
+              <span className="mono" style={{ fontWeight: 700, minWidth: 16 }}>
+                {tr.n}
+              </span>
+              <span style={{ flex: 1 }}>{tr.text}</span>
+              <span style={{ fontSize: 12 }}>{tr.mark}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function OverlayModal({
+  overlay,
+  game,
+  onAction,
+  onSecondary,
+  onChooseRelic,
+  onBindRelic,
+}: {
+  overlay: OverlayKind;
+  game: GameState;
+  onAction: () => void;
+  onSecondary?: () => void;
+  onChooseRelic: (id: string) => void;
+  onBindRelic: (rid: string, unitId: string) => void;
+}) {
+  let title = '';
+  let subtitle = '';
+  let body = '';
+  let bannerBg = JADE;
+  let bannerFg = BONE;
+  let showAction = true;
+  let actionLabel = 'Continue';
+  let showSecondary = false;
+  let secondaryLabel = '';
+  let showRelics = false;
+  let relics: { glyph: string; name: string; desc: string; onTap?: () => void }[] = [];
+
+  if (overlay.kind === 'result') {
+    title = overlay.win ? 'ROUND WON' : 'ROUND LOST';
+    subtitle = overlay.win ? 'The Adversary buckles' : 'The field turns on you';
+    bannerBg = overlay.win ? JADE : RUST;
+    body =
+      (overlay.win ? 'The Adversary takes ' : 'You take ') +
+      overlay.dmg +
+      ' damage' +
+      ((overlay.win ? game.foeLossStreak : game.lossStreak) > 1
+        ? ` — ${overlay.win ? game.foeLossStreak : game.lossStreak} losses in a row, and it compounds.`
+        : '.');
+    actionLabel = overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND';
+  } else if (overlay.kind === 'relic') {
+    title = 'SPOILS';
+    subtitle = 'Choose one relic';
+    bannerBg = SAF;
+    bannerFg = INK;
+    body = 'Relics bind to a creature and persist for the rest of the match. Three per creature.';
+    showAction = false;
+    showRelics = true;
+    relics = overlay.picks.map((id) => {
+      const r = RELIC_MAP[id];
+      return { glyph: r.glyph, name: r.name, desc: r.desc, onTap: () => onChooseRelic(id) };
+    });
+  } else if (overlay.kind === 'bind') {
+    title = 'BIND RELIC';
+    subtitle = RELIC_MAP[overlay.rid].name;
+    bannerBg = SAF;
+    bannerFg = INK;
+    body = `${RELIC_MAP[overlay.rid].desc} Pick the creature that carries it.`;
+    showAction = false;
+    showRelics = true;
+    relics = game.board
+      .filter((u) => u.relics.length < 3)
+      .map((u) => ({
+        glyph: HERO_MAP[u.hid].glyph,
+        name: `${HERO_MAP[u.hid].name} ${'★'.repeat(u.star)}`,
+        desc: u.relics.length ? `Carrying ${u.relics.map((r) => RELIC_MAP[r].name).join(', ')}` : 'No relics yet',
+        onTap: () => onBindRelic(overlay.rid, u.u),
+      }));
+  } else if (overlay.kind === 'spar') {
+    title = overlay.win ? 'SPAR WON' : 'SPAR LOST';
+    subtitle = 'Sandbox — nothing is at stake';
+    bannerBg = overlay.win ? JADE : '#4a4436';
+    body = 'Adjust the board and spar again. Gold and rerolls are free here.';
+    actionLabel = 'BACK TO BOARD';
+  } else {
+    title = overlay.win ? 'VICTORY' : 'DEFEAT';
+    subtitle = overlay.win ? 'The Adversary is undone' : 'Your omens are spent';
+    bannerBg = overlay.win ? JADE : INK;
+    bannerFg = overlay.win ? BONE : SAF;
+    body = overlay.win
+      ? 'Twelve creatures answered. Yours answered louder.'
+      : 'The Adversary outlasted your board. Redraft and try a different six.';
+    actionLabel = 'PLAY AGAIN';
+    showSecondary = true;
+    secondaryLabel = 'Home';
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'rgba(14,13,10,.72)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 22,
+        zIndex: 50,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          background: BONE,
+          border: '3px solid #14120E',
+          boxShadow: '7px 7px 0 #E8A317',
+          animation: 'omStamp 0.3s both',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ background: bannerBg, borderBottom: '3px solid #14120E', padding: '14px 16px' }}>
+          <div className="slab" style={{ fontSize: 26, lineHeight: 1, color: bannerFg }}>
+            {title}
+          </div>
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 13,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: bannerFg,
+              opacity: 0.8,
+            }}
+          >
+            {subtitle}
+          </div>
+        </div>
+        <div style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 15, lineHeight: 1.4, color: '#4a4436', textWrap: 'pretty' }}>{body}</div>
+          {showRelics && (
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {relics.map((r, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="btn-active-sm"
+                  onClick={r.onTap}
+                  style={{
+                    display: 'flex',
+                    gap: 10,
+                    alignItems: 'center',
+                    textAlign: 'left',
+                    border: '2px solid #14120E',
+                    padding: '9px 10px',
+                    background: '#e7dcc2',
+                  }}
+                >
+                  <span style={{ fontSize: 22, color: JADE }}>{r.glyph}</span>
+                  <span style={{ flex: 1 }}>
+                    <span className="slab" style={{ display: 'block', fontSize: 15, lineHeight: 1.1 }}>
+                      {r.name}
+                    </span>
+                    <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#6b6455', lineHeight: 1.3 }}>
+                      {r.desc}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {showAction && (
+          <div style={{ padding: '0 16px 16px', display: 'flex', gap: 8 }}>
+            {showSecondary && onSecondary && (
+              <button
+                type="button"
+                onClick={onSecondary}
+                style={{
+                  flex: 1,
+                  border: '2px solid #14120E',
+                  padding: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  fontSize: 13,
+                }}
+              >
+                {secondaryLabel}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-active-sm"
+              onClick={onAction}
+              style={{
+                flex: 1.4,
+                background: JADE,
+                color: BONE,
+                border: '3px solid #14120E',
+                boxShadow: '4px 4px 0 #14120E',
+                padding: 12,
+                fontFamily: "'Alfa Slab One', serif",
+                fontSize: 17,
+              }}
+            >
+              {actionLabel}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
