@@ -1,14 +1,14 @@
-import { BONE, INK, JADE, MATCH_DEFAULTS, PRACTICE_BOARD_CAP, RUST, SAF, STARMUL, BOARD_BG_TILE_SIZE, BOARD_CELL_COUNT, BOARD_CELL_HEIGHT_PCT, BOARD_CELL_WIDTH_PCT, BOARD_COLS, BOARD_ROWS, BOSS_FOOTPRINT, PLAYER_ROW_START } from '../../data/constants';
-import {
-  BATTLEGROUND_MAP,
-  battlegroundBackgroundUrl,
-  battlegroundUsesImage,
-} from '../../data/battlegrounds';
+import { useEffect, useState } from 'react';
+import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL, BOARD_CELL_COUNT, BOARD_CELL_HEIGHT_PCT, BOARD_CELL_WIDTH_PCT, BOARD_COLS, BOARD_ROWS, BOSS_FOOTPRINT, PLAYER_ROW_START } from '../../data/constants';
+import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
-import { activeSynergies, classCard, classCounts, isBossRound, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { activeSynergies, classCard, classCounts, combatant, isRankedMode, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
+import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
+import { BattlegroundPreview } from '../BattlegroundPreview';
 import { CombatFxLayer, getLungeTransform } from '../CombatFxLayer';
 import { PixelSprite } from '../PixelSprite';
 
@@ -59,51 +59,23 @@ export function GameScreen({
 }: GameScreenProps) {
   const plan = g.phase === 'plan';
   const combat = g.phase === 'combat';
+  const period = periodInfo(g.round, g.matchRounds);
+  const foePreview =
+    !combat && isRankedMode(g.mode)
+      ? g.mode === 'bot' && isBossRound(g.round)
+        ? makeBossUnits(g.round)
+        : g.foe
+      : [];
   const src: Combatant[] =
     combatants ??
     g.board
-      .concat(g.foe)
-      .map((u) => {
-        const foeUnit = g.foe.find((f) => f.u === u.u);
-        const isBoss = foeUnit?.boss ?? false;
-        const h = isBoss ? null : HERO_MAP[u.hid];
-        const m = STARMUL[u.star];
-        return {
-          u: u.u,
-          hid: u.hid,
-          star: u.star,
-          side: g.foe.some((f) => f.u === u.u) ? ('foe' as const) : ('me' as const),
-          r: u.r!,
-          c: u.c!,
-          glyph: isBoss ? '☠' : h!.glyph,
-          name: isBoss ? 'The Adversary' : h!.name,
-          maxHp: isBoss ? 1000 : Math.round(h!.hp * m),
-          hp: isBoss ? 1000 : Math.round(h!.hp * m),
-          atk: isBoss ? 100 : h!.dmg * m,
-          as: isBoss ? 0.35 : h!.as,
-          range: isBoss ? 2 : h!.range,
-          crit: isBoss ? 0.08 : h!.crit,
-          critDmg: 0.8,
-          mana: 0,
-          startMana: 0,
-          sp: 0,
-          dr: 0,
-          lifesteal: 0,
-          shield: 0,
-          amp: 0,
-          stun: 0,
-          silence: 0,
-          snare: 0,
-          burn: 0,
-          burnT: 0,
-          cd: 0,
-          mv: 0,
-          alive: true,
-          cast2: false,
-          boss: isBoss,
-          footprint: isBoss ? BOSS_FOOTPRINT : 1,
-        };
-      });
+      .concat(foePreview)
+      .map((u) => combatant(u, g.board.some((b) => b.u === u.u) ? 'me' : 'foe', g.heroHpMul));
+
+  const [sellArmed, setSellArmed] = useState(false);
+  useEffect(() => {
+    setSellArmed(false);
+  }, [g.sel?.u]);
 
   const selUnit = g.sel
     ? (g.sel.from === 'bench' ? g.bench : g.board).find((x) => x.u === g.sel!.u)
@@ -111,7 +83,19 @@ export function GameScreen({
   const sv = selUnit ? sellValue(selUnit) : 0;
   const shown = activeSynergies(g.board.map((u) => u.hid)).filter((t) => t.count >= 1);
   const rerollCost = MATCH_DEFAULTS.rerollCost;
-  const canReroll = g.mode === 'practice' || g.gold >= rerollCost;
+  const canReroll = g.mode === 'practice' || g.freeRerolls > 0 || g.gold >= rerollCost;
+  const rerollLabel =
+    g.mode === 'practice' ? 'FREE ROLL' : g.freeRerolls > 0 ? `FREE ROLL ×${g.freeRerolls}` : `ROLL ◈${rerollCost}`;
+  const fightLabel =
+    g.mode === 'practice'
+      ? 'SPAR'
+      : g.mode === 'marathon'
+        ? 'FIGHT'
+        : period.isBoss
+          ? 'FIGHT BOSS'
+          : period.isFinal
+            ? 'FINAL FIGHT'
+            : 'FIGHT';
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -134,7 +118,7 @@ export function GameScreen({
             ‹
           </button>
           <div className="slab" style={{ fontSize: 15, letterSpacing: '0.02em', color: SAF }}>
-            {g.mode === 'practice' ? 'SANDBOX' : isBossRound(g.round) ? `ROUND ${g.round} · BOSS` : `ROUND ${g.round} / ${MATCH_DEFAULTS.matchRounds}`}
+            {g.mode === 'practice' ? 'SANDBOX' : g.mode === 'marathon' ? `MARATHON ${g.round} / ${g.matchRounds}` : `ROUND ${g.round} / ${g.matchRounds}`}
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, border: '2px solid #E8A317', padding: '2px 8px' }}>
@@ -144,10 +128,10 @@ export function GameScreen({
             </span>
           </div>
           <div className="mono" style={{ border: '2px solid #6b6455', padding: '2px 8px', fontWeight: 700, fontSize: 13 }}>
-            {g.board.length}/{g.mode === 'practice' ? PRACTICE_BOARD_CAP : boardCap}
+            {g.board.length}/{boardCap}
           </div>
         </div>
-        {g.mode === 'bot' && (
+        {isRankedMode(g.mode) && (
           <>
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', width: 34, color: '#8f8878' }}>
@@ -191,17 +175,56 @@ export function GameScreen({
                 {g.foeHp}
               </span>
             </div>
+            <div
+              style={{
+                marginTop: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                className="slab"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: '0.12em',
+                  color: period.isBoss ? SAF : BONE,
+                  border: `2px solid ${period.isBoss ? SAF : '#6b6455'}`,
+                  padding: '2px 7px',
+                }}
+              >
+                {period.label}
+              </span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: period.isBoss ? SAF : '#a99f86',
+                }}
+              >
+                {period.isFinal
+                  ? 'Final vs the Adversary'
+                  : period.isBoss
+                    ? `${getBossEncounter(g.round)?.name ?? 'Boss'} this round`
+                    : period.roundsUntilBoss === 1
+                      ? 'Boss next round'
+                      : `Boss in ${period.roundsUntilBoss} rounds`}
+              </span>
+            </div>
           </>
         )}
       </div>
 
       <div
-        className="synergy-bar"
         style={{
           display: 'flex',
           gap: 5,
           padding: '7px 10px',
-          borderBottom: '2px solid var(--om-line)',
+          borderBottom: '2px solid #14120E',
+          background: '#e7dcc2',
           overflowX: 'auto',
           minHeight: 34,
           alignItems: 'center',
@@ -252,13 +275,8 @@ export function GameScreen({
 
       <div
         className="game-board"
-        style={{
-          ['--board-bg' as string]: `url(${battlegroundBackgroundUrl(battlegroundId)})`,
-          ['--board-bg-size' as string]: battlegroundUsesImage(battlegroundId) ? 'cover' : BOARD_BG_TILE_SIZE,
-          ['--board-bg-repeat' as string]: battlegroundUsesImage(battlegroundId) ? 'no-repeat' : 'repeat',
-          ['--board-bg-position' as string]: battlegroundUsesImage(battlegroundId) ? 'center' : 'initial',
-        }}
       >
+        <BattlegroundBoardBackground id={battlegroundId} />
         <div
           style={{
             position: 'absolute',
@@ -279,13 +297,13 @@ export function GameScreen({
                 type="button"
                 onClick={() => onTapCell(r, c)}
                 style={{
-                  borderRight: '1px solid rgba(20,18,14,.16)',
-                  borderBottom: '1px solid rgba(20,18,14,.16)',
+                  borderRight: '1px solid rgba(20,18,14,.22)',
+                  borderBottom: '1px solid rgba(20,18,14,.22)',
                   background: mine
                     ? g.sel && !occupied
-                      ? 'rgba(232,163,23,.28)'
-                      : 'rgba(27,107,82,.18)'
-                    : 'rgba(180,68,43,.18)',
+                      ? 'rgba(232,163,23,.24)'
+                      : 'rgba(27,107,82,.12)'
+                    : 'rgba(180,68,43,.12)',
                 }}
               />
             );
@@ -342,11 +360,11 @@ export function GameScreen({
                       else onTapBoard(boardUnit);
                     }
                   }}
-                  className={`board-unit${isBoss ? ' board-unit--boss' : ''}`}
+                  className={`board-unit${sel ? ' board-unit--sel' : ''}${isBoss ? ' board-unit--boss' : ''}`}
                   style={{
                     position: 'relative',
-                    border: `2px solid ${isBoss ? '#E8A317' : '#14120E'}`,
-                    background: me ? INK : isBoss ? '#4a1210' : '#7a2d1d',
+                    border: isBoss ? `2px solid ${SAF}` : undefined,
+                    background: !me && isBoss ? '#4a1210' : undefined,
                     width: isBoss ? '88%' : undefined,
                     height: isBoss ? '88%' : undefined,
                     display: 'flex',
@@ -355,17 +373,27 @@ export function GameScreen({
                     pointerEvents: 'auto',
                     transform: lunge,
                     transition: lunge ? 'transform 0.07s ease-out' : undefined,
-                    boxShadow: sel
-                      ? `0 0 0 3px ${SAF}`
-                      : u.stun > 0
-                        ? '0 0 0 3px #4C7BD1'
+                    boxShadow:
+                      u.stun > 0 && !sel
+                        ? '0 0 0 2px #4C7BD1'
                         : isBoss
                           ? '0 0 0 2px rgba(232,163,23,.55), 4px 4px 0 rgba(20,18,14,.45)'
-                          : '2px 2px 0 rgba(20,18,14,.35)',
+                          : undefined,
                   }}
                 >
                   <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 80 : undefined} />
-                  {!isBoss && (
+                  {boardUnit && boardUnit.relics.length > 0 && (
+                    <span className="relic-strip" aria-hidden>
+                      {boardUnit.relics.slice(0, 3).map((rid) => {
+                        const rel = RELIC_MAP[rid];
+                        return (
+                          <span key={rid} className="relic-glyph" style={{ color: rel.color }}>
+                            {rel.glyph}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  )}
                   <span
                     style={{
                       position: 'absolute',
@@ -384,14 +412,13 @@ export function GameScreen({
                   >
                     {'★'.repeat(u.star)}
                   </span>
-                  )}
                   <span
                     style={{
                       position: 'absolute',
                       left: -2,
                       right: -2,
                       bottom: -7,
-                      height: isBoss ? 7 : 5,
+                      height: 5,
                       background: INK,
                       border: '1px solid #14120E',
                     }}
@@ -424,6 +451,26 @@ export function GameScreen({
                           background: '#4C7BD1',
                         }}
                       />
+                    </span>
+                  )}
+                  {u.boss && (
+                    <span
+                      className="slab"
+                      style={{
+                        position: 'absolute',
+                        bottom: 6,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        fontSize: 7,
+                        letterSpacing: '0.08em',
+                        background: SAF,
+                        color: INK,
+                        border: '1px solid #14120E',
+                        padding: '0 3px',
+                        lineHeight: '10px',
+                      }}
+                    >
+                      BOSS
                     </span>
                   )}
                   {sel && (
@@ -491,6 +538,23 @@ export function GameScreen({
             </span>
           </div>
         )}
+        {plan && g.mode === 'bot' && (period.isBoss || period.isFinal) && !banner && (
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 8, textAlign: 'center', pointerEvents: 'none', zIndex: 31 }}>
+            <span
+              className="slab"
+              style={{
+                display: 'inline-block',
+                background: period.isBoss ? RUST : INK,
+                color: period.isBoss ? BONE : SAF,
+                border: `2px solid ${period.isBoss ? INK : SAF}`,
+                padding: '3px 10px',
+                fontSize: 13,
+              }}
+            >
+              {period.isBoss ? getBossEncounter(g.round)?.name ?? 'BOSS ROUND' : 'FINAL VS THE ADVERSARY'}
+            </span>
+          </div>
+        )}
       </div>
 
       <div
@@ -530,15 +594,13 @@ export function GameScreen({
               key={u.u}
               type="button"
               onClick={() => onTapBench(u)}
-              className="bench-slot"
+              className={`bench-slot bench-slot--filled${sel ? ' board-unit--sel' : ''}`}
               style={{
-                border: '2px solid #14120E',
-                background: INK,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 position: 'relative',
-                boxShadow: sel ? `0 0 0 3px ${SAF}` : '2px 2px 0 rgba(20,18,14,.3)',
+                boxShadow: sel ? `0 0 0 2px ${SAF}` : undefined,
               }}
             >
               <PixelSprite src={spriteCss(u.hid)} />
@@ -563,7 +625,7 @@ export function GameScreen({
           );
         })}
         <div style={{ flex: 1 }} />
-        {selUnit && (
+        {selUnit && plan && (
           <>
             <button
               type="button"
@@ -582,19 +644,28 @@ export function GameScreen({
             </button>
             <button
               type="button"
-              onClick={onSell}
+              onClick={() => {
+                if (!sellArmed) {
+                  setSellArmed(true);
+                  return;
+                }
+                onSell();
+                setSellArmed(false);
+              }}
               style={{
                 flex: '0 0 auto',
-                border: '2px solid #B4442B',
-                color: RUST,
-                padding: '8px 9px',
+                border: '2px solid #14120E',
+                background: sellArmed ? RUST : BONE,
+                color: sellArmed ? BONE : RUST,
+                padding: '8px 10px',
                 fontWeight: 700,
                 fontSize: 11,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
+                boxShadow: sellArmed ? '3px 3px 0 #14120E' : undefined,
               }}
             >
-              Sell ◈{sv}
+              {sellArmed ? `Confirm ◈${sv}` : `Sell ◈${sv}`}
             </button>
           </>
         )}
@@ -696,7 +767,7 @@ export function GameScreen({
                   color: canReroll ? INK : '#a99f86',
                 }}
               >
-                ↻ {g.mode === 'practice' ? 'FREE ROLL' : `ROLL ◈${rerollCost}`}
+                ↻ {rerollLabel}
               </button>
               <button
                 type="button"
@@ -713,7 +784,7 @@ export function GameScreen({
                   color: g.board.length ? BONE : '#8a8271',
                 }}
               >
-                {g.mode === 'practice' ? 'SPAR' : 'FIGHT'}
+                {fightLabel}
               </button>
             </div>
           </>
@@ -853,7 +924,7 @@ export function SheetModal({
         <div style={{ padding: '14px 16px 20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
             {[
-              { k: 'HP', v: Math.round(h.hp * m) },
+              { k: 'HP', v: Math.round(h.hp * m * game.heroHpMul) },
               { k: 'ATK', v: Math.round(h.dmg * m) },
               { k: 'SPD', v: h.as.toFixed(2) },
               { k: 'CRIT', v: `${Math.round(h.crit * 100)}%` },
@@ -1068,17 +1139,33 @@ export function OverlayModal({
   let relics: { glyph: string; name: string; desc: string; onTap?: () => void }[] = [];
 
   if (overlay.kind === 'result') {
-    title = overlay.win ? 'ROUND WON' : 'ROUND LOST';
-    subtitle = overlay.win ? 'The Adversary buckles' : 'The field turns on you';
-    bannerBg = overlay.win ? JADE : RUST;
-    body =
-      (overlay.win ? 'The Adversary takes ' : 'You take ') +
-      overlay.dmg +
-      ' damage' +
-      ((overlay.win ? game.foeLossStreak : game.lossStreak) > 1
-        ? ` — ${overlay.win ? game.foeLossStreak : game.lossStreak} losses in a row, and it compounds.`
-        : '.');
-    actionLabel = overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND';
+    if (overlay.boss) {
+      title = overlay.win ? `${overlay.boss.name.toUpperCase()} FELLED` : `FELLED BY ${overlay.boss.name.toUpperCase()}`;
+      subtitle = overlay.win ? `Period ${overlay.boss.period} spoil` : `Period ${overlay.boss.period} · you still stand`;
+      bannerBg = overlay.win ? JADE : RUST;
+      if (overlay.win && overlay.boss.reward) {
+        body =
+          `The omen breaks. You claim ${rewardLines(overlay.boss.reward).join(' · ')}. The Adversary's board is untouched.`;
+      } else {
+        body =
+          `You take ${overlay.dmg} damage` +
+          (game.lossStreak > 1 ? ` — ${game.lossStreak} losses in a row, and it compounds.` : '.') +
+          ' The match continues.';
+      }
+      actionLabel = overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND';
+    } else {
+      title = overlay.win ? 'ROUND WON' : 'ROUND LOST';
+      subtitle = overlay.win ? 'The Adversary buckles' : 'The field turns on you';
+      bannerBg = overlay.win ? JADE : RUST;
+      body =
+        (overlay.win ? 'The Adversary takes ' : 'You take ') +
+        overlay.dmg +
+        ' damage' +
+        ((overlay.win ? game.foeLossStreak : game.lossStreak) > 1
+          ? ` — ${overlay.win ? game.foeLossStreak : game.lossStreak} losses in a row, and it compounds.`
+          : '.');
+      actionLabel = overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND';
+    }
   } else if (overlay.kind === 'relic') {
     title = 'SPOILS';
     subtitle = 'Choose one relic';
@@ -1168,6 +1255,35 @@ export function OverlayModal({
         </div>
         <div style={{ padding: '14px 16px' }}>
           <div style={{ fontSize: 15, lineHeight: 1.4, color: '#4a4436', textWrap: 'pretty' }}>{body}</div>
+          {overlay.kind === 'result' && overlay.win && overlay.boss?.reward && (
+            <div
+              style={{
+                marginTop: 12,
+                border: '2px solid #14120E',
+                background: '#e7dcc2',
+                padding: '9px 10px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              {rewardLines(overlay.boss.reward).map((line) => (
+                <span
+                  key={line}
+                  className="slab"
+                  style={{
+                    fontSize: 13,
+                    background: SAF,
+                    color: INK,
+                    border: '2px solid #14120E',
+                    padding: '3px 8px',
+                  }}
+                >
+                  {line}
+                </span>
+              ))}
+            </div>
+          )}
           {overlay.kind === 'over' && overlay.win && overlay.unlocked && overlay.unlocked.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <div
@@ -1251,17 +1367,17 @@ export function OverlayModal({
                         padding: '7px 9px',
                       }}
                     >
-                      <span
-                        className="pixel"
+                      <div
                         style={{
                           width: 28,
                           height: 28,
-                          backgroundImage: `url(${battlegroundBackgroundUrl(id)})`,
-                          backgroundSize: 'cover',
                           border: '2px solid #14120E',
                           flexShrink: 0,
+                          overflow: 'hidden',
                         }}
-                      />
+                      >
+                        <BattlegroundPreview id={id} />
+                      </div>
                       <span style={{ flex: 1 }}>
                         <span className="slab" style={{ display: 'block', fontSize: 15, lineHeight: 1.1 }}>
                           {b?.name ?? id}

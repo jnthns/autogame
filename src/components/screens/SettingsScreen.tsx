@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from 'react';
-import { BONE, INK, JADE } from '../../data/constants';
+import { BONE, JADE } from '../../data/constants';
+import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
+import { BattlegroundPreview } from '../BattlegroundPreview';
 import {
   BATTLEGROUNDS,
   BATTLEGROUND_MAP,
-  battlegroundBackgroundUrl,
-  battlegroundUsesImage,
   battlegroundUnlockCurrent,
   battlegroundUnlocked,
   battlegroundUnlockLabel,
@@ -284,8 +284,6 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
             {BATTLEGROUNDS.map((b) => {
               const open = battlegroundUnlocked(b.id, progress);
               const selected = settings.battlegroundId === b.id;
-              const tile = battlegroundBackgroundUrl(b.id);
-              const imageBg = battlegroundUsesImage(b.id);
               return (
                 <button
                   key={b.id}
@@ -308,51 +306,19 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                     cursor: open ? 'pointer' : 'default',
                   }}
                 >
-                  <div
-                    className={open ? 'pixel' : 'pixel pixel-locked'}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      backgroundImage: tile ? `url(${tile})` : undefined,
-                      backgroundSize: imageBg ? 'cover' : '16.66% 16.66%',
-                      backgroundRepeat: imageBg ? 'no-repeat' : 'repeat',
-                      backgroundPosition: imageBg ? 'center' : undefined,
-                      imageRendering: 'pixelated',
-                      position: 'relative',
-                    }}
-                  >
+                  <div className="settings-bg-preview">
+                    <BattlegroundPreview
+                      id={b.id}
+                      animate={!settings.reduceMotion}
+                      locked={!open}
+                    />
                     {selected && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          top: 2,
-                          right: 2,
-                          background: JADE,
-                          color: BONE,
-                          border: `2px solid ${INK}`,
-                          width: 14,
-                          height: 14,
-                          fontSize: 10,
-                          lineHeight: '11px',
-                          textAlign: 'center',
-                          fontWeight: 700,
-                        }}
-                      >
+                      <span className="settings-bg-badge">
                         ✓
                       </span>
                     )}
                     {!open && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 13,
-                          color: INK,
-                        }}
-                      >
+                      <span className="settings-bg-lock">
                         🔒
                       </span>
                     )}
@@ -362,7 +328,41 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
             })}
           </div>
           {shown && (
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 14 }}>
+              <div
+                style={{
+                  width: '100%',
+                  height: 140,
+                  border: '3px solid var(--om-line)',
+                  borderRadius: 4,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  marginBottom: 10,
+                  background: 'var(--om-board, #e8dcc8)',
+                }}
+              >
+                <BattlegroundBoardBackground id={shown.id} animate={!settings.reduceMotion} />
+                {!shownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(14,13,10,.65)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      color: BONE,
+                    }}
+                  >
+                    <span style={{ fontSize: 24 }}>🔒</span>
+                    <span className="slab" style={{ fontSize: 13, letterSpacing: '0.1em' }}>
+                      LOCKED
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="slab" style={{ fontSize: 16, lineHeight: 1.15 }}>
                 {shown.name}
                 {!shownOpen ? ' · locked' : ''}

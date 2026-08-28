@@ -1,20 +1,20 @@
-import { BONE, JADE, SAF } from '../../data/constants';
+import { BONE, JADE, RUST, SAF } from '../../data/constants';
 import type { Difficulty } from '../../game/types';
 
 interface ModesScreenProps {
   onBack: () => void;
   onPractice: () => void;
   onBot: () => void;
+  onMarathon: () => void;
   difficulty: Difficulty;
 }
-
 const DIFFICULTY_TAG: Record<Difficulty, string> = {
   normal: 'Mortal',
   hard: 'Hard',
   mythic: 'Mythic',
 };
 
-export function ModesScreen({ onBack, onPractice, onBot, difficulty }: ModesScreenProps) {
+export function ModesScreen({ onBack, onPractice, onBot, onMarathon, difficulty }: ModesScreenProps) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div
@@ -88,15 +88,15 @@ export function ModesScreen({ onBack, onPractice, onBot, difficulty }: ModesScre
             }}
           >
             <span className="slab" style={{ fontSize: 24, lineHeight: 1, color: BONE }}>
-              BOT MATCH
+              HYPER ROLL
             </span>
             <span style={{ fontSize: 25, color: SAF }}>☳</span>
           </div>
           <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
-            Twelve rounds against the Adversary. Match wins unseal sealed omens — some ask for a synergy, not just a count.
+            Thirteen rounds against the Adversary. Period bosses on 4, 8 and 12; round 13 is the final fight. Wins unseal sealed omens — some ask for a synergy, not just a count.
           </div>
           <div style={{ display: 'flex', gap: 7, padding: '0 16px 16px', flexWrap: 'wrap' }}>
-            {['Hyper roll', 'Relics', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
+            {['Hyper roll', 'Period bosses', 'Relics', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
               <span
                 key={tag}
                 style={{
@@ -113,8 +113,49 @@ export function ModesScreen({ onBack, onPractice, onBot, difficulty }: ModesScre
             ))}
           </div>
         </button>
-        <div
-          className="modes-list-note om-muted"
+        <button
+          type="button"
+          className="btn-active om-card"
+          onClick={onMarathon}
+          style={{ textAlign: 'left', border: '3px solid var(--om-line)', boxShadow: '5px 5px 0 var(--om-line)', overflow: 'hidden' }}
+        >
+          <div
+            style={{
+              background: RUST,
+              borderBottom: '3px solid #14120E',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span className="slab" style={{ fontSize: 24, lineHeight: 1, color: BONE }}>
+              MARATHON
+            </span>
+            <span style={{ fontSize: 25, color: SAF }}>☷</span>
+          </div>
+          <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
+            Eighteen rounds against the Adversary. Creatures hold 50% more health. No period bosses — pure endurance. Wins still unseal omens.
+          </div>
+          <div style={{ display: 'flex', gap: 7, padding: '0 16px 16px', flexWrap: 'wrap' }}>
+            {['18 rounds', '+50% HP', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
+              <span
+                key={tag}
+                style={{
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.13em',
+                  textTransform: 'uppercase',
+                  border: '2px solid var(--om-line)',
+                  padding: '3px 7px',
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </button>
+        <div          className="modes-list-note om-muted"
           style={{
             padding: 14,
             border: '2px dashed var(--om-muted)',

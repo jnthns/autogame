@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, MATCH_DEFAULTS, PLAYER_ROW_START, RUST, SAF, STARMUL } from '../data/constants';
-import { HERO_MAP } from '../data/heroes';
+import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, PLAYER_ROW_START, RUST, SAF } from '../data/constants';
 import {
   battlegroundUnlocked,
   newlyUnlockedBattlegrounds,
@@ -15,13 +14,16 @@ import {
 } from '../data/progress';
 import { DEFAULT_BATTLEGROUND_ID, loadSettings, saveSettings, type SettingsState } from '../data/settings';
 import {
+  applyMerges,
   applyTraits,
-  bossCombatant,
   cap,
   CombatEngine,
   combatant,
+  combatOpponents,
+  countHeroStar,
   createGame,
   gameActions,
+  isRankedMode,
   makeFoeBoard,
   mergeUnits,
   pickRelics,
@@ -29,6 +31,7 @@ import {
   rollShop,
   scaleFoeCombatants,
 } from '../game/engine';
+import { debugRoundFromUrl } from '../game/hyperRoll';
 import type {
   Combatant,
   CombatFx,
@@ -153,7 +156,11 @@ export function useGame() {
       resetUidCounter();
       engineRef.current = null;
       setCombatants(null);
-      const g = createGame(mode, { speed: settingsRef.current.defaultSpeed });
+      const g = createGame(mode, {
+        speed: settingsRef.current.defaultSpeed,
+        startRound: mode === 'bot' ? debugRoundFromUrl() : undefined,
+        draft,
+      });
       rollShop(g, draft, true);
       setGame(g);
       setOverlay(null);
@@ -181,8 +188,8 @@ export function useGame() {
     (win: boolean) => {
       const g = gameRef.current;
       if (!g) return;
-      let result = gameActions.resolveRound(g, win, MATCH_DEFAULTS.matchRounds);
-      if (result.kind === 'over' && g.mode === 'bot') {
+      let result = gameActions.resolveRound(g, win, g.matchRounds);
+      if (result.kind === 'over' && isRankedMode(g.mode)) {
         const before = progressRef.current;
         let next: ProgressState = { ...before, botMatches: before.botMatches + 1 };
         let newlyUnlocked: string[] = [];
@@ -216,16 +223,13 @@ export function useGame() {
       pop(PLAYER_ROW_START + 1, 1, 'PLACE A CREATURE', RUST, '12px');
       return;
     }
-    const difficulty = g.mode === 'bot' ? settingsRef.current.difficulty : 'normal';
-    const playerHpSum = g.board.reduce((s, u) => s + Math.round(HERO_MAP[u.hid].hp * STARMUL[u.star]), 0);
-    makeFoeBoard(g, difficulty, playerHpSum);
-    const mine = g.board.map((u) => combatant(u, 'me'));
-    const theirs = g.foe.map((u) =>
-      u.boss ? bossCombatant(u, playerHpSum, g.round, difficulty) : combatant(u, 'foe'),
-    );
+    const difficulty = isRankedMode(g.mode) ? settingsRef.current.difficulty : 'normal';
+    if (g.mode === 'practice') makeFoeBoard(g, difficulty);
+    const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
+    const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
     applyTraits(mine);
     applyTraits(theirs);
-    if (g.mode === 'bot') scaleFoeCombatants(theirs, difficulty);
+    if (isRankedMode(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
       (r, c, text, color, size) => pop(r, c, text, color, size),
       (text) => {
@@ -260,8 +264,10 @@ export function useGame() {
     (i: number) => {
       const g = gameRef.current;
       if (!g) return;
+      const hid = g.shop[i];
+      const twoStarBefore = hid ? countHeroStar(g, hid, 2) : 0;
       gameActions.buy(g, i);
-      mergeUnits(g, (r, c, text) => pop(r, c, text));
+      if (hid) applyMerges(g, { boughtHid: hid, twoStarBeforeBuy: twoStarBefore }, (r, c, text) => pop(r, c, text));
       syncGame(g);
     },
     [pop, syncGame],
@@ -285,19 +291,21 @@ export function useGame() {
     (u: Parameters<typeof gameActions.tapUnit>[1], from: 'bench' | 'board') => {
       const g = gameRef.current;
       if (!g) return;
-      gameActions.tapUnit(g, u, from, MATCH_DEFAULTS.matchRounds);
+      gameActions.tapUnit(g, u, from, g.matchRounds);
+      mergeUnits(g, (r, c, text) => pop(r, c, text));
       syncGame(g);
     },
-    [syncGame],
+    [pop, syncGame],
   );
 
   const tapCell = useCallback(
     (r: number, c: number) => {
       const g = gameRef.current;
       if (!g) return;
-      gameActions.tapCell(g, r, c, MATCH_DEFAULTS.matchRounds, (text) =>
+      gameActions.tapCell(g, r, c, g.matchRounds, (text) =>
         pop(PLAYER_ROW_START + 1, 1, text, RUST, '12px'),
       );
+      mergeUnits(g, (r2, c2, text) => pop(r2, c2, text));
       syncGame(g);
     },
     [pop, syncGame],
@@ -395,7 +403,7 @@ export function useGame() {
     chooseRelic,
     bindRelic,
     autoDraft,
-    cap: game ? cap(game.round, MATCH_DEFAULTS.matchRounds, game.mode) : 3,
+    cap: game ? cap(game.round, game.matchRounds, game.mode) : 3,
   };
 }
 
