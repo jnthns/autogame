@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, MATCH_DEFAULTS, RUST, SAF } from '../data/constants';
-import { HEROES } from '../data/heroes';
+import {
+  battlegroundUnlocked,
+  newlyUnlockedBattlegrounds,
+} from '../data/battlegrounds';
+import {
+  applyMatchWin,
+  heroUnlocked,
+  loadProgress,
+  saveProgress,
+  unlockedHeroIds,
+  type ProgressState,
+} from '../data/progress';
+import { DEFAULT_BATTLEGROUND_ID, loadSettings, saveSettings, type SettingsState } from '../data/settings';
 import {
   applyTraits,
   cap,
@@ -13,9 +25,12 @@ import {
   pickRelics,
   resetUidCounter,
   rollShop,
+  scaleFoeCombatants,
 } from '../game/engine';
 import type {
   Combatant,
+  CombatFx,
+  CombatFxPayload,
   Floater,
   GameMode,
   GameState,
@@ -24,22 +39,37 @@ import type {
   SheetState,
 } from '../game/types';
 
-function loadDraft(): string[] {
+function loadDraft(unlocked: string[]): string[] {
+  const allow = new Set(unlocked);
   try {
     const s = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (s) {
       const d = JSON.parse(s);
-      if (Array.isArray(d) && d.length) return d;
+      if (Array.isArray(d) && d.length) {
+        const kept = d.filter((id: unknown): id is string => typeof id === 'string' && allow.has(id));
+        if (kept.length) return kept.slice(0, 6);
+      }
     }
   } catch {
     /* ignore */
   }
-  return [...DEFAULT_DRAFT];
+  return DEFAULT_DRAFT.filter((id) => allow.has(id)).slice(0, 6);
 }
 
 export function useGame() {
   const [screen, setScreen] = useState<Screen>('home');
-  const [draft, setDraftState] = useState<string[]>(loadDraft);
+  const [progress, setProgress] = useState<ProgressState>(loadProgress);
+  const [settings, setSettings] = useState<SettingsState>(() => {
+    const s = loadSettings();
+    const p = loadProgress();
+    if (!battlegroundUnlocked(s.battlegroundId, p)) {
+      const next = { ...s, battlegroundId: DEFAULT_BATTLEGROUND_ID };
+      saveSettings(next);
+      return next;
+    }
+    return s;
+  });
+  const [draft, setDraftState] = useState<string[]>(() => loadDraft(unlockedHeroIds(loadProgress())));
   const [inspectId, setInspectId] = useState<string | null>(null);
   const [game, setGame] = useState<GameState | null>(null);
   const [overlay, setOverlay] = useState<OverlayKind | null>(null);
@@ -47,15 +77,26 @@ export function useGame() {
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [banner, setBanner] = useState('');
   const [combatants, setCombatants] = useState<Combatant[] | null>(null);
+  const [combatFx, setCombatFx] = useState<CombatFx[]>([]);
   const [tick, setTick] = useState(0);
 
   const engineRef = useRef<CombatEngine | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameRef = useRef<GameState | null>(null);
+  const progressRef = useRef(progress);
+  const settingsRef = useRef(settings);
 
   useEffect(() => {
     gameRef.current = game;
   }, [game]);
+
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const syncGame = useCallback((g: GameState) => {
     setGame({ ...g });
@@ -66,6 +107,13 @@ export function useGame() {
     const f: Floater = { k: `f${Date.now()}${Math.random()}`, r, c, text, color, size, t: Date.now() };
     setFloaters((prev) => [...prev, f].slice(-14));
     setTimeout(() => setFloaters((prev) => prev.filter((x) => x.k !== f.k)), 900);
+  }, []);
+
+  const spawnFx = useCallback((payload: CombatFxPayload) => {
+    if (settingsRef.current.reduceVfx) return;
+    const item: CombatFx = { ...payload, k: `fx${Date.now()}${Math.random()}`, t: Date.now() };
+    setCombatFx((prev) => [...prev, item].slice(-28));
+    setTimeout(() => setCombatFx((prev) => prev.filter((x) => x.k !== item.k)), 420);
   }, []);
 
   const saveDraft = useCallback((d: string[]) => {
@@ -79,6 +127,7 @@ export function useGame() {
 
   const toggleHero = useCallback(
     (id: string) => {
+      if (!heroUnlocked(id, progressRef.current)) return;
       const d = draft.slice();
       const i = d.indexOf(id);
       if (i >= 0) d.splice(i, 1);
@@ -102,11 +151,12 @@ export function useGame() {
       resetUidCounter();
       engineRef.current = null;
       setCombatants(null);
-      const g = createGame(mode);
+      const g = createGame(mode, { speed: settingsRef.current.defaultSpeed });
       rollShop(g, draft, true);
       setGame(g);
       setOverlay(null);
       setFloaters([]);
+      setCombatFx([]);
       setBanner('');
       setSheet(null);
       setScreen('game');
@@ -121,6 +171,7 @@ export function useGame() {
     setGame(null);
     setOverlay(null);
     setFloaters([]);
+    setCombatFx([]);
     setScreen('home');
   }, [clearTimer]);
 
@@ -128,9 +179,28 @@ export function useGame() {
     (win: boolean) => {
       const g = gameRef.current;
       if (!g) return;
-      const result = gameActions.resolveRound(g, win, MATCH_DEFAULTS.matchRounds);
+      let result = gameActions.resolveRound(g, win, MATCH_DEFAULTS.matchRounds);
+      if (result.kind === 'over' && g.mode === 'bot') {
+        const before = progressRef.current;
+        let next: ProgressState = { ...before, botMatches: before.botMatches + 1 };
+        let newlyUnlocked: string[] = [];
+        if (result.win) {
+          const r = applyMatchWin(next, g.board.map((u) => u.hid));
+          next = r.next;
+          newlyUnlocked = r.newlyUnlocked;
+        }
+        saveProgress(next);
+        progressRef.current = next;
+        setProgress(next);
+        result = {
+          ...result,
+          unlocked: newlyUnlocked,
+          unlockedBattlegrounds: newlyUnlockedBattlegrounds(before, next),
+        };
+      }
       engineRef.current = null;
       setCombatants(null);
+      setCombatFx([]);
       setOverlay(result);
       syncGame(g);
     },
@@ -144,21 +214,25 @@ export function useGame() {
       pop(6, 1, 'PLACE A CREATURE', RUST, '12px');
       return;
     }
-    makeFoeBoard(g);
+    const difficulty = g.mode === 'bot' ? settingsRef.current.difficulty : 'normal';
+    makeFoeBoard(g, difficulty);
     const mine = g.board.map((u) => combatant(u, 'me'));
     const theirs = g.foe.map((u) => combatant(u, 'foe'));
     applyTraits(mine);
     applyTraits(theirs);
+    if (g.mode === 'bot') scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
       (r, c, text, color, size) => pop(r, c, text, color, size),
       (text) => {
         setBanner(text);
         setTimeout(() => setBanner(''), 1100);
       },
+      (fx) => spawnFx(fx),
     );
     engine.C = mine.concat(theirs);
     engineRef.current = engine;
     setCombatants(engine.C);
+    setCombatFx([]);
     g.phase = 'combat';
     syncGame(g);
     clearTimer();
@@ -175,7 +249,7 @@ export function useGame() {
         setTimeout(() => resolveCombat(win), 500);
       }
     }, 100);
-  }, [clearTimer, pop, resolveCombat, syncGame]);
+  }, [clearTimer, pop, resolveCombat, spawnFx, syncGame]);
 
   const buy = useCallback(
     (i: number) => {
@@ -237,6 +311,7 @@ export function useGame() {
     gameActions.nextRound(g, draft);
     setOverlay(null);
     setFloaters([]);
+    setCombatFx([]);
     syncGame(g);
   }, [draft, syncGame]);
 
@@ -260,11 +335,22 @@ export function useGame() {
     [nextRound],
   );
 
+  const updateSettings = useCallback((partial: Partial<SettingsState>) => {
+    setSettings((prev) => {
+      if (partial.battlegroundId && !battlegroundUnlocked(partial.battlegroundId, progressRef.current)) {
+        return prev;
+      }
+      const next = { ...prev, ...partial };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
   const autoDraft = useCallback(() => {
-    const p = HEROES.map((h) => h.id)
+    const pool = unlockedHeroIds(progressRef.current)
       .sort(() => Math.random() - 0.5)
       .slice(0, 6);
-    saveDraft(p);
+    saveDraft(pool);
   }, [saveDraft]);
 
   useEffect(() => () => clearTimer(), [clearTimer]);
@@ -273,6 +359,9 @@ export function useGame() {
     screen,
     setScreen,
     draft,
+    progress,
+    settings,
+    updateSettings,
     inspectId,
     setInspectId,
     game,
@@ -283,6 +372,7 @@ export function useGame() {
     floaters,
     banner,
     combatants,
+    combatFx,
     tick,
     saveDraft,
     toggleHero,

@@ -1,14 +1,20 @@
 import { BONE, INK, JADE, SAF } from '../../data/constants';
+import { HomeSpriteParade } from '../HomeSpriteParade';
 
 interface HomeScreenProps {
   teamCount: number;
+  unboundIds: string[];
+  totalHeroes: number;
+  wins: number;
   onPlay: () => void;
   onBuild: () => void;
+  onSettings: () => void;
 }
 
-export function HomeScreen({ teamCount, onPlay, onBuild }: HomeScreenProps) {
+export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, onBuild, onSettings }: HomeScreenProps) {
+  const unbound = unboundIds.length;
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
       <div
         style={{
           position: 'absolute',
@@ -42,7 +48,21 @@ export function HomeScreen({ teamCount, onPlay, onBuild }: HomeScreenProps) {
           transform: 'rotate(45deg)',
         }}
       />
-      <div style={{ padding: '56px 26px 0', position: 'relative' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: '38%',
+          left: '50%',
+          width: 320,
+          height: 320,
+          marginLeft: -160,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(232,163,23,.12) 0%, transparent 68%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <div className="screen-header-home" style={{ position: 'relative', zIndex: 1 }}>
         <div
           style={{
             fontWeight: 700,
@@ -56,34 +76,37 @@ export function HomeScreen({ teamCount, onPlay, onBuild }: HomeScreenProps) {
         </div>
         <div
           style={{
-            marginTop: 18,
+            marginTop: 14,
             display: 'inline-block',
             background: INK,
-            padding: '14px 18px 16px',
+            padding: '12px 16px 14px',
             animation: 'omStamp 0.5s cubic-bezier(.2,.9,.3,1.2) both',
+            boxShadow: '4px 4px 0 rgba(27,107,82,.35)',
           }}
         >
-          <div className="slab" style={{ fontSize: 46, lineHeight: 0.88, color: BONE }}>
+          <div className="slab" style={{ fontSize: 42, lineHeight: 0.88, color: BONE }}>
             TWELVE
             <br />
             <span style={{ color: SAF }}>OMENS</span>
           </div>
         </div>
         <div
-          style={{
-            marginTop: 16,
-            fontSize: 16,
-            lineHeight: 1.35,
-            color: '#4a4436',
-            maxWidth: 272,
-            textWrap: 'pretty',
-          }}
+            className="om-muted"
+            style={{
+              marginTop: 12,
+              fontSize: 15,
+              lineHeight: 1.35,
+              maxWidth: 272,
+              textWrap: 'pretty',
+            }}
         >
-          Twelve creatures out of twelve mythologies. Draft six. Roll, merge, and set them on the field.
+          Twelve creatures to start. Twelve more wait behind the veil. Draft six. Earn the rest.
         </div>
       </div>
-      <div style={{ flex: 1 }} />
-      <div style={{ padding: '0 22px 30px', display: 'flex', flexDirection: 'column', gap: 12, position: 'relative' }}>
+
+      <HomeSpriteParade unboundIds={unboundIds} />
+
+      <div className="screen-footer" style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', zIndex: 1 }}>
         <button
           type="button"
           className="btn-active"
@@ -120,15 +143,14 @@ export function HomeScreen({ teamCount, onPlay, onBuild }: HomeScreenProps) {
         </button>
         <button
           type="button"
-          className="btn-active"
+          className="btn-active om-card"
           onClick={onBuild}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 14,
-            background: BONE,
-            border: '3px solid #14120E',
-            boxShadow: '5px 5px 0 #14120E',
+            border: '3px solid var(--om-line)',
+            boxShadow: '5px 5px 0 var(--om-line)',
             padding: 17,
           }}
         >
@@ -138,13 +160,13 @@ export function HomeScreen({ teamCount, onPlay, onBuild }: HomeScreenProps) {
               BUILD TEAM
             </span>
             <span
+              className="om-muted"
               style={{
                 display: 'block',
                 marginTop: 4,
                 fontSize: 12,
                 letterSpacing: '0.16em',
                 textTransform: 'uppercase',
-                color: '#6b6455',
               }}
             >
               {teamCount} of 6 drafted
@@ -152,19 +174,49 @@ export function HomeScreen({ teamCount, onPlay, onBuild }: HomeScreenProps) {
           </span>
           <span style={{ fontSize: 22, color: JADE }}>›</span>
         </button>
-        <div
-          className="mono"
+        <button
+          type="button"
+          className="btn-active om-card"
+          onClick={onSettings}
           style={{
             display: 'flex',
-            gap: 7,
-            justifyContent: 'center',
-            marginTop: 8,
-            fontSize: 11,
-            letterSpacing: '0.24em',
-            color: '#9c937d',
+            alignItems: 'center',
+            gap: 14,
+            border: '3px solid var(--om-line)',
+            boxShadow: '5px 5px 0 var(--om-line)',
+            padding: 17,
           }}
         >
-          ☰ ☱ ☲ ☳ ☴ ☵ ☶ ☷
+          <span style={{ fontSize: 29, lineHeight: 1, color: JADE }}>⚙</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>
+            <span className="slab" style={{ display: 'block', fontSize: 25, lineHeight: 1 }}>
+              SETTINGS
+            </span>
+            <span
+              className="om-muted"
+              style={{
+                display: 'block',
+                marginTop: 4,
+                fontSize: 12,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Battlegrounds · theme · trial
+            </span>
+          </span>
+          <span style={{ fontSize: 22, color: JADE }}>›</span>
+        </button>
+        <div
+          className="mono om-muted"
+          style={{
+            textAlign: 'center',
+            marginTop: 4,
+            fontSize: 11,
+            letterSpacing: '0.16em',
+          }}
+        >
+          {unbound}/{totalHeroes} UNBOUND · {wins} WIN{wins === 1 ? '' : 'S'}
         </div>
       </div>
     </div>

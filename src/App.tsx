@@ -4,6 +4,9 @@ import { BuildScreen } from './components/screens/BuildScreen';
 import { GameScreen, OverlayModal, SheetModal } from './components/screens/GameScreen';
 import { HomeScreen } from './components/screens/HomeScreen';
 import { ModesScreen } from './components/screens/ModesScreen';
+import { SettingsScreen } from './components/screens/SettingsScreen';
+import { HEROES } from './data/heroes';
+import { unlockedHeroIds } from './data/progress';
 
 export default function App() {
   const game = useGame();
@@ -22,12 +25,28 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="phone">
+      <div
+        className={['phone', game.settings.darkMode ? 'theme-dark' : '', game.settings.reduceMotion ? 'reduce-motion' : '']
+          .filter(Boolean)
+          .join(' ')}
+      >
         {game.screen === 'home' && (
           <HomeScreen
             teamCount={game.draft.length}
+            unboundIds={unlockedHeroIds(game.progress)}
+            totalHeroes={HEROES.length}
+            wins={game.progress.wins}
             onPlay={() => game.setScreen('modes')}
             onBuild={() => game.setScreen('build')}
+            onSettings={() => game.setScreen('settings')}
+          />
+        )}
+        {game.screen === 'settings' && (
+          <SettingsScreen
+            progress={game.progress}
+            settings={game.settings}
+            onChange={game.updateSettings}
+            onBack={() => game.setScreen('home')}
           />
         )}
         {game.screen === 'modes' && (
@@ -35,11 +54,13 @@ export default function App() {
             onBack={() => game.setScreen('home')}
             onPractice={() => game.startGame('practice')}
             onBot={() => game.startGame('bot')}
+            difficulty={game.settings.difficulty}
           />
         )}
         {game.screen === 'build' && (
           <BuildScreen
             draft={game.draft}
+            progress={game.progress}
             onBack={() => game.setScreen('home')}
             onAutoDraft={game.autoDraft}
             onToBattle={() => game.setScreen('modes')}
@@ -51,9 +72,12 @@ export default function App() {
             <GameScreen
               game={game.game}
               combatants={game.combatants}
+              combatFx={game.combatFx}
               floaters={game.floaters}
               banner={game.banner}
               boardCap={game.cap}
+              battlegroundId={game.settings.battlegroundId}
+              reduceVfx={game.settings.reduceVfx}
               onQuit={game.quitGame}
               onTapCell={game.tapCell}
               onTapBench={(u) => game.tapUnit(u, 'bench')}
@@ -92,6 +116,7 @@ export default function App() {
           <InspectModal
             heroId={game.inspectId}
             draft={game.draft}
+            progress={game.progress}
             onClose={() => game.setInspectId(null)}
             onToggle={() => {
               game.toggleHero(game.inspectId!);

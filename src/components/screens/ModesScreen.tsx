@@ -1,21 +1,29 @@
-import { BONE, INK, JADE, SAF } from '../../data/constants';
+import { BONE, JADE, SAF } from '../../data/constants';
+import type { Difficulty } from '../../game/types';
 
 interface ModesScreenProps {
   onBack: () => void;
   onPractice: () => void;
   onBot: () => void;
+  difficulty: Difficulty;
 }
 
-export function ModesScreen({ onBack, onPractice, onBot }: ModesScreenProps) {
+const DIFFICULTY_TAG: Record<Difficulty, string> = {
+  normal: 'Mortal',
+  hard: 'Hard',
+  mythic: 'Mythic',
+};
+
+export function ModesScreen({ onBack, onPractice, onBot, difficulty }: ModesScreenProps) {
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div
+        className="screen-header-nav"
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: '46px 20px 14px',
-          borderBottom: '3px solid #14120E',
+          borderBottom: '3px solid var(--om-line)',
         }}
       >
         <button
@@ -24,7 +32,7 @@ export function ModesScreen({ onBack, onPractice, onBot }: ModesScreenProps) {
           style={{
             width: 34,
             height: 34,
-            border: '2px solid #14120E',
+            border: '2px solid var(--om-line)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -37,12 +45,12 @@ export function ModesScreen({ onBack, onPractice, onBot }: ModesScreenProps) {
           CHOOSE A TRIAL
         </div>
       </div>
-      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="modes-list" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, flex: 1, overflowY: 'auto' }}>
         <button
           type="button"
-          className="btn-active"
+          className="btn-active om-card"
           onClick={onPractice}
-          style={{ textAlign: 'left', border: '3px solid #14120E', boxShadow: '5px 5px 0 #14120E', overflow: 'hidden' }}
+          style={{ textAlign: 'left', border: '3px solid var(--om-line)', boxShadow: '5px 5px 0 var(--om-line)', overflow: 'hidden' }}
         >
           <div
             style={{
@@ -59,15 +67,15 @@ export function ModesScreen({ onBack, onPractice, onBot }: ModesScreenProps) {
             </span>
             <span style={{ fontSize: 25 }}>☴</span>
           </div>
-          <div style={{ padding: '14px 16px 16px', fontSize: 15, lineHeight: 1.4, color: '#4a4436' }}>
+          <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
             Sandbox. Infinite gold, free rerolls, no opponent. Test placements, merges and traits for as long as you like.
           </div>
         </button>
         <button
           type="button"
-          className="btn-active"
+          className="btn-active om-card"
           onClick={onBot}
-          style={{ textAlign: 'left', border: '3px solid #14120E', boxShadow: '5px 5px 0 #14120E', overflow: 'hidden' }}
+          style={{ textAlign: 'left', border: '3px solid var(--om-line)', boxShadow: '5px 5px 0 var(--om-line)', overflow: 'hidden' }}
         >
           <div
             style={{
@@ -84,11 +92,11 @@ export function ModesScreen({ onBack, onPractice, onBot }: ModesScreenProps) {
             </span>
             <span style={{ fontSize: 25, color: SAF }}>☳</span>
           </div>
-          <div style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4, color: '#4a4436' }}>
-            Twelve rounds against the Adversary. 100 health each. Round losses compound — three in a row and the field will end you.
+          <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
+            Twelve rounds against the Adversary. Match wins unseal sealed omens — some ask for a synergy, not just a count.
           </div>
           <div style={{ display: 'flex', gap: 7, padding: '0 16px 16px', flexWrap: 'wrap' }}>
-            {['Hyper roll', 'Relics', '3★ merges'].map((tag) => (
+            {['Hyper roll', 'Relics', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
               <span
                 key={tag}
                 style={{
@@ -96,7 +104,7 @@ export function ModesScreen({ onBack, onPractice, onBot }: ModesScreenProps) {
                   fontSize: 11,
                   letterSpacing: '0.13em',
                   textTransform: 'uppercase',
-                  border: '2px solid #14120E',
+                  border: '2px solid var(--om-line)',
                   padding: '3px 7px',
                 }}
               >
@@ -106,15 +114,15 @@ export function ModesScreen({ onBack, onPractice, onBot }: ModesScreenProps) {
           </div>
         </button>
         <div
+          className="modes-list-note om-muted"
           style={{
             padding: 14,
-            border: '2px dashed #b3a98f',
+            border: '2px dashed var(--om-muted)',
             fontSize: 14,
             lineHeight: 1.4,
-            color: '#6b6455',
           }}
         >
-          Your shop only rolls the <strong style={{ color: INK }}>six</strong> creatures you drafted. Draft narrow to hit 3★ fast; draft wide for trait depth.
+          Your shop only rolls the <strong style={{ color: 'var(--om-fg)' }}>six</strong> creatures you drafted. Draft narrow to hit 3★ fast; draft wide for trait depth.
         </div>
       </div>
     </div>
