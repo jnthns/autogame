@@ -11,6 +11,9 @@ export interface Unit {
   relics: string[];
   r?: number;
   c?: number;
+  boss?: boolean;
+  scaleHp?: number;
+  scaleAtk?: number;
 }
 
 export interface Selection {
@@ -18,8 +21,15 @@ export interface Selection {
   from: 'bench' | 'board';
 }
 
+export interface BossRewardGrant {
+  gold: number;
+  freeRerolls: number;
+  relic: boolean;
+}
+
 export interface GameState {
   mode: GameMode;
+  matchRounds: number;
   round: number;
   gold: number;
   myHp: number;
@@ -30,12 +40,17 @@ export interface GameState {
   bench: Unit[];
   board: Unit[];
   foe: Unit[];
+  foeBench: Unit[];
+  foeGold: number;
+  foeDraft: string[];
+  foeShop: (string | null)[];
   shop: (string | null)[];
+  freeRerolls: number;
   sel: Selection | null;
   speed: number;
   phase: Phase;
   log: string;
-  lastResult: { win: boolean; dmg: number } | null;
+  lastResult: { win: boolean; dmg: number; boss?: boolean } | null;
 }
 
 export interface Floater {
@@ -65,7 +80,13 @@ export interface CombatFx {
 export type CombatFxPayload = Omit<CombatFx, 'k' | 't'>;
 
 export type OverlayKind =
-  | { kind: 'result'; win: boolean; dmg: number; offer: boolean }
+  | {
+      kind: 'result';
+      win: boolean;
+      dmg: number;
+      offer: boolean;
+      boss?: { name: string; period: number; reward?: BossRewardGrant };
+    }
   | { kind: 'relic'; picks: string[] }
   | { kind: 'bind'; rid: string }
   | { kind: 'spar'; win: boolean }
@@ -121,6 +142,7 @@ export interface Combatant {
   buffT?: number;
   buffAs?: number;
   dmgBuff?: number;
+  boss?: boolean;
 }
 
 export interface ActiveTrait {

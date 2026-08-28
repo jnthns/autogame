@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL } from '../../data/constants';
 import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
-import { activeSynergies, classCard, classCounts, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { activeSynergies, classCard, classCounts, combatant, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
 import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
 import { BattlegroundPreview } from '../BattlegroundPreview';
@@ -57,47 +59,17 @@ export function GameScreen({
 }: GameScreenProps) {
   const plan = g.phase === 'plan';
   const combat = g.phase === 'combat';
+  const period = periodInfo(g.round, g.matchRounds);
+  const foePreview =
+    !combat && g.mode === 'bot' ? (isBossRound(g.round) ? makeBossUnits(g.round) : g.foe) : [];
   const src: Combatant[] =
     combatants ??
-    g.board
-      .concat(g.foe)
-      .map((u) => {
-        const h = HERO_MAP[u.hid];
-        const m = STARMUL[u.star];
-        return {
-          u: u.u,
-          hid: u.hid,
-          star: u.star,
-          side: g.foe.some((f) => f.u === u.u) ? ('foe' as const) : ('me' as const),
-          r: u.r!,
-          c: u.c!,
-          glyph: h.glyph,
-          name: h.name,
-          maxHp: Math.round(h.hp * m),
-          hp: Math.round(h.hp * m),
-          atk: h.dmg * m,
-          as: h.as,
-          range: h.range,
-          crit: h.crit,
-          critDmg: 0.8,
-          mana: 0,
-          startMana: 0,
-          sp: 0,
-          dr: 0,
-          lifesteal: 0,
-          shield: 0,
-          amp: 0,
-          stun: 0,
-          silence: 0,
-          snare: 0,
-          burn: 0,
-          burnT: 0,
-          cd: 0,
-          mv: 0,
-          alive: true,
-          cast2: false,
-        };
-      });
+    g.board.concat(foePreview).map((u) => combatant(u, g.board.some((b) => b.u === u.u) ? 'me' : 'foe'));
+
+  const [sellArmed, setSellArmed] = useState(false);
+  useEffect(() => {
+    setSellArmed(false);
+  }, [g.sel?.u]);
 
   const selUnit = g.sel
     ? (g.sel.from === 'bench' ? g.bench : g.board).find((x) => x.u === g.sel!.u)
@@ -105,7 +77,10 @@ export function GameScreen({
   const sv = selUnit ? sellValue(selUnit) : 0;
   const shown = activeSynergies(g.board.map((u) => u.hid)).filter((t) => t.count >= 1);
   const rerollCost = MATCH_DEFAULTS.rerollCost;
-  const canReroll = g.mode === 'practice' || g.gold >= rerollCost;
+  const canReroll = g.mode === 'practice' || g.freeRerolls > 0 || g.gold >= rerollCost;
+  const rerollLabel =
+    g.mode === 'practice' ? 'FREE ROLL' : g.freeRerolls > 0 ? `FREE ROLL ×${g.freeRerolls}` : `ROLL ◈${rerollCost}`;
+  const fightLabel = g.mode === 'practice' ? 'SPAR' : period.isBoss ? 'FIGHT BOSS' : period.isFinal ? 'FINAL FIGHT' : 'FIGHT';
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -128,7 +103,7 @@ export function GameScreen({
             ‹
           </button>
           <div className="slab" style={{ fontSize: 15, letterSpacing: '0.02em', color: SAF }}>
-            {g.mode === 'practice' ? 'SANDBOX' : `ROUND ${g.round} / ${MATCH_DEFAULTS.matchRounds}`}
+            {g.mode === 'practice' ? 'SANDBOX' : `ROUND ${g.round} / ${g.matchRounds}`}
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, border: '2px solid #E8A317', padding: '2px 8px' }}>
@@ -185,17 +160,56 @@ export function GameScreen({
                 {g.foeHp}
               </span>
             </div>
+            <div
+              style={{
+                marginTop: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                className="slab"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: '0.12em',
+                  color: period.isBoss ? SAF : BONE,
+                  border: `2px solid ${period.isBoss ? SAF : '#6b6455'}`,
+                  padding: '2px 7px',
+                }}
+              >
+                {period.label}
+              </span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: period.isBoss ? SAF : '#a99f86',
+                }}
+              >
+                {period.isFinal
+                  ? 'Final vs the Adversary'
+                  : period.isBoss
+                    ? `${getBossEncounter(g.round)?.name ?? 'Boss'} this round`
+                    : period.roundsUntilBoss === 1
+                      ? 'Boss next round'
+                      : `Boss in ${period.roundsUntilBoss} rounds`}
+              </span>
+            </div>
           </>
         )}
       </div>
 
       <div
-        className="synergy-bar"
         style={{
           display: 'flex',
           gap: 5,
           padding: '7px 10px',
-          borderBottom: '2px solid var(--om-line)',
+          borderBottom: '2px solid #14120E',
+          background: '#e7dcc2',
           overflowX: 'auto',
           minHeight: 34,
           alignItems: 'center',
@@ -333,7 +347,7 @@ export function GameScreen({
                   style={{
                     position: 'relative',
                     border: '2px solid #14120E',
-                    background: me ? INK : '#7a2d1d',
+                    background: me ? INK : u.boss ? '#5c1c12' : '#7a2d1d',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -407,6 +421,26 @@ export function GameScreen({
                       />
                     </span>
                   )}
+                  {u.boss && (
+                    <span
+                      className="slab"
+                      style={{
+                        position: 'absolute',
+                        bottom: 6,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        fontSize: 7,
+                        letterSpacing: '0.08em',
+                        background: SAF,
+                        color: INK,
+                        border: '1px solid #14120E',
+                        padding: '0 3px',
+                        lineHeight: '10px',
+                      }}
+                    >
+                      BOSS
+                    </span>
+                  )}
                   {sel && (
                     <span
                       className="slab"
@@ -469,6 +503,23 @@ export function GameScreen({
               }}
             >
               {banner}
+            </span>
+          </div>
+        )}
+        {plan && g.mode === 'bot' && (period.isBoss || period.isFinal) && !banner && (
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 8, textAlign: 'center', pointerEvents: 'none', zIndex: 31 }}>
+            <span
+              className="slab"
+              style={{
+                display: 'inline-block',
+                background: period.isBoss ? RUST : INK,
+                color: period.isBoss ? BONE : SAF,
+                border: `2px solid ${period.isBoss ? INK : SAF}`,
+                padding: '3px 10px',
+                fontSize: 13,
+              }}
+            >
+              {period.isBoss ? getBossEncounter(g.round)?.name ?? 'BOSS ROUND' : 'FINAL VS THE ADVERSARY'}
             </span>
           </div>
         )}
@@ -544,7 +595,7 @@ export function GameScreen({
           );
         })}
         <div style={{ flex: 1 }} />
-        {selUnit && (
+        {selUnit && plan && (
           <>
             <button
               type="button"
@@ -563,19 +614,28 @@ export function GameScreen({
             </button>
             <button
               type="button"
-              onClick={onSell}
+              onClick={() => {
+                if (!sellArmed) {
+                  setSellArmed(true);
+                  return;
+                }
+                onSell();
+                setSellArmed(false);
+              }}
               style={{
                 flex: '0 0 auto',
-                border: '2px solid #B4442B',
-                color: RUST,
-                padding: '8px 9px',
+                border: '2px solid #14120E',
+                background: sellArmed ? RUST : BONE,
+                color: sellArmed ? BONE : RUST,
+                padding: '8px 10px',
                 fontWeight: 700,
                 fontSize: 11,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
+                boxShadow: sellArmed ? '3px 3px 0 #14120E' : undefined,
               }}
             >
-              Sell ◈{sv}
+              {sellArmed ? `Confirm ◈${sv}` : `Sell ◈${sv}`}
             </button>
           </>
         )}
@@ -677,7 +737,7 @@ export function GameScreen({
                   color: canReroll ? INK : '#a99f86',
                 }}
               >
-                ↻ {g.mode === 'practice' ? 'FREE ROLL' : `ROLL ◈${rerollCost}`}
+                ↻ {rerollLabel}
               </button>
               <button
                 type="button"
@@ -694,7 +754,7 @@ export function GameScreen({
                   color: g.board.length ? BONE : '#8a8271',
                 }}
               >
-                {g.mode === 'practice' ? 'SPAR' : 'FIGHT'}
+                {fightLabel}
               </button>
             </div>
           </>
@@ -1049,17 +1109,33 @@ export function OverlayModal({
   let relics: { glyph: string; name: string; desc: string; onTap?: () => void }[] = [];
 
   if (overlay.kind === 'result') {
-    title = overlay.win ? 'ROUND WON' : 'ROUND LOST';
-    subtitle = overlay.win ? 'The Adversary buckles' : 'The field turns on you';
-    bannerBg = overlay.win ? JADE : RUST;
-    body =
-      (overlay.win ? 'The Adversary takes ' : 'You take ') +
-      overlay.dmg +
-      ' damage' +
-      ((overlay.win ? game.foeLossStreak : game.lossStreak) > 1
-        ? ` — ${overlay.win ? game.foeLossStreak : game.lossStreak} losses in a row, and it compounds.`
-        : '.');
-    actionLabel = overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND';
+    if (overlay.boss) {
+      title = overlay.win ? `${overlay.boss.name.toUpperCase()} FELLED` : `FELLED BY ${overlay.boss.name.toUpperCase()}`;
+      subtitle = overlay.win ? `Period ${overlay.boss.period} spoil` : `Period ${overlay.boss.period} · you still stand`;
+      bannerBg = overlay.win ? JADE : RUST;
+      if (overlay.win && overlay.boss.reward) {
+        body =
+          `The omen breaks. You claim ${rewardLines(overlay.boss.reward).join(' · ')}. The Adversary's board is untouched.`;
+      } else {
+        body =
+          `You take ${overlay.dmg} damage` +
+          (game.lossStreak > 1 ? ` — ${game.lossStreak} losses in a row, and it compounds.` : '.') +
+          ' The match continues.';
+      }
+      actionLabel = overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND';
+    } else {
+      title = overlay.win ? 'ROUND WON' : 'ROUND LOST';
+      subtitle = overlay.win ? 'The Adversary buckles' : 'The field turns on you';
+      bannerBg = overlay.win ? JADE : RUST;
+      body =
+        (overlay.win ? 'The Adversary takes ' : 'You take ') +
+        overlay.dmg +
+        ' damage' +
+        ((overlay.win ? game.foeLossStreak : game.lossStreak) > 1
+          ? ` — ${overlay.win ? game.foeLossStreak : game.lossStreak} losses in a row, and it compounds.`
+          : '.');
+      actionLabel = overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND';
+    }
   } else if (overlay.kind === 'relic') {
     title = 'SPOILS';
     subtitle = 'Choose one relic';
@@ -1149,6 +1225,35 @@ export function OverlayModal({
         </div>
         <div style={{ padding: '14px 16px' }}>
           <div style={{ fontSize: 15, lineHeight: 1.4, color: '#4a4436', textWrap: 'pretty' }}>{body}</div>
+          {overlay.kind === 'result' && overlay.win && overlay.boss?.reward && (
+            <div
+              style={{
+                marginTop: 12,
+                border: '2px solid #14120E',
+                background: '#e7dcc2',
+                padding: '9px 10px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              {rewardLines(overlay.boss.reward).map((line) => (
+                <span
+                  key={line}
+                  className="slab"
+                  style={{
+                    fontSize: 13,
+                    background: SAF,
+                    color: INK,
+                    border: '2px solid #14120E',
+                    padding: '3px 8px',
+                  }}
+                >
+                  {line}
+                </span>
+              ))}
+            </div>
+          )}
           {overlay.kind === 'over' && overlay.win && overlay.unlocked && overlay.unlocked.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <div
