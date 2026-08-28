@@ -1,17 +1,22 @@
 import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL } from '../../data/constants';
+import { BATTLEGROUND_MAP, battlegroundTileUrl } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
-import { activeTraits, sellValue, traitCard } from '../../game/engine';
-import type { Combatant, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
+import { activeSynergies, classCard, classCounts, sellValue, traitCard, traitCounts } from '../../game/engine';
+import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
+import { CombatFxLayer, getLungeTransform } from '../CombatFxLayer';
 import { PixelSprite } from '../PixelSprite';
 
 interface GameScreenProps {
   game: GameState;
   combatants: Combatant[] | null;
+  combatFx: CombatFx[];
   floaters: Floater[];
   banner: string;
   boardCap: number;
+  battlegroundId: string;
+  reduceVfx?: boolean;
   onQuit: () => void;
   onTapCell: (r: number, c: number) => void;
   onTapBench: (u: GameState['bench'][0]) => void;
@@ -29,9 +34,12 @@ interface GameScreenProps {
 export function GameScreen({
   game: g,
   combatants,
+  combatFx,
   floaters,
   banner,
   boardCap,
+  battlegroundId,
+  reduceVfx,
   onQuit,
   onTapCell,
   onTapBench,
@@ -93,13 +101,13 @@ export function GameScreen({
     ? (g.sel.from === 'bench' ? g.bench : g.board).find((x) => x.u === g.sel!.u)
     : null;
   const sv = selUnit ? sellValue(selUnit) : 0;
-  const shown = activeTraits(g.board.map((u) => u.hid)).filter((t) => t.count >= 1);
+  const shown = activeSynergies(g.board.map((u) => u.hid)).filter((t) => t.count >= 1);
   const rerollCost = MATCH_DEFAULTS.rerollCost;
   const canReroll = g.mode === 'practice' || g.gold >= rerollCost;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: BONE }}>
-      <div style={{ padding: '42px 12px 8px', borderBottom: '3px solid #14120E', background: INK, color: BONE }}>
+    <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="screen-header" style={{ borderBottom: '3px solid #14120E', background: INK, color: BONE }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
@@ -180,12 +188,12 @@ export function GameScreen({
       </div>
 
       <div
+        className="synergy-bar"
         style={{
           display: 'flex',
           gap: 5,
           padding: '7px 10px',
-          borderBottom: '2px solid #14120E',
-          background: '#e7dcc2',
+          borderBottom: '2px solid var(--om-line)',
           overflowX: 'auto',
           minHeight: 34,
           alignItems: 'center',
@@ -193,7 +201,7 @@ export function GameScreen({
       >
         {shown.map((t) => (
           <button
-            key={t.name}
+            key={`${t.kind}-${t.name}`}
             type="button"
             onClick={onOpenTraits}
             style={{
@@ -203,17 +211,24 @@ export function GameScreen({
               gap: 4,
               border: '2px solid #14120E',
               padding: '2px 6px',
-              background: t.lvl > 1 ? SAF : t.lvl ? INK : BONE,
+              background: t.lvl > 1 ? (t.kind === 'class' ? '#4C7BD1' : SAF) : t.lvl ? INK : BONE,
             }}
           >
-            <span style={{ fontSize: 12, color: t.lvl ? (t.lvl > 1 ? INK : BONE) : '#8a8271' }}>{t.glyph}</span>
+            <span
+              style={{
+                fontSize: 12,
+                color: t.lvl ? (t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE) : '#8a8271',
+              }}
+            >
+              {t.glyph}
+            </span>
             <span
               style={{
                 fontWeight: 700,
                 fontSize: 10,
                 letterSpacing: '0.07em',
                 textTransform: 'uppercase',
-                color: t.lvl ? (t.lvl > 1 ? INK : BONE) : '#8a8271',
+                color: t.lvl ? (t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE) : '#8a8271',
               }}
             >
               {t.name} {t.count}
@@ -228,14 +243,9 @@ export function GameScreen({
       </div>
 
       <div
+        className="game-board"
         style={{
-          position: 'relative',
-          margin: 0,
-          borderBottom: '3px solid #14120E',
-          background: '#dfd3b6',
-          overflow: 'hidden',
-          flex: '1 1 auto',
-          minHeight: 230,
+          ['--board-bg' as string]: `url(${battlegroundTileUrl(battlegroundId)})`,
         }}
       >
         <div
@@ -263,8 +273,8 @@ export function GameScreen({
                   background: mine
                     ? g.sel && !occupied
                       ? 'rgba(232,163,23,.28)'
-                      : 'rgba(27,107,82,.10)'
-                    : 'rgba(180,68,43,.10)',
+                      : 'rgba(27,107,82,.18)'
+                    : 'rgba(180,68,43,.18)',
                 }}
               />
             );
@@ -289,6 +299,7 @@ export function GameScreen({
             const sel = g.sel && g.sel.u === u.u;
             const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
             const boardUnit = g.board.find((x) => x.u === u.u);
+            const lunge = combat ? getLungeTransform(combatFx, u.r, u.c) : undefined;
             return (
               <div
                 key={u.u}
@@ -318,16 +329,17 @@ export function GameScreen({
                       else onTapBoard(boardUnit);
                     }
                   }}
+                  className="board-unit"
                   style={{
                     position: 'relative',
-                    width: 38,
-                    height: 38,
                     border: '2px solid #14120E',
                     background: me ? INK : '#7a2d1d',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     pointerEvents: 'auto',
+                    transform: lunge,
+                    transition: lunge ? 'transform 0.07s ease-out' : undefined,
                     boxShadow: sel
                       ? `0 0 0 3px ${SAF}`
                       : u.stun > 0
@@ -335,7 +347,7 @@ export function GameScreen({
                         : '2px 2px 0 rgba(20,18,14,.35)',
                   }}
                 >
-                  <PixelSprite src={spriteCss(u.hid)} size={30} />
+                  <PixelSprite src={spriteCss(u.hid)} />
                   <span
                     style={{
                       position: 'absolute',
@@ -419,6 +431,7 @@ export function GameScreen({
               </div>
             );
           })}
+        {combat && !reduceVfx && <CombatFxLayer fx={combatFx} />}
         {floaters.map((f) => (
           <div
             key={f.k}
@@ -479,10 +492,8 @@ export function GameScreen({
             return (
               <div
                 key={i}
+                className="bench-slot"
                 style={{
-                  flex: '0 0 auto',
-                  width: 40,
-                  height: 40,
                   border: '2px solid #14120E',
                   background: BONE,
                   display: 'flex',
@@ -500,10 +511,8 @@ export function GameScreen({
               key={u.u}
               type="button"
               onClick={() => onTapBench(u)}
+              className="bench-slot"
               style={{
-                flex: '0 0 auto',
-                width: 40,
-                height: 40,
                 border: '2px solid #14120E',
                 background: INK,
                 display: 'flex',
@@ -513,7 +522,7 @@ export function GameScreen({
                 boxShadow: sel ? `0 0 0 3px ${SAF}` : '2px 2px 0 rgba(20,18,14,.3)',
               }}
             >
-              <PixelSprite src={spriteCss(u.hid)} size={30} />
+              <PixelSprite src={spriteCss(u.hid)} />
               <span
                 style={{
                   position: 'absolute',
@@ -620,7 +629,7 @@ export function GameScreen({
                       opacity: afford ? 1 : 0.55,
                     }}
                   >
-                    <PixelSprite src={spriteCss(hid)} size={30} />
+                    <PixelSprite src={spriteCss(hid)} />
                     <span
                       style={{
                         fontSize: 9,
@@ -723,11 +732,12 @@ export function SheetModal({
   onClose: () => void;
 }) {
   if (!sheet) return null;
-  const counts: Record<string, number> = {};
-  game.board.forEach((u) => HERO_MAP[u.hid].traits.forEach((t) => (counts[t] = (counts[t] || 0) + 1)));
+  const traitBoard = traitCounts(game.board.map((u) => u.hid));
+  const classBoard = classCounts(game.board.map((u) => u.hid));
 
   if (sheet.kind === 'traits') {
-    const names = Object.keys(counts).sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+    const traitNames = Object.keys(traitBoard).sort((a, b) => (traitBoard[b] || 0) - (traitBoard[a] || 0));
+    const classNames = Object.keys(classBoard).sort((a, b) => (classBoard[b] || 0) - (classBoard[a] || 0));
     return (
       <div
         style={{
@@ -753,10 +763,37 @@ export function SheetModal({
         >
           <SheetHeader title="SYNERGIES" subtitle={`Board of ${game.board.length}`} onClose={onClose} isTraits />
           <div style={{ padding: '14px 16px 20px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {names.map((n) => {
-              const t = traitCard(n, counts);
-              return <TraitCardBlock key={n} card={t} showDesc />;
-            })}
+            {classNames.length > 0 && (
+              <>
+                <div style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+                  Classes
+                </div>
+                {classNames.map((n) => {
+                  const t = classCard(n, classBoard);
+                  return <TraitCardBlock key={`class-${n}`} card={t} showDesc />;
+                })}
+              </>
+            )}
+            {traitNames.length > 0 && (
+              <>
+                <div
+                  style={{
+                    marginTop: classNames.length ? 8 : 0,
+                    fontWeight: 700,
+                    fontSize: 11,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: '#6b6455',
+                  }}
+                >
+                  Myth traits
+                </div>
+                {traitNames.map((n) => {
+                  const t = traitCard(n, traitBoard);
+                  return <TraitCardBlock key={`trait-${n}`} card={t} showDesc />;
+                })}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -820,11 +857,17 @@ export function SheetModal({
             </div>
           </div>
           <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
-            Synergies on this creature
+            Class on this creature
+          </div>
+          <div style={{ marginTop: 7 }}>
+            <TraitCardBlock card={classCard(h.heroClass, classBoard)} showDesc />
+          </div>
+          <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+            Myth traits on this creature
           </div>
           <div style={{ marginTop: 7, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {h.traits.map((t) => (
-              <TraitCardBlock key={t} card={traitCard(t, counts)} />
+              <TraitCardBlock key={t} card={traitCard(t, traitBoard)} />
             ))}
           </div>
           {sheet.relics.length > 0 && (
@@ -1057,7 +1100,7 @@ export function OverlayModal({
     bannerBg = overlay.win ? JADE : INK;
     bannerFg = overlay.win ? BONE : SAF;
     body = overlay.win
-      ? 'Twelve creatures answered. Yours answered louder.'
+      ? 'Your omens answered louder. Bot victories unseal what waits behind the veil.'
       : 'The Adversary outlasted your board. Redraft and try a different six.';
     actionLabel = 'PLAY AGAIN';
     showSecondary = true;
@@ -1106,6 +1149,124 @@ export function OverlayModal({
         </div>
         <div style={{ padding: '14px 16px' }}>
           <div style={{ fontSize: 15, lineHeight: 1.4, color: '#4a4436', textWrap: 'pretty' }}>{body}</div>
+          {overlay.kind === 'over' && overlay.win && overlay.unlocked && overlay.unlocked.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: '#6b6455',
+                  marginBottom: 8,
+                }}
+              >
+                Unsealed
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {overlay.unlocked.map((id) => {
+                  const h = HERO_MAP[id];
+                  return (
+                    <div
+                      key={id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        border: '2px solid #14120E',
+                        background: '#e7dcc2',
+                        padding: '7px 9px',
+                      }}
+                    >
+                      <PixelSprite src={spriteCss(id)} size={28} />
+                      <span style={{ flex: 1 }}>
+                        <span className="slab" style={{ display: 'block', fontSize: 15, lineHeight: 1.1 }}>
+                          {h.name}
+                        </span>
+                        <span
+                          style={{
+                            display: 'block',
+                            marginTop: 2,
+                            fontSize: 11,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            color: '#6b6455',
+                          }}
+                        >
+                          {h.traits.join(' · ')}
+                        </span>
+                      </span>
+                      <span style={{ color: JADE, fontWeight: 700, fontSize: 16 }}>✦</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {overlay.kind === 'over' && overlay.unlockedBattlegrounds && overlay.unlockedBattlegrounds.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: '#6b6455',
+                  marginBottom: 8,
+                }}
+              >
+                Battleground unlocked
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {overlay.unlockedBattlegrounds.map((id) => {
+                  const b = BATTLEGROUND_MAP[id];
+                  return (
+                    <div
+                      key={id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        border: '2px solid #14120E',
+                        background: '#e7dcc2',
+                        padding: '7px 9px',
+                      }}
+                    >
+                      <span
+                        className="pixel"
+                        style={{
+                          width: 28,
+                          height: 28,
+                          backgroundImage: `url(${battlegroundTileUrl(id)})`,
+                          backgroundSize: 'cover',
+                          border: '2px solid #14120E',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ flex: 1 }}>
+                        <span className="slab" style={{ display: 'block', fontSize: 15, lineHeight: 1.1 }}>
+                          {b?.name ?? id}
+                        </span>
+                        <span
+                          style={{
+                            display: 'block',
+                            marginTop: 2,
+                            fontSize: 11,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            color: '#6b6455',
+                          }}
+                        >
+                          {b?.theme}
+                        </span>
+                      </span>
+                      <span style={{ color: JADE, fontWeight: 700, fontSize: 16 }}>✦</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {showRelics && (
             <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {relics.map((r, i) => (

@@ -1,19 +1,26 @@
-import { BONE, INK, JADE, RUST, costTone } from '../data/constants';
+import { CLASSES } from '../data/classes';
+import { BONE, INK, JADE, RUST, SAF, costTone } from '../data/constants';
 import { HERO_MAP } from '../data/heroes';
+import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../data/progress';
 import { spriteCss } from '../data/sprites';
 import { PixelSprite } from './PixelSprite';
 
 interface InspectModalProps {
   heroId: string;
   draft: string[];
+  progress: ProgressState;
   onClose: () => void;
   onToggle: () => void;
 }
 
-export function InspectModal({ heroId, draft, onClose, onToggle }: InspectModalProps) {
+export function InspectModal({ heroId, draft, progress, onClose, onToggle }: InspectModalProps) {
   const h = HERO_MAP[heroId];
   const on = draft.includes(heroId);
   const full = draft.length >= 6;
+  const unlocked = heroUnlocked(heroId, progress);
+  const req = unlockReq(heroId);
+  const have = req ? unlockCurrent(req, progress) : 0;
+  const need = req?.n ?? 0;
 
   return (
     <div
@@ -52,7 +59,7 @@ export function InspectModal({ heroId, draft, onClose, onToggle }: InspectModalP
               justifyContent: 'center',
             }}
           >
-            <PixelSprite src={spriteCss(h.id)} size={48} />
+            <PixelSprite src={spriteCss(h.id)} size={48} dimmed={!unlocked} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="slab" style={{ fontSize: 24, lineHeight: 1 }}>
@@ -70,6 +77,20 @@ export function InspectModal({ heroId, draft, onClose, onToggle }: InspectModalP
               {h.origin} · {h.creature}
             </div>
             <div style={{ marginTop: 7, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  border: '2px solid #14120E',
+                  padding: '2px 6px',
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  background: '#4C7BD1',
+                  color: BONE,
+                }}
+              >
+                {CLASSES[h.heroClass].glyph} {h.heroClass}
+              </span>
               {h.traits.map((t) => (
                 <span
                   key={t}
@@ -128,15 +149,39 @@ export function InspectModal({ heroId, draft, onClose, onToggle }: InspectModalP
           </div>
         </div>
         <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.4, color: '#6b6455', textWrap: 'pretty' }}>{h.quirk}</div>
+        {!unlocked && req && (
+          <div style={{ marginTop: 12, border: '3px solid #14120E', padding: 12, background: '#e7dcc2' }}>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: '#6b6455',
+              }}
+            >
+              Sealed omen
+            </div>
+            <div className="slab" style={{ fontSize: 16, lineHeight: 1.15, marginTop: 4 }}>
+              {unlockLabel(req)}
+            </div>
+            <div style={{ marginTop: 8, height: 8, background: 'rgba(20,18,14,.15)', border: '2px solid #14120E' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, (have / need) * 100)}%`, background: SAF }} />
+            </div>
+            <div className="mono" style={{ marginTop: 6, fontSize: 12, fontWeight: 700 }}>
+              {have} / {need}
+            </div>
+          </div>
+        )}
         <button
           type="button"
           className="btn-active-sm"
-          onClick={onToggle}
+          onClick={unlocked ? onToggle : onClose}
           style={{
             marginTop: 16,
             width: '100%',
-            background: on ? RUST : full ? '#cfc3a6' : JADE,
-            color: on || !full ? BONE : '#8a8271',
+            background: !unlocked ? '#6b6455' : on ? RUST : full ? '#cfc3a6' : JADE,
+            color: !unlocked || on || !full ? BONE : '#8a8271',
             border: '3px solid #14120E',
             boxShadow: '4px 4px 0 #14120E',
             padding: 13,
@@ -144,7 +189,7 @@ export function InspectModal({ heroId, draft, onClose, onToggle }: InspectModalP
             fontSize: 19,
           }}
         >
-          {on ? 'REMOVE FROM ROSTER' : full ? 'ROSTER FULL' : 'ADD TO ROSTER'}
+          {!unlocked ? 'SEALED' : on ? 'REMOVE FROM ROSTER' : full ? 'ROSTER FULL' : 'ADD TO ROSTER'}
         </button>
       </div>
     </div>

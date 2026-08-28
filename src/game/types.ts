@@ -1,6 +1,8 @@
-export type Screen = 'home' | 'modes' | 'build' | 'game';
+export type Screen = 'home' | 'modes' | 'build' | 'game' | 'settings';
 export type GameMode = 'practice' | 'bot';
 export type Phase = 'plan' | 'combat' | 'result';
+export type Difficulty = 'normal' | 'hard' | 'mythic';
+export type CombatSpeed = 1 | 2 | 4;
 
 export interface Unit {
   u: string;
@@ -46,12 +48,28 @@ export interface Floater {
   t: number;
 }
 
+export type CombatFxKind = 'phys' | 'magic' | 'crit' | 'true' | 'cast';
+
+export interface CombatFx {
+  k: string;
+  kind: CombatFxKind;
+  hid: string;
+  fromR: number;
+  fromC: number;
+  toR: number;
+  toC: number;
+  melee: boolean;
+  t: number;
+}
+
+export type CombatFxPayload = Omit<CombatFx, 'k' | 't'>;
+
 export type OverlayKind =
   | { kind: 'result'; win: boolean; dmg: number; offer: boolean }
   | { kind: 'relic'; picks: string[] }
   | { kind: 'bind'; rid: string }
   | { kind: 'spar'; win: boolean }
-  | { kind: 'over'; win: boolean };
+  | { kind: 'over'; win: boolean; unlocked?: string[]; unlockedBattlegrounds?: string[] };
 
 export interface SheetHero {
   kind: 'hero';
@@ -112,4 +130,5 @@ export interface ActiveTrait {
   label: string;
   glyph: string;
   desc: string;
+  kind: 'trait' | 'class';
 }

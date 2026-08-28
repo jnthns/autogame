@@ -1,30 +1,42 @@
 import { BONE, INK, JADE, SAF, costTone } from '../../data/constants';
 import { HEROES } from '../../data/heroes';
+import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../../data/progress';
 import { spriteCss } from '../../data/sprites';
-import { activeTraits } from '../../game/engine';
+import { CLASSES } from '../../data/classes';
+import { activeSynergies } from '../../game/engine';
 import { PixelSprite } from '../PixelSprite';
 
 interface BuildScreenProps {
   draft: string[];
+  progress: ProgressState;
   onBack: () => void;
   onAutoDraft: () => void;
   onToBattle: () => void;
   onInspect: (id: string) => void;
 }
 
-export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect }: BuildScreenProps) {
+export function BuildScreen({
+  draft,
+  progress,
+  onBack,
+  onAutoDraft,
+  onToBattle,
+  onInspect,
+}: BuildScreenProps) {
   const full = draft.length >= 6;
-  const traits = activeTraits(draft).filter((t) => t.lvl > 0);
+  const synergies = activeSynergies(draft).filter((t) => t.lvl > 0);
+  const unbound = HEROES.filter((h) => heroUnlocked(h.id, progress));
+  const sealed = HEROES.filter((h) => !heroUnlocked(h.id, progress));
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div
+        className="screen-header-nav"
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: '46px 16px 12px',
-          borderBottom: '3px solid #14120E',
+          borderBottom: '3px solid var(--om-line)',
         }}
       >
         <button
@@ -55,7 +67,7 @@ export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect 
               marginTop: 3,
             }}
           >
-            {draft.length} / 6 chosen
+            {draft.length} / 6 chosen · {unbound.length} / {HEROES.length} unbound
           </div>
         </div>
         <button
@@ -126,7 +138,7 @@ export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect 
         })}
       </div>
 
-      {traits.length > 0 && (
+      {synergies.length > 0 && (
         <div
           style={{
             display: 'flex',
@@ -137,9 +149,9 @@ export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect 
             background: BONE,
           }}
         >
-          {traits.map((t) => (
+          {synergies.map((t) => (
             <div
-              key={t.name}
+              key={`${t.kind}-${t.name}`}
               style={{
                 flex: '0 0 auto',
                 display: 'flex',
@@ -147,17 +159,17 @@ export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect 
                 gap: 5,
                 border: '2px solid #14120E',
                 padding: '3px 7px',
-                background: t.lvl > 1 ? SAF : INK,
+                background: t.lvl > 1 ? (t.kind === 'class' ? '#4C7BD1' : SAF) : INK,
               }}
             >
-              <span style={{ fontSize: 13, color: t.lvl > 1 ? INK : BONE }}>{t.glyph}</span>
+              <span style={{ fontSize: 13, color: t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE }}>{t.glyph}</span>
               <span
                 style={{
                   fontWeight: 700,
                   fontSize: 11,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: t.lvl > 1 ? INK : BONE,
+                  color: t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE,
                 }}
               >
                 {t.name} {t.count}
@@ -179,7 +191,7 @@ export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect 
           alignContent: 'start',
         }}
       >
-        {HEROES.map((h) => {
+        {unbound.map((h) => {
           const on = draft.includes(h.id);
           const tone = costTone(h.cost);
           return (
@@ -248,7 +260,7 @@ export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect 
                     color: on ? '#a99f86' : '#6b6455',
                   }}
                 >
-                  {h.traits.join(' · ')}
+                  {CLASSES[h.heroClass].glyph} {h.heroClass} · {h.traits.join(' · ')}
                 </div>
                 <div style={{ marginTop: 6, display: 'flex', gap: 4 }}>
                   {[0, 1, 2].map((i) => (
@@ -262,6 +274,132 @@ export function BuildScreen({ draft, onBack, onAutoDraft, onToBattle, onInspect 
                       }}
                     />
                   ))}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+        {sealed.length > 0 && (
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              marginTop: 4,
+              padding: '8px 2px 2px',
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <span className="slab" style={{ fontSize: 16, lineHeight: 1 }}>
+              SEALED
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                fontWeight: 700,
+                color: '#6b6455',
+              }}
+            >
+              Win bot matches to unseal
+            </span>
+          </div>
+        )}
+        {sealed.map((h) => {
+          const req = unlockReq(h.id);
+          const have = req ? unlockCurrent(req, progress) : 0;
+          const need = req?.n ?? 1;
+          return (
+            <button
+              key={h.id}
+              type="button"
+              className="btn-active-sm"
+              onClick={() => onInspect(h.id)}
+              style={{
+                textAlign: 'left',
+                border: '3px solid #14120E',
+                background: '#e7dcc2',
+                boxShadow: '3px 3px 0 rgba(20,18,14,.18)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                opacity: 0.92,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 9px',
+                  background: '#6b6455',
+                  borderBottom: '2px solid #14120E',
+                }}
+              >
+                <span className="mono" style={{ fontWeight: 700, fontSize: 11, color: BONE }}>
+                  ⊘ LOCKED
+                </span>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: BONE,
+                  }}
+                >
+                  {have}/{need}
+                </span>
+              </div>
+              <div
+                style={{
+                  padding: '10px 9px 6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 62,
+                  position: 'relative',
+                }}
+              >
+                <PixelSprite src={spriteCss(h.id)} size={48} dimmed />
+              </div>
+              <div style={{ padding: '0 9px 9px' }}>
+                <div className="slab" style={{ fontSize: 15, lineHeight: 1.05, color: '#4a4436' }}>
+                  {h.name}
+                </div>
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    fontWeight: 600,
+                    color: '#6b6455',
+                  }}
+                >
+                  {CLASSES[h.heroClass].glyph} {h.heroClass} · {h.traits.join(' · ')}
+                </div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 11,
+                    lineHeight: 1.3,
+                    color: '#6b6455',
+                    fontWeight: 600,
+                  }}
+                >
+                  {req ? unlockLabel(req) : 'Sealed'}
+                </div>
+                <div style={{ marginTop: 6, display: 'flex', gap: 3, height: 5 }}>
+                  <span
+                    style={{
+                      width: `${Math.min(100, (have / need) * 100)}%`,
+                      background: SAF,
+                    }}
+                  />
+                  <span style={{ flex: 1, background: 'rgba(20,18,14,.15)' }} />
                 </div>
               </div>
             </button>

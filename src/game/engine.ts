@@ -1,12 +1,18 @@
 import { CAPS, MATCH_DEFAULTS, SAF, STARMUL } from '../data/constants';
+import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
 import type {
   ActiveTrait,
   Combatant,
+  CombatFxKind,
+  CombatFxPayload,
+  CombatSpeed,
+  Difficulty,
   GameMode,
   GameState,
+  OverlayKind,
   Selection,
   Unit,
 } from './types';
@@ -18,8 +24,9 @@ export function resetUidCounter() {
   uidCounter = 0;
 }
 
-export function createGame(mode: GameMode): GameState {
+export function createGame(mode: GameMode, opts?: { speed?: CombatSpeed }): GameState {
   const hp = MATCH_DEFAULTS.startHealth;
+  const speed = opts?.speed === 2 || opts?.speed === 4 ? opts.speed : 1;
   return {
     mode,
     round: 1,
@@ -34,7 +41,7 @@ export function createGame(mode: GameMode): GameState {
     foe: [],
     shop: [],
     sel: null,
-    speed: 1,
+    speed,
     phase: 'plan',
     log: '',
     lastResult: null,
@@ -70,6 +77,15 @@ export function traitCounts(ids: string[]): Record<string, number> {
   return c;
 }
 
+export function classCounts(ids: string[]): Record<string, number> {
+  const c: Record<string, number> = {};
+  ids.forEach((id) => {
+    const cls = HERO_MAP[id].heroClass;
+    c[cls] = (c[cls] || 0) + 1;
+  });
+  return c;
+}
+
 export function activeTraits(ids: string[]): ActiveTrait[] {
   const c = traitCounts(ids);
   return Object.keys(c)
@@ -83,9 +99,31 @@ export function activeTraits(ids: string[]): ActiveTrait[] {
           label = txt;
         }
       });
-      return { name, count: c[name], lvl, label, glyph: def.glyph, desc: def.desc };
+      return { name, count: c[name], lvl, label, glyph: def.glyph, desc: def.desc, kind: 'trait' as const };
     })
     .sort((a, b) => b.lvl - a.lvl || b.count - a.count);
+}
+
+export function activeClasses(ids: string[]): ActiveTrait[] {
+  const c = classCounts(ids);
+  return Object.keys(c)
+    .map((name) => {
+      const def = CLASSES[name as ClassName];
+      let lvl = 0;
+      let label = '';
+      def.tiers.forEach(([n, txt]) => {
+        if (c[name] >= n) {
+          lvl++;
+          label = txt;
+        }
+      });
+      return { name, count: c[name], lvl, label, glyph: def.glyph, desc: def.desc, kind: 'class' as const };
+    })
+    .sort((a, b) => b.lvl - a.lvl || b.count - a.count);
+}
+
+export function activeSynergies(ids: string[]): ActiveTrait[] {
+  return [...activeTraits(ids), ...activeClasses(ids)].sort((a, b) => b.lvl - a.lvl || b.count - a.count);
 }
 
 function findUnit(g: GameState, sel: Selection): { u: Unit; from: 'bench' | 'board' } | null {
@@ -199,8 +237,15 @@ export function sellValue(u: Unit): number {
   return Math.max(1, cost * (u.star === 3 ? 5 : u.star === 2 ? 3 : 1) - (u.star === 1 ? 0 : 1));
 }
 
-export function makeFoeBoard(g: GameState): void {
-  const n = Math.min(2 + Math.floor(g.round * 0.45), 6);
+const FOE_SCALE: Record<Difficulty, { hp: number; atk: number; extra: number }> = {
+  normal: { hp: 1, atk: 1, extra: 0 },
+  hard: { hp: 1.2, atk: 1.12, extra: 0 },
+  mythic: { hp: 1.4, atk: 1.28, extra: 1 },
+};
+
+export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal'): void {
+  const extra = g.mode === 'bot' ? FOE_SCALE[difficulty].extra : 0;
+  const n = Math.min(2 + Math.floor(g.round * 0.45) + extra, 7);
   const ids = HEROES.map((h) => h.id)
     .sort(() => Math.random() - 0.5)
     .slice(0, n);
@@ -208,7 +253,7 @@ export function makeFoeBoard(g: GameState): void {
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) cells.push({ r, c });
   cells.sort(() => Math.random() - 0.5);
   g.foe = ids.map((hid, i) => {
-    const star =
+    let star: 1 | 2 | 3 =
       g.round >= 9
         ? Math.random() < 0.4
           ? 3
@@ -218,8 +263,23 @@ export function makeFoeBoard(g: GameState): void {
             ? 2
             : 1
           : 1;
+    if (g.mode === 'bot' && difficulty === 'mythic' && star < 3 && Math.random() < 0.22) {
+      star = (star + 1) as 2 | 3;
+    } else if (g.mode === 'bot' && difficulty === 'hard' && star === 1 && Math.random() < 0.18) {
+      star = 2;
+    }
     const pos = cells[i];
-    return { u: uid(), hid, star: star as 1 | 2 | 3, relics: [], r: pos.r, c: pos.c };
+    return { u: uid(), hid, star, relics: [], r: pos.r, c: pos.c };
+  });
+}
+
+export function scaleFoeCombatants(list: Combatant[], difficulty: Difficulty): void {
+  const s = FOE_SCALE[difficulty];
+  if (s.hp === 1 && s.atk === 1) return;
+  list.forEach((c) => {
+    c.maxHp = Math.round(c.maxHp * s.hp);
+    c.hp = c.maxHp;
+    c.atk = Math.round(c.atk * s.atk);
   });
 }
 
@@ -308,6 +368,74 @@ export function applyTraits(list: Combatant[]): void {
       u.hp = u.maxHp;
       u.atk *= 1.1;
     });
+
+  const cc: Record<string, number> = {};
+  list.forEach((u) => {
+    const cls = HERO_MAP[u.hid].heroClass;
+    cc[cls] = (cc[cls] || 0) + 1;
+  });
+  const clvl = (n: ClassName) => cc[n] || 0;
+
+  if (clvl('Warden') >= 4) {
+    list.forEach((u) => {
+      u.maxHp = Math.round(u.maxHp * 1.15);
+      u.hp = Math.min(u.maxHp, Math.round(u.hp * 1.15));
+      u.atk *= 0.85;
+      if (HERO_MAP[u.hid].heroClass === 'Warden') u.dr = Math.min(0.6, u.dr + 0.2);
+    });
+  } else if (clvl('Warden') >= 2) {
+    list.forEach((u) => {
+      if (HERO_MAP[u.hid].heroClass !== 'Warden') return;
+      u.maxHp = Math.round(u.maxHp * 1.2);
+      u.hp = Math.min(u.maxHp, Math.round(u.hp * 1.2));
+      u.dr = Math.min(0.6, u.dr + 0.12);
+      u.atk *= 0.88;
+    });
+  }
+
+  if (clvl('Striker') >= 4) {
+    list.forEach((u) => {
+      u.atk *= 1.12;
+      u.maxHp = Math.round(u.maxHp * 0.88);
+      u.hp = Math.min(u.maxHp, u.hp);
+      if (HERO_MAP[u.hid].heroClass === 'Striker') u.crit += 0.18;
+    });
+  } else if (clvl('Striker') >= 2) {
+    list.forEach((u) => {
+      if (HERO_MAP[u.hid].heroClass !== 'Striker') return;
+      u.atk *= 1.2;
+      u.crit += 0.12;
+      u.maxHp = Math.round(u.maxHp * 0.88);
+      u.hp = Math.min(u.maxHp, u.hp);
+    });
+  }
+
+  if (clvl('Invoker') >= 4) {
+    list.forEach((u) => {
+      u.as *= 0.88;
+      if (HERO_MAP[u.hid].heroClass === 'Invoker') u.sp += 50;
+    });
+  } else if (clvl('Invoker') >= 2) {
+    list.forEach((u) => {
+      if (HERO_MAP[u.hid].heroClass !== 'Invoker') return;
+      u.sp += 30;
+      u.as *= 0.85;
+    });
+  }
+
+  if (clvl('Herald') >= 4) {
+    list.forEach((u) => {
+      u.shield += 140;
+      u.dr = Math.min(0.6, u.dr + 0.1);
+      u.atk *= 0.88;
+    });
+  } else if (clvl('Herald') >= 2) {
+    list.forEach((u) => {
+      u.shield += 70;
+      if (HERO_MAP[u.hid].heroClass === 'Herald') u.atk *= 0.85;
+    });
+  }
+
   list.forEach((u) => {
     u.mana = Math.min(90, u.startMana);
     u.cd = 1 / u.as;
@@ -321,7 +449,20 @@ export class CombatEngine {
   constructor(
     private onPop: (r: number, c: number, text: string, color: string, size?: string) => void,
     private onBanner: (text: string) => void,
+    private onFx?: (fx: CombatFxPayload) => void,
   ) {}
+
+  private emitFx(src: Combatant, t: Combatant, kind: CombatFxKind) {
+    this.onFx?.({
+      kind,
+      hid: src.hid,
+      fromR: src.r,
+      fromC: src.c,
+      toR: t.r,
+      toC: t.c,
+      melee: this.dist(src, t) <= 1,
+    });
+  }
 
   dist(a: { r: number; c: number }, b: { r: number; c: number }) {
     return Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c));
@@ -353,7 +494,7 @@ export class CombatEngine {
     }
     t.hp -= dmg;
     t.mana = Math.min(100, t.mana + 5);
-    if (dmg > 0)
+    if (dmg > 0) {
       this.onPop(
         t.r,
         t.c,
@@ -361,6 +502,12 @@ export class CombatEngine {
         kind === 'magic' ? '#4C7BD1' : kind === 'crit' ? SAF : '#F2E9D4',
         '13px',
       );
+      if (src) {
+        const fxKind: CombatFxKind =
+          kind === 'magic' ? 'magic' : kind === 'crit' ? 'crit' : kind === 'true' ? 'true' : 'phys';
+        this.emitFx(src, t, fxKind);
+      }
+    }
     if (src && src.lifesteal > 0 && dmg > 0)
       src.hp = Math.min(src.maxHp, src.hp + dmg * src.lifesteal);
     if (t.hp <= 0) {
@@ -379,6 +526,14 @@ export class CombatEngine {
       t.alive = false;
       this.onPop(t.r, t.c, '✕', '#B4442B', '16px');
     }
+  }
+
+  heal(u: Combatant, amt: number) {
+    if (!u.alive || amt <= 0) return;
+    const got = Math.min(u.maxHp - u.hp, amt);
+    if (got <= 0) return;
+    u.hp += got;
+    this.onPop(u.r, u.c, `+${Math.round(got)}`, '#1B6B52', '13px');
   }
 
   enemiesOf(u: Combatant) {
@@ -413,6 +568,7 @@ export class CombatEngine {
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
     if (u.side === 'me') this.onBanner(HERO_MAP[u.hid].ability);
+    this.emitFx(u, t, 'cast');
     const E = this.enemiesOf(u);
     const A = this.alliesOf(u);
     const near = (n: number) =>
@@ -513,6 +669,111 @@ export class CombatEngine {
             this.hurt(u, o, (240 + sp) * m, 'true');
           });
         break;
+      case 'kelpi': {
+        const b = near(1)[0];
+        if (b) {
+          const dealt = this.hurt(u, b, (150 + sp) * m, 'magic');
+          b.snare = 2.5;
+          this.heal(u, dealt / 2);
+        }
+        break;
+      }
+      case 'barng':
+        A.forEach((a) => {
+          a.stun = 0;
+          a.snare = 0;
+          a.shield += (160 + sp) * m;
+        });
+        break;
+      case 'coyot': {
+        const o = E[Math.floor(Math.random() * E.length)];
+        if (o) {
+          this.hurt(u, o, (140 + sp) * m, 'magic');
+          o.stun = 1.5;
+        }
+        A.forEach((a) => {
+          a.crit += 0.15;
+        });
+        break;
+      }
+      case 'griff': {
+        const ally = A.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || u;
+        ally.shield += (250 + sp) * m;
+        E.forEach((o) => {
+          if (this.dist(ally, o) <= 1) this.hurt(u, o, (180 + sp) * m, 'phys');
+        });
+        break;
+      }
+      case 'golem':
+        u.shield += (320 + sp) * m;
+        E.forEach((o) => {
+          if (this.dist(u, o) <= 1) this.hurt(u, o, (90 + sp) * m, 'magic');
+        });
+        break;
+      case 'bansh': {
+        const o = E.slice().sort((a, b) => a.hp - b.hp)[0];
+        if (o) {
+          o.stun = 2;
+          const exec = o.hp < o.maxHp * 0.4;
+          this.hurt(u, o, (200 + sp) * m, exec ? 'true' : 'magic');
+        }
+        break;
+      }
+      case 'hydra': {
+        let hits = 0;
+        near(3).forEach((o) => {
+          this.hurt(u, o, (160 + sp) * m, 'magic');
+          hits++;
+        });
+        this.heal(u, 40 * m * hits);
+        break;
+      }
+      case 'nuwa':
+        A.slice()
+          .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)
+          .slice(0, 2)
+          .forEach((a) => {
+            this.heal(a, (200 + sp) * m);
+            a.dr = Math.min(0.6, (a.dr || 0) + 0.15);
+          });
+        break;
+      case 'camaz': {
+        const far = E.slice().sort((a, b) => this.dist(u, b) - this.dist(u, a))[0];
+        if (far) {
+          const dealt = this.hurt(u, far, (240 + sp) * m, 'phys');
+          this.heal(u, dealt);
+        }
+        break;
+      }
+      case 'simur':
+        A.forEach((a) => {
+          this.heal(a, (160 + sp) * m);
+          if (!a.buffAs) {
+            a.buffAs = 1.2;
+            a.as *= 1.2;
+            a.buffT = 4;
+          }
+        });
+        near(2).forEach((o) => this.hurt(u, o, (200 + sp) * m, 'magic'));
+        break;
+      case 'levia':
+        E.forEach((o) => {
+          if (this.dist(u, o) <= 2) {
+            this.hurt(u, o, (220 + sp) * m, 'magic');
+            o.snare = 1.5;
+          }
+        });
+        break;
+      case 'wendi': {
+        const steal = Math.round(t.hp * 0.1);
+        this.hurt(u, t, (280 + sp) * m, 'phys');
+        if (steal > 0) {
+          u.maxHp += steal;
+          this.heal(u, steal);
+          u.atk *= 1.08;
+        }
+        break;
+      }
       default:
         this.hurt(u, t, (200 + sp) * m, 'magic');
     }
@@ -655,7 +916,7 @@ export const gameActions = {
     g.sel = null;
   },
 
-  resolveRound(g: GameState, win: boolean, maxR: number) {
+  resolveRound(g: GameState, win: boolean, maxR: number): OverlayKind {
     g.phase = 'result';
     if (g.mode === 'practice') {
       g.foe = [];
@@ -711,6 +972,30 @@ export function traitCard(name: string, counts: Record<string, number>) {
     cardBg: best ? '#F2E9D4' : '#ece2ca',
     headBg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#E8A317' : '#14120E') : '#d8cdb2',
     headFg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#14120E' : '#F2E9D4') : '#6b6455',
+    tiers: def.tiers.map(([need, text]) => ({
+      n: need,
+      text,
+      fg: n >= need ? '#14120E' : '#a99f86',
+      mark: n >= need ? '●' : '○',
+    })),
+  };
+}
+
+export function classCard(name: string, counts: Record<string, number>) {
+  const def = CLASSES[name as ClassName];
+  const n = counts[name] || 0;
+  let best = 0;
+  def.tiers.forEach(([need]) => {
+    if (n >= need) best = need;
+  });
+  return {
+    name,
+    glyph: def.glyph,
+    desc: def.desc,
+    countLabel: `${n} drafted`,
+    cardBg: best ? '#e7dcc2' : '#ece2ca',
+    headBg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#4C7BD1' : '#14120E') : '#d8cdb2',
+    headFg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#F2E9D4' : '#F2E9D4') : '#6b6455',
     tiers: def.tiers.map(([need, text]) => ({
       n: need,
       text,
