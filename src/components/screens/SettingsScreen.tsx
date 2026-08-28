@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
-import { BONE, INK, JADE } from '../../data/constants';
+import { BONE, JADE } from '../../data/constants';
+import { BattlegroundPreview } from '../BattlegroundPreview';
 import {
   BATTLEGROUNDS,
   BATTLEGROUND_MAP,
-  battlegroundTileUrl,
   battlegroundUnlockCurrent,
   battlegroundUnlocked,
   battlegroundUnlockLabel,
@@ -283,7 +283,6 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
             {BATTLEGROUNDS.map((b) => {
               const open = battlegroundUnlocked(b.id, progress);
               const selected = settings.battlegroundId === b.id;
-              const tile = battlegroundTileUrl(b.id);
               return (
                 <button
                   key={b.id}
@@ -306,50 +305,19 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                     cursor: open ? 'pointer' : 'default',
                   }}
                 >
-                  <div
-                    className={open ? 'pixel' : 'pixel pixel-locked'}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      backgroundImage: tile ? `url(${tile})` : undefined,
-                      backgroundSize: '16.66% 16.66%',
-                      backgroundRepeat: 'repeat',
-                      imageRendering: 'pixelated',
-                      position: 'relative',
-                    }}
-                  >
+                  <div className="settings-bg-preview">
+                    <BattlegroundPreview
+                      id={b.id}
+                      animate={!settings.reduceMotion}
+                      locked={!open}
+                    />
                     {selected && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          top: 2,
-                          right: 2,
-                          background: JADE,
-                          color: BONE,
-                          border: `2px solid ${INK}`,
-                          width: 14,
-                          height: 14,
-                          fontSize: 10,
-                          lineHeight: '11px',
-                          textAlign: 'center',
-                          fontWeight: 700,
-                        }}
-                      >
+                      <span className="settings-bg-badge">
                         ✓
                       </span>
                     )}
                     {!open && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 13,
-                          color: INK,
-                        }}
-                      >
+                      <span className="settings-bg-lock">
                         🔒
                       </span>
                     )}

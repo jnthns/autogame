@@ -795,6 +795,53 @@ button:disabled {
   overflow: hidden;
 }
 
+.settings-bg-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--om-board, #e8dcc8);
+}
+
+.battleground-preview {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  object-fit: cover;
+}
+
+.settings-bg-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: #1b6b52;
+  color: #f2e9d4;
+  border: 2px solid #14120e;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  line-height: 11px;
+  text-align: center;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.settings-bg-lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #14120e;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.phone.reduce-motion .battleground-preview {
+  animation: none !important;
+}
+
 .phone.reduce-motion .home-parade * {
   animation: none !important;
 }
