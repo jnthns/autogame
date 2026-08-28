@@ -343,25 +343,32 @@ export function GameScreen({
                       else onTapBoard(boardUnit);
                     }
                   }}
-                  className="board-unit"
+                  className={`board-unit${sel ? ' board-unit--sel' : ''}`}
                   style={{
                     position: 'relative',
-                    border: '2px solid #14120E',
-                    background: me ? INK : u.boss ? '#5c1c12' : '#7a2d1d',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     pointerEvents: 'auto',
                     transform: lunge,
                     transition: lunge ? 'transform 0.07s ease-out' : undefined,
-                    boxShadow: sel
-                      ? `0 0 0 3px ${SAF}`
-                      : u.stun > 0
-                        ? '0 0 0 3px #4C7BD1'
-                        : '2px 2px 0 rgba(20,18,14,.35)',
+                    boxShadow:
+                      u.stun > 0 && !sel ? '0 0 0 2px #4C7BD1' : undefined,
                   }}
                 >
                   <PixelSprite src={spriteCss(u.hid)} />
+                  {boardUnit && boardUnit.relics.length > 0 && (
+                    <span className="relic-strip" aria-hidden>
+                      {boardUnit.relics.slice(0, 3).map((rid) => {
+                        const rel = RELIC_MAP[rid];
+                        return (
+                          <span key={rid} className="relic-glyph" style={{ color: rel.color }}>
+                            {rel.glyph}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  )}
                   <span
                     style={{
                       position: 'absolute',
@@ -562,15 +569,13 @@ export function GameScreen({
               key={u.u}
               type="button"
               onClick={() => onTapBench(u)}
-              className="bench-slot"
+              className={`bench-slot bench-slot--filled${sel ? ' board-unit--sel' : ''}`}
               style={{
-                border: '2px solid #14120E',
-                background: INK,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 position: 'relative',
-                boxShadow: sel ? `0 0 0 3px ${SAF}` : '2px 2px 0 rgba(20,18,14,.3)',
+                boxShadow: sel ? `0 0 0 2px ${SAF}` : undefined,
               }}
             >
               <PixelSprite src={spriteCss(u.hid)} />

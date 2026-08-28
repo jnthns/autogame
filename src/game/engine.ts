@@ -250,6 +250,64 @@ function swapUnits(
   }
 }
 
+function combineUnits(
+  board: Unit[],
+  bench: Unit[],
+  take: { u: Unit; on: 'bench' | 'board' }[],
+  hid: string,
+  star: 2 | 3,
+  onPop?: (r: number, c: number, text: string) => void,
+): void {
+  const host = take.find((x) => x.on === 'board') || take[0];
+  const relics: string[] = [];
+  take.forEach((x) =>
+    x.u.relics.forEach((r) => {
+      if (relics.length < 3) relics.push(r);
+    }),
+  );
+  const spot = host.on === 'board' ? { r: host.u.r!, c: host.u.c! } : null;
+  take.forEach((x) => {
+    const l = x.on === 'bench' ? bench : board;
+    const i = l.findIndex((y) => y.u === x.u.u);
+    if (i >= 0) l.splice(i, 1);
+  });
+  const nu: Unit = { u: uid(), hid, star, relics };
+  if (spot) {
+    nu.r = spot.r;
+    nu.c = spot.c;
+    board.push(nu);
+  } else {
+    bench.push(nu);
+  }
+  onPop?.(
+    spot ? spot.r : 7,
+    spot ? spot.c : 0,
+    `${star}★ ${HERO_MAP[hid].name.split(' ')[0]}`,
+  );
+}
+
+export function countHeroStar(g: GameState, hid: string, star: 1 | 2 | 3): number {
+  return [...g.board, ...g.bench].filter((u) => u.hid === hid && u.star === star).length;
+}
+
+/** When 2× 2★ already exist, buying any copy merges them to 3★ (TFT shop trigger). */
+function pairMergeTwos(
+  g: GameState,
+  hid: string,
+  onPop?: (r: number, c: number, text: string) => void,
+): void {
+  const twos: { u: Unit; on: 'bench' | 'board' }[] = [];
+  g.board.forEach((u) => {
+    if (u.hid === hid && u.star === 2) twos.push({ u, on: 'board' });
+  });
+  g.bench.forEach((u) => {
+    if (u.hid === hid && u.star === 2) twos.push({ u, on: 'bench' });
+  });
+  if (twos.length !== 2) return;
+  twos.sort((a, b) => (a.on === 'board' ? -1 : 1) - (b.on === 'board' ? -1 : 1));
+  combineUnits(g.board, g.bench, twos, hid, 3, onPop);
+}
+
 export function mergeUnitLists(
   board: Unit[],
   bench: Unit[],
@@ -270,33 +328,7 @@ export function mergeUnitLists(
         const arr = groups[hid];
         if (arr.length < 3) continue;
         arr.sort((a, b) => (a.on === 'board' ? -1 : 1) - (b.on === 'board' ? -1 : 1));
-        const take = arr.slice(0, 3);
-        const host = take.find((x) => x.on === 'board') || take[0];
-        const relics: string[] = [];
-        take.forEach((x) =>
-          x.u.relics.forEach((r) => {
-            if (relics.length < 3) relics.push(r);
-          }),
-        );
-        const spot = host.on === 'board' ? { r: host.u.r!, c: host.u.c! } : null;
-        take.forEach((x) => {
-          const l = x.on === 'bench' ? bench : board;
-          const i = l.findIndex((y) => y.u === x.u.u);
-          if (i >= 0) l.splice(i, 1);
-        });
-        const nu: Unit = { u: uid(), hid, star: (star + 1) as 2 | 3, relics };
-        if (spot) {
-          nu.r = spot.r;
-          nu.c = spot.c;
-          board.push(nu);
-        } else {
-          bench.push(nu);
-        }
-        onPop?.(
-          spot ? spot.r : 7,
-          spot ? spot.c : 0,
-          `${star + 1}★ ${HERO_MAP[hid].name.split(' ')[0]}`,
-        );
+        combineUnits(board, bench, arr.slice(0, 3), hid, (star + 1) as 2 | 3, onPop);
         changed = true;
         break;
       }
@@ -307,6 +339,17 @@ export function mergeUnitLists(
 
 export function mergeUnits(g: GameState, onPop?: (r: number, c: number, text: string) => void): void {
   mergeUnitLists(g.board, g.bench, onPop);
+}
+
+export function applyMerges(
+  g: GameState,
+  opts?: { boughtHid?: string; twoStarBeforeBuy?: number },
+  onPop?: (r: number, c: number, text: string) => void,
+): void {
+  mergeUnits(g, onPop);
+  if (opts?.boughtHid && (opts.twoStarBeforeBuy ?? 0) >= 2) {
+    pairMergeTwos(g, opts.boughtHid, onPop);
+  }
 }
 
 /** TFT/DAC-style: 1★ refunds full cost; combined units pay a small combine tax. */
@@ -1218,6 +1261,7 @@ export const gameActions = {
   },
 
   bindRelic(_g: GameState, rid: string, u: Unit) {
+    if (u.relics.length >= 3) return;
     u.relics.push(rid);
   },
 };

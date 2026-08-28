@@ -14,11 +14,13 @@ import {
 } from '../data/progress';
 import { DEFAULT_BATTLEGROUND_ID, loadSettings, saveSettings, type SettingsState } from '../data/settings';
 import {
+  applyMerges,
   applyTraits,
   cap,
   CombatEngine,
   combatant,
   combatOpponents,
+  countHeroStar,
   createGame,
   gameActions,
   makeFoeBoard,
@@ -261,8 +263,10 @@ export function useGame() {
     (i: number) => {
       const g = gameRef.current;
       if (!g) return;
+      const hid = g.shop[i];
+      const twoStarBefore = hid ? countHeroStar(g, hid, 2) : 0;
       gameActions.buy(g, i);
-      mergeUnits(g, (r, c, text) => pop(r, c, text));
+      if (hid) applyMerges(g, { boughtHid: hid, twoStarBeforeBuy: twoStarBefore }, (r, c, text) => pop(r, c, text));
       syncGame(g);
     },
     [pop, syncGame],
@@ -287,9 +291,10 @@ export function useGame() {
       const g = gameRef.current;
       if (!g) return;
       gameActions.tapUnit(g, u, from, g.matchRounds);
+      mergeUnits(g, (r, c, text) => pop(r, c, text));
       syncGame(g);
     },
-    [syncGame],
+    [pop, syncGame],
   );
 
   const tapCell = useCallback(
@@ -299,6 +304,7 @@ export function useGame() {
       gameActions.tapCell(g, r, c, g.matchRounds, (text) =>
         pop(6, 1, text, RUST, '12px'),
       );
+      mergeUnits(g, (r2, c2, text) => pop(r2, c2, text));
       syncGame(g);
     },
     [pop, syncGame],

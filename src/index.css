@@ -702,12 +702,48 @@ button:disabled {
 .board-unit {
   width: var(--unit-size);
   height: var(--unit-size);
+  background: transparent;
+  border: none;
+}
+
+.board-unit .pixel {
+  filter: drop-shadow(0 1px 0 rgba(20, 18, 14, 0.55)) drop-shadow(0 0 1px rgba(20, 18, 14, 0.35));
+}
+
+.board-unit--sel {
+  filter: drop-shadow(0 0 0 2px #e8a317);
 }
 
 .bench-slot {
   flex: 0 0 auto;
   width: var(--bench-size);
   height: var(--bench-size);
+}
+
+.bench-slot--filled {
+  background: transparent;
+  border-color: transparent;
+}
+
+.bench-slot--filled .pixel {
+  filter: drop-shadow(0 1px 0 rgba(20, 18, 14, 0.55)) drop-shadow(0 0 1px rgba(20, 18, 14, 0.35));
+}
+
+.relic-strip {
+  position: absolute;
+  right: -1px;
+  top: 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.relic-glyph {
+  font-size: 7px;
+  font-weight: 700;
+  text-shadow: 0 0 1px #14120e, 0 1px 0 #14120e;
 }
 
 .home-parade {
