@@ -1,5 +1,5 @@
 export type Screen = 'home' | 'modes' | 'build' | 'game' | 'settings';
-export type GameMode = 'practice' | 'bot';
+export type GameMode = 'practice' | 'bot' | 'marathon';
 export type Phase = 'plan' | 'combat' | 'result';
 export type Difficulty = 'normal' | 'hard' | 'mythic';
 export type CombatSpeed = 1 | 2 | 4;
@@ -30,6 +30,7 @@ export interface BossRewardGrant {
 export interface GameState {
   mode: GameMode;
   matchRounds: number;
+  heroHpMul: number;
   round: number;
   gold: number;
   myHp: number;

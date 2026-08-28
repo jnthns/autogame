@@ -19,6 +19,11 @@ export const MATCH_DEFAULTS = {
 export const HYPER_ROLL_ROUNDS = 13;
 export const BOSS_ROUNDS = [4, 8, 12] as const;
 
+export const MARATHON = {
+  matchRounds: 18,
+  heroHpMul: 1.5,
+} as const;
+
 export function costTone(c: number): string {
   return c >= 5 ? '#7A3E9D' : c >= 4 ? RUST : c >= 3 ? JADE : '#4a4436';
 }

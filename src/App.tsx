@@ -54,6 +54,7 @@ export default function App() {
             onBack={() => game.setScreen('home')}
             onPractice={() => game.startGame('practice')}
             onBot={() => game.startGame('bot')}
+            onMarathon={() => game.startGame('marathon')}
             difficulty={game.settings.difficulty}
           />
         )}

@@ -1,4 +1,4 @@
-import { CAPS, MATCH_DEFAULTS, SAF, STARMUL } from '../data/constants';
+import { CAPS, MARATHON, MATCH_DEFAULTS, SAF, STARMUL } from '../data/constants';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
@@ -33,6 +33,18 @@ export function resetUidCounter() {
   uidCounter = 0;
 }
 
+export function isRankedMode(mode: GameMode): boolean {
+  return mode === 'bot' || mode === 'marathon';
+}
+
+export function matchRoundsFor(mode: GameMode): number {
+  return mode === 'marathon' ? MARATHON.matchRounds : MATCH_DEFAULTS.matchRounds;
+}
+
+export function heroHpMulFor(mode: GameMode): number {
+  return mode === 'marathon' ? MARATHON.heroHpMul : 1;
+}
+
 export function pickBotDraft(): string[] {
   const low = HEROES.filter((h) => h.cost <= 2).sort(() => Math.random() - 0.5);
   const mid = HEROES.filter((h) => h.cost === 3).sort(() => Math.random() - 0.5);
@@ -49,7 +61,8 @@ export function createGame(
   const speed = opts?.speed === 2 || opts?.speed === 4 ? opts.speed : 1;
   const g: GameState = {
     mode,
-    matchRounds: MATCH_DEFAULTS.matchRounds,
+    matchRounds: matchRoundsFor(mode),
+    heroHpMul: heroHpMulFor(mode),
     round: 1,
     gold: mode === 'practice' ? 999 : 14,
     myHp: hp,
@@ -72,12 +85,12 @@ export function createGame(
     log: '',
     lastResult: null,
   };
-  if (mode === 'bot') {
+  if (isRankedMode(mode)) {
     runBotTurn(g);
-    const target = opts?.startRound;
+    const target = mode === 'bot' ? opts?.startRound : undefined;
     if (target && target > 1) {
       fastForwardMatch(g, target);
-      seedDebugPlayer(g, opts.draft ?? [], target);
+      seedDebugPlayer(g, opts?.draft ?? [], target);
     }
   }
   return g;
@@ -452,7 +465,7 @@ function botSellWeakest(g: GameState): boolean {
 }
 
 export function runBotTurn(g: GameState): void {
-  if (g.mode !== 'bot') return;
+  if (!isRankedMode(g.mode)) return;
   g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id));
 
   const tryBuys = () => {
@@ -541,7 +554,7 @@ export function scaleFoeCombatants(list: Combatant[], difficulty: Difficulty): v
   });
 }
 
-export function combatant(u: Unit, side: 'me' | 'foe'): Combatant {
+export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant {
   const h = HERO_MAP[u.hid];
   const m = STARMUL[u.star];
   const hpScale = u.scaleHp ?? 1;
@@ -555,7 +568,7 @@ export function combatant(u: Unit, side: 'me' | 'foe'): Combatant {
     c: u.c!,
     glyph: h.glyph,
     name: u.boss ? `${h.name}` : h.name,
-    maxHp: Math.round(h.hp * m * hpScale),
+    maxHp: Math.round(h.hp * m * hpScale * heroHpMul),
     hp: 0,
     atk: h.dmg * m * atkScale,
     as: h.as,
@@ -1193,7 +1206,7 @@ export const gameActions = {
     if (g.mode === 'practice') {
       return { kind: 'spar' as const, win };
     }
-    const boss = getBossEncounter(g.round);
+    const boss = g.mode === 'bot' ? getBossEncounter(g.round) : null;
     let dmg = 0;
     if (boss) {
       if (win) {
