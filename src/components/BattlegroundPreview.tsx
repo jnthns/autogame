@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { battlegroundImageUrl, battlegroundUsesImage } from '../data/battlegrounds';
 import { BATTLEGROUND_WALLPAPERS } from '../data/battlegroundWallpapers';
 
 interface BattlegroundPreviewProps {
@@ -9,13 +10,13 @@ interface BattlegroundPreviewProps {
   style?: React.CSSProperties;
 }
 
-export function BattlegroundPreview({
+function AnimatedBattlegroundPreview({
   id,
-  animate = true,
-  locked = false,
-  className = '',
+  animate,
+  locked,
+  className,
   style,
-}: BattlegroundPreviewProps) {
+}: Required<Pick<BattlegroundPreviewProps, 'id' | 'animate' | 'locked' | 'className' | 'style'>>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
 
@@ -64,6 +65,44 @@ export function BattlegroundPreview({
       aria-hidden
       className={`battleground-preview pixel${locked ? ' pixel-locked' : ''}${className ? ` ${className}` : ''}`}
       style={{ width: '100%', height: '100%', objectFit: 'cover', ...style }}
+    />
+  );
+}
+
+export function BattlegroundPreview({
+  id,
+  animate = true,
+  locked = false,
+  className = '',
+  style,
+}: BattlegroundPreviewProps) {
+  const imageUrl = battlegroundImageUrl(id);
+  if (battlegroundUsesImage(id) && imageUrl) {
+    return (
+      <div
+        aria-hidden
+        className={`battleground-preview pixel${locked ? ' pixel-locked' : ''}${className ? ` ${className}` : ''}`}
+        style={{
+          width: '100%',
+          height: '100%',
+          backgroundImage: `url(${imageUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          imageRendering: 'pixelated',
+          ...style,
+        }}
+      />
+    );
+  }
+
+  return (
+    <AnimatedBattlegroundPreview
+      id={id}
+      animate={animate}
+      locked={locked}
+      className={className}
+      style={style ?? {}}
     />
   );
 }

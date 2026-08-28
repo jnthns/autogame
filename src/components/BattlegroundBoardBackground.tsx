@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { battlegroundImageUrl, battlegroundUsesImage } from '../data/battlegrounds';
 import { BATTLEGROUND_WALLPAPERS } from '../data/battlegroundWallpapers';
 
 interface BattlegroundBoardBackgroundProps {
@@ -8,12 +9,12 @@ interface BattlegroundBoardBackgroundProps {
   style?: React.CSSProperties;
 }
 
-export function BattlegroundBoardBackground({
+function AnimatedBoardWallpaper({
   id,
-  animate = true,
-  className = '',
+  animate,
+  className,
   style,
-}: BattlegroundBoardBackgroundProps) {
+}: Required<Pick<BattlegroundBoardBackgroundProps, 'id' | 'animate' | 'className' | 'style'>>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
 
@@ -72,5 +73,37 @@ export function BattlegroundBoardBackground({
         ...style,
       }}
     />
+  );
+}
+
+export function BattlegroundBoardBackground({
+  id,
+  animate = true,
+  className = '',
+  style,
+}: BattlegroundBoardBackgroundProps) {
+  const imageUrl = battlegroundImageUrl(id);
+  if (battlegroundUsesImage(id) && imageUrl) {
+    return (
+      <div
+        aria-hidden
+        className={`board-wallpaper-canvas pixel ${className}`.trim()}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `url(${imageUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          pointerEvents: 'none',
+          imageRendering: 'pixelated',
+          ...style,
+        }}
+      />
+    );
+  }
+
+  return (
+    <AnimatedBoardWallpaper id={id} animate={animate} className={className} style={style ?? {}} />
   );
 }
