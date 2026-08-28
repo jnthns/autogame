@@ -1,4 +1,17 @@
-import { CAPS, MATCH_DEFAULTS, SAF, STARMUL } from '../data/constants';
+import {
+  BOARD_COLS,
+  BOARD_ROWS,
+  BOARD_SIDE_ROWS,
+  BOSS_ANCHOR,
+  BOSS_FOOTPRINT,
+  BOT_BOARD_CAPS,
+  BOSS_ROUNDS,
+  MATCH_DEFAULTS,
+  PLAYER_ROW_START,
+  PRACTICE_BOARD_CAP,
+  SAF,
+  STARMUL,
+} from '../data/constants';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
@@ -48,8 +61,31 @@ export function createGame(mode: GameMode, opts?: { speed?: CombatSpeed }): Game
   };
 }
 
-export function cap(round: number, maxR: number = MATCH_DEFAULTS.matchRounds): number {
-  return CAPS[Math.min(round, maxR) - 1] ?? CAPS[CAPS.length - 1];
+export function cap(round: number, maxR: number = MATCH_DEFAULTS.matchRounds, mode: GameMode = 'bot'): number {
+  if (mode === 'practice') return PRACTICE_BOARD_CAP;
+  return BOT_BOARD_CAPS[Math.min(round, maxR) - 1] ?? BOT_BOARD_CAPS[BOT_BOARD_CAPS.length - 1];
+}
+
+export function isBossRound(round: number): boolean {
+  return (BOSS_ROUNDS as readonly number[]).includes(round);
+}
+
+export function unitFootprint(u: { footprint?: number; boss?: boolean }): number {
+  return u.footprint ?? (u.boss ? BOSS_FOOTPRINT : 1);
+}
+
+export function occupiesCell(u: { r: number; c: number; footprint?: number; boss?: boolean }, r: number, c: number): boolean {
+  const fp = unitFootprint(u);
+  return r >= u.r && r < u.r + fp && c >= u.c && c < u.c + fp;
+}
+
+function unitCenter(u: { r: number; c: number; footprint?: number; boss?: boolean }) {
+  const fp = unitFootprint(u);
+  return { r: u.r + (fp - 1) / 2, c: u.c + (fp - 1) / 2 };
+}
+
+function cellBlocked(C: Combatant[], r: number, c: number, skip?: string): boolean {
+  return C.some((o) => o.alive && o.u !== skip && occupiesCell(o, r, c));
 }
 
 export function rollShop(g: GameState, draft: string[], silent = false): void {
@@ -143,7 +179,7 @@ function moveToBench(g: GameState, u: Unit): void {
 function moveToBoard(g: GameState, u: Unit, r: number, c: number, maxR: number): boolean {
   const i = g.bench.findIndex((x) => x.u === u.u);
   if (i >= 0) {
-    if (g.board.length >= cap(g.round, maxR)) return false;
+    if (g.board.length >= cap(g.round, maxR, g.mode)) return false;
     g.bench.splice(i, 1);
     g.board.push(u);
   }
@@ -220,7 +256,7 @@ export function mergeUnits(g: GameState, onPop?: (r: number, c: number, text: st
           g.bench.push(nu);
         }
         onPop?.(
-          spot ? spot.r : 7,
+          spot ? spot.r : BOARD_ROWS - 1,
           spot ? spot.c : 0,
           `${star + 1}★ ${HERO_MAP[hid].name.split(' ')[0]}`,
         );
@@ -243,14 +279,75 @@ const FOE_SCALE: Record<Difficulty, { hp: number; atk: number; extra: number }> 
   mythic: { hp: 1.4, atk: 1.28, extra: 1 },
 };
 
-export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal'): void {
-  const extra = g.mode === 'bot' ? FOE_SCALE[difficulty].extra : 0;
-  const n = Math.min(2 + Math.floor(g.round * 0.45) + extra, 7);
+const BOSS_HP_MULT: Record<Difficulty, number> = {
+  normal: 5,
+  hard: 5.5,
+  mythic: 6,
+};
+
+const BOSS_ATK_SCALE: Record<Difficulty, number> = {
+  normal: 1,
+  hard: 1.12,
+  mythic: 1.28,
+};
+
+function reservedBossCells(): { r: number; c: number }[] {
+  const cells: { r: number; c: number }[] = [];
+  for (let r = BOSS_ANCHOR.r; r < BOSS_ANCHOR.r + BOSS_FOOTPRINT; r++) {
+    for (let c = BOSS_ANCHOR.c; c < BOSS_ANCHOR.c + BOSS_FOOTPRINT; c++) {
+      cells.push({ r, c });
+    }
+  }
+  return cells;
+}
+
+function makeBossBoard(g: GameState, difficulty: Difficulty, playerHpSum: number): void {
+  void playerHpSum;
+  const blocked = new Set(reservedBossCells().map((p) => `${p.r},${p.c}`));
+  g.foe = [
+    {
+      u: uid(),
+      hid: 'boss',
+      star: 1,
+      relics: [],
+      r: BOSS_ANCHOR.r,
+      c: BOSS_ANCHOR.c,
+      boss: true,
+    },
+  ];
+
+  const extra = FOE_SCALE[difficulty].extra;
+  const n = Math.min(2 + Math.floor(g.round / 4) + extra, 5);
   const ids = HEROES.map((h) => h.id)
     .sort(() => Math.random() - 0.5)
     .slice(0, n);
   const cells: { r: number; c: number }[] = [];
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) cells.push({ r, c });
+  for (let r = 0; r < BOARD_SIDE_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      if (!blocked.has(`${r},${c}`)) cells.push({ r, c });
+    }
+  }
+  cells.sort(() => Math.random() - 0.5);
+  ids.forEach((hid, i) => {
+    const pos = cells[i];
+    if (!pos) return;
+    const star: 1 | 2 | 3 = g.round >= 8 ? 2 : 1;
+    g.foe.push({ u: uid(), hid, star, relics: [], r: pos.r, c: pos.c });
+  });
+}
+
+export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal', playerHpSum = 0): void {
+  if (g.mode === 'bot' && isBossRound(g.round)) {
+    makeBossBoard(g, difficulty, playerHpSum);
+    return;
+  }
+  const extra = g.mode === 'bot' ? FOE_SCALE[difficulty].extra : 0;
+  const n = Math.min(3 + Math.floor(g.round * 0.7) + extra, 12);
+  const ids = HEROES.map((h) => h.id)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, n);
+  const cells: { r: number; c: number }[] = [];
+  for (let r = 0; r < BOARD_SIDE_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) cells.push({ r, c });
   cells.sort(() => Math.random() - 0.5);
   g.foe = ids.map((hid, i) => {
     let star: 1 | 2 | 3 =
@@ -277,10 +374,57 @@ export function scaleFoeCombatants(list: Combatant[], difficulty: Difficulty): v
   const s = FOE_SCALE[difficulty];
   if (s.hp === 1 && s.atk === 1) return;
   list.forEach((c) => {
+    if (c.boss) {
+      c.atk = Math.round(c.atk * BOSS_ATK_SCALE[difficulty]);
+      return;
+    }
     c.maxHp = Math.round(c.maxHp * s.hp);
     c.hp = c.maxHp;
     c.atk = Math.round(c.atk * s.atk);
   });
+}
+
+export function bossCombatant(u: Unit, playerHpSum: number, round: number, difficulty: Difficulty): Combatant {
+  const hpMult = BOSS_HP_MULT[difficulty];
+  const bossHp = Math.max(800, Math.round(playerHpSum * hpMult));
+  const o: Combatant = {
+    u: u.u,
+    hid: 'boss',
+    star: 1,
+    side: 'foe',
+    r: u.r!,
+    c: u.c!,
+    glyph: '☠',
+    name: 'The Adversary',
+    maxHp: bossHp,
+    hp: bossHp,
+    atk: 85 + round * 10,
+    as: 0.35,
+    range: 2,
+    crit: 0.08,
+    critDmg: 0.6,
+    mana: 0,
+    startMana: 20,
+    sp: 0,
+    dr: 0.12,
+    lifesteal: 0,
+    shield: 0,
+    amp: 0,
+    stun: 0,
+    silence: 0,
+    snare: 999,
+    burn: 0,
+    burnT: 0,
+    cd: 1 / 0.35,
+    mv: 999,
+    alive: true,
+    cast2: false,
+    footprint: BOSS_FOOTPRINT,
+    boss: true,
+  };
+  o.hp = o.maxHp;
+  o.mana = Math.min(90, o.startMana);
+  return o;
 }
 
 export function combatant(u: Unit, side: 'me' | 'foe'): Combatant {
@@ -329,13 +473,15 @@ export function combatant(u: Unit, side: 'me' | 'foe'): Combatant {
 
 export function applyTraits(list: Combatant[]): void {
   const c: Record<string, number> = {};
-  list.forEach((u) =>
+  list.forEach((u) => {
+    if (u.boss) return;
     HERO_MAP[u.hid].traits.forEach((t: string) => {
       c[t] = (c[t] || 0) + 1;
-    }),
-  );
+    });
+  });
   const lvl = (n: string) => c[n] || 0;
   list.forEach((u) => {
+    if (u.boss) return;
     const tr = HERO_MAP[u.hid].traits;
     if (tr.includes('Serpent'))
       u.lifesteal += lvl('Serpent') >= 4 ? 0.35 : lvl('Serpent') >= 2 ? 0.15 : 0;
@@ -371,6 +517,7 @@ export function applyTraits(list: Combatant[]): void {
 
   const cc: Record<string, number> = {};
   list.forEach((u) => {
+    if (u.boss) return;
     const cls = HERO_MAP[u.hid].heroClass;
     cc[cls] = (cc[cls] || 0) + 1;
   });
@@ -464,8 +611,10 @@ export class CombatEngine {
     });
   }
 
-  dist(a: { r: number; c: number }, b: { r: number; c: number }) {
-    return Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c));
+  dist(a: { r: number; c: number; footprint?: number; boss?: boolean }, b: { r: number; c: number; footprint?: number; boss?: boolean }) {
+    const ac = unitCenter(a);
+    const bc = unitCenter(b);
+    return Math.max(Math.abs(ac.r - bc.r), Math.abs(ac.c - bc.c));
   }
 
   target(u: Combatant): Combatant | null {
@@ -483,6 +632,15 @@ export class CombatEngine {
     return best;
   }
 
+  private bossBasicAttack(u: Combatant) {
+    const crit = Math.random() < u.crit;
+    const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
+    const kind = crit ? 'crit' : 'phys';
+    this.enemiesOf(u).forEach((o) => {
+      if (this.dist(u, o) <= u.range) this.hurt(u, o, dmg, kind);
+    });
+  }
+
   hurt(src: Combatant | null, t: Combatant, amount: number, kind: string): number {
     if (!t.alive) return 0;
     let dmg = amount * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
@@ -495,9 +653,10 @@ export class CombatEngine {
     t.hp -= dmg;
     t.mana = Math.min(100, t.mana + 5);
     if (dmg > 0) {
+      const popPos = unitCenter(t);
       this.onPop(
-        t.r,
-        t.c,
+        popPos.r,
+        popPos.c,
         `-${Math.round(dmg)}`,
         kind === 'magic' ? '#4C7BD1' : kind === 'crit' ? SAF : '#F2E9D4',
         '13px',
@@ -513,7 +672,8 @@ export class CombatEngine {
     if (t.hp <= 0) {
       t.alive = false;
       t.hp = 0;
-      this.onPop(t.r, t.c, '✕', '#B4442B', '16px');
+      const popPos = unitCenter(t);
+      this.onPop(popPos.r, popPos.c, '✕', '#B4442B', '16px');
     }
     return dmg;
   }
@@ -533,7 +693,8 @@ export class CombatEngine {
     const got = Math.min(u.maxHp - u.hp, amt);
     if (got <= 0) return;
     u.hp += got;
-    this.onPop(u.r, u.c, `+${Math.round(got)}`, '#1B6B52', '13px');
+    const popPos = unitCenter(u);
+    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, '#1B6B52', '13px');
   }
 
   enemiesOf(u: Combatant) {
@@ -555,8 +716,8 @@ export class CombatEngine {
     for (const [a, b] of tries) {
       const nr = u.r + a;
       const nc = u.c + b;
-      if (nr < 0 || nr > 7 || nc < 0 || nc > 3) continue;
-      if (this.C.some((o) => o.alive && o.r === nr && o.c === nc)) continue;
+      if (nr < 0 || nr > BOARD_ROWS - 1 || nc < 0 || nc > BOARD_COLS - 1) continue;
+      if (cellBlocked(this.C, nr, nc, u.u)) continue;
       u.r = nr;
       u.c = nc;
       return;
@@ -567,7 +728,6 @@ export class CombatEngine {
     u.mana = 0;
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
-    if (u.side === 'me') this.onBanner(HERO_MAP[u.hid].ability);
     this.emitFx(u, t, 'cast');
     const E = this.enemiesOf(u);
     const A = this.alliesOf(u);
@@ -577,6 +737,11 @@ export class CombatEngine {
         .slice(0, n);
 
     switch (u.hid) {
+      case 'boss': {
+        const slam = 220 + sp + u.star * 40;
+        E.forEach((o) => this.hurt(u, o, slam, 'magic'));
+        break;
+      }
       case 'jorm': {
         let tot = 0;
         E.forEach((o) => {
@@ -800,6 +965,8 @@ export class CombatEngine {
       const t = this.target(u);
       if (!t) return;
       if (u.mana >= 100 && u.silence <= 0) {
+        if (u.boss) this.onBanner('Cataclysm — all allies struck');
+        else if (u.side === 'me') this.onBanner(HERO_MAP[u.hid].ability);
         this.cast(u, t);
         return;
       }
@@ -808,9 +975,13 @@ export class CombatEngine {
         u.cd -= dt;
         if (u.cd <= 0) {
           u.cd = 1 / u.as;
-          const crit = Math.random() < u.crit;
-          const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
-          this.hurt(u, t, dmg, crit ? 'crit' : 'phys');
+          if (u.boss) {
+            this.bossBasicAttack(u);
+          } else {
+            const crit = Math.random() < u.crit;
+            const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
+            this.hurt(u, t, dmg, crit ? 'crit' : 'phys');
+          }
           u.mana = Math.min(100, u.mana + 12);
           if (u.scorch) {
             this.C.forEach((o) => {
@@ -900,8 +1071,8 @@ export const gameActions = {
   },
 
   tapCell(g: GameState, r: number, c: number, maxR: number, onPop: (text: string) => void) {
-    if (g.phase !== 'plan' || r < 4) return;
-    const occ = g.board.find((u) => u.r === r && u.c === c);
+    if (g.phase !== 'plan' || r < PLAYER_ROW_START) return;
+    const occ = g.board.find((u) => u.r != null && u.c != null && occupiesCell(u as Unit & { r: number; c: number }, r, c));
     if (!g.sel) {
       if (occ) gameActions.tapUnit(g, occ, 'board', maxR);
       return;

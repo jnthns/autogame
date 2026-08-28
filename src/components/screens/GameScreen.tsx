@@ -1,4 +1,4 @@
-import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL } from '../../data/constants';
+import { BONE, INK, JADE, MATCH_DEFAULTS, PRACTICE_BOARD_CAP, RUST, SAF, STARMUL, BOARD_BG_TILE_SIZE, BOARD_CELL_COUNT, BOARD_CELL_HEIGHT_PCT, BOARD_CELL_WIDTH_PCT, BOARD_COLS, BOARD_ROWS, BOSS_FOOTPRINT, PLAYER_ROW_START } from '../../data/constants';
 import {
   BATTLEGROUND_MAP,
   battlegroundBackgroundUrl,
@@ -7,7 +7,7 @@ import {
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
-import { activeSynergies, classCard, classCounts, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { activeSynergies, classCard, classCounts, isBossRound, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
 import { CombatFxLayer, getLungeTransform } from '../CombatFxLayer';
 import { PixelSprite } from '../PixelSprite';
@@ -64,7 +64,9 @@ export function GameScreen({
     g.board
       .concat(g.foe)
       .map((u) => {
-        const h = HERO_MAP[u.hid];
+        const foeUnit = g.foe.find((f) => f.u === u.u);
+        const isBoss = foeUnit?.boss ?? false;
+        const h = isBoss ? null : HERO_MAP[u.hid];
         const m = STARMUL[u.star];
         return {
           u: u.u,
@@ -73,14 +75,14 @@ export function GameScreen({
           side: g.foe.some((f) => f.u === u.u) ? ('foe' as const) : ('me' as const),
           r: u.r!,
           c: u.c!,
-          glyph: h.glyph,
-          name: h.name,
-          maxHp: Math.round(h.hp * m),
-          hp: Math.round(h.hp * m),
-          atk: h.dmg * m,
-          as: h.as,
-          range: h.range,
-          crit: h.crit,
+          glyph: isBoss ? '☠' : h!.glyph,
+          name: isBoss ? 'The Adversary' : h!.name,
+          maxHp: isBoss ? 1000 : Math.round(h!.hp * m),
+          hp: isBoss ? 1000 : Math.round(h!.hp * m),
+          atk: isBoss ? 100 : h!.dmg * m,
+          as: isBoss ? 0.35 : h!.as,
+          range: isBoss ? 2 : h!.range,
+          crit: isBoss ? 0.08 : h!.crit,
           critDmg: 0.8,
           mana: 0,
           startMana: 0,
@@ -98,6 +100,8 @@ export function GameScreen({
           mv: 0,
           alive: true,
           cast2: false,
+          boss: isBoss,
+          footprint: isBoss ? BOSS_FOOTPRINT : 1,
         };
       });
 
@@ -130,7 +134,7 @@ export function GameScreen({
             ‹
           </button>
           <div className="slab" style={{ fontSize: 15, letterSpacing: '0.02em', color: SAF }}>
-            {g.mode === 'practice' ? 'SANDBOX' : `ROUND ${g.round} / ${MATCH_DEFAULTS.matchRounds}`}
+            {g.mode === 'practice' ? 'SANDBOX' : isBossRound(g.round) ? `ROUND ${g.round} · BOSS` : `ROUND ${g.round} / ${MATCH_DEFAULTS.matchRounds}`}
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, border: '2px solid #E8A317', padding: '2px 8px' }}>
@@ -140,7 +144,7 @@ export function GameScreen({
             </span>
           </div>
           <div className="mono" style={{ border: '2px solid #6b6455', padding: '2px 8px', fontWeight: 700, fontSize: 13 }}>
-            {g.board.length}/{boardCap}
+            {g.board.length}/{g.mode === 'practice' ? PRACTICE_BOARD_CAP : boardCap}
           </div>
         </div>
         {g.mode === 'bot' && (
@@ -250,7 +254,7 @@ export function GameScreen({
         className="game-board"
         style={{
           ['--board-bg' as string]: `url(${battlegroundBackgroundUrl(battlegroundId)})`,
-          ['--board-bg-size' as string]: battlegroundUsesImage(battlegroundId) ? 'cover' : '25% 12.5%',
+          ['--board-bg-size' as string]: battlegroundUsesImage(battlegroundId) ? 'cover' : BOARD_BG_TILE_SIZE,
           ['--board-bg-repeat' as string]: battlegroundUsesImage(battlegroundId) ? 'no-repeat' : 'repeat',
           ['--board-bg-position' as string]: battlegroundUsesImage(battlegroundId) ? 'center' : 'initial',
         }}
@@ -260,15 +264,15 @@ export function GameScreen({
             position: 'absolute',
             inset: 0,
             display: 'grid',
-            gridTemplateColumns: 'repeat(4,1fr)',
-            gridTemplateRows: 'repeat(8,1fr)',
+            gridTemplateColumns: `repeat(${BOARD_COLS},1fr)`,
+            gridTemplateRows: `repeat(${BOARD_ROWS},1fr)`,
           }}
         >
-          {Array.from({ length: 32 }, (_, i) => {
-            const r = Math.floor(i / 4);
-            const c = i % 4;
-            const mine = r >= 4;
-            const occupied = src.some((u) => u.alive !== false && u.r === r && u.c === c);
+          {Array.from({ length: BOARD_CELL_COUNT }, (_, i) => {
+            const r = Math.floor(i / BOARD_COLS);
+            const c = i % BOARD_COLS;
+            const mine = r >= PLAYER_ROW_START;
+            const occupied = src.some((u) => u.alive !== false && occupiesCell(u, r, c));
             return (
               <button
                 key={i}
@@ -307,21 +311,23 @@ export function GameScreen({
             const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
             const boardUnit = g.board.find((x) => x.u === u.u);
             const lunge = combat ? getLungeTransform(combatFx, u.r, u.c) : undefined;
+            const fp = u.footprint ?? (u.boss ? BOSS_FOOTPRINT : 1);
+            const isBoss = fp > 1;
             return (
               <div
                 key={u.u}
                 style={{
                   position: 'absolute',
-                  width: '25%',
-                  height: '12.5%',
-                  left: `${u.c * 25}%`,
-                  top: `${u.r * 12.5}%`,
+                  width: `${fp * BOARD_CELL_WIDTH_PCT}%`,
+                  height: `${fp * BOARD_CELL_HEIGHT_PCT}%`,
+                  left: `${u.c * BOARD_CELL_WIDTH_PCT}%`,
+                  top: `${u.r * BOARD_CELL_HEIGHT_PCT}%`,
                   transition: 'left 0.3s, top 0.3s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   pointerEvents: 'none',
-                  zIndex: sel ? 20 : 10,
+                  zIndex: sel ? 20 : isBoss ? 15 : 10,
                 }}
               >
                 <button
@@ -336,11 +342,13 @@ export function GameScreen({
                       else onTapBoard(boardUnit);
                     }
                   }}
-                  className="board-unit"
+                  className={`board-unit${isBoss ? ' board-unit--boss' : ''}`}
                   style={{
                     position: 'relative',
-                    border: '2px solid #14120E',
-                    background: me ? INK : '#7a2d1d',
+                    border: `2px solid ${isBoss ? '#E8A317' : '#14120E'}`,
+                    background: me ? INK : isBoss ? '#4a1210' : '#7a2d1d',
+                    width: isBoss ? '88%' : undefined,
+                    height: isBoss ? '88%' : undefined,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -351,10 +359,13 @@ export function GameScreen({
                       ? `0 0 0 3px ${SAF}`
                       : u.stun > 0
                         ? '0 0 0 3px #4C7BD1'
-                        : '2px 2px 0 rgba(20,18,14,.35)',
+                        : isBoss
+                          ? '0 0 0 2px rgba(232,163,23,.55), 4px 4px 0 rgba(20,18,14,.45)'
+                          : '2px 2px 0 rgba(20,18,14,.35)',
                   }}
                 >
-                  <PixelSprite src={spriteCss(u.hid)} />
+                  <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 80 : undefined} />
+                  {!isBoss && (
                   <span
                     style={{
                       position: 'absolute',
@@ -373,13 +384,14 @@ export function GameScreen({
                   >
                     {'★'.repeat(u.star)}
                   </span>
+                  )}
                   <span
                     style={{
                       position: 'absolute',
                       left: -2,
                       right: -2,
                       bottom: -7,
-                      height: 5,
+                      height: isBoss ? 7 : 5,
                       background: INK,
                       border: '1px solid #14120E',
                     }}
@@ -445,9 +457,9 @@ export function GameScreen({
             className="mono"
             style={{
               position: 'absolute',
-              left: `${f.c * 25}%`,
-              top: `${f.r * 12.5}%`,
-              width: '25%',
+              left: `${f.c * BOARD_CELL_WIDTH_PCT}%`,
+              top: `${f.r * BOARD_CELL_HEIGHT_PCT}%`,
+              width: `${BOARD_CELL_WIDTH_PCT}%`,
               textAlign: 'center',
               pointerEvents: 'none',
               animation: 'omFloat 0.9s ease-out forwards',

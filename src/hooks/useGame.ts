@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, MATCH_DEFAULTS, RUST, SAF } from '../data/constants';
+import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, MATCH_DEFAULTS, PLAYER_ROW_START, RUST, SAF, STARMUL } from '../data/constants';
+import { HERO_MAP } from '../data/heroes';
 import {
   battlegroundUnlocked,
   newlyUnlockedBattlegrounds,
@@ -15,6 +16,7 @@ import {
 import { DEFAULT_BATTLEGROUND_ID, loadSettings, saveSettings, type SettingsState } from '../data/settings';
 import {
   applyTraits,
+  bossCombatant,
   cap,
   CombatEngine,
   combatant,
@@ -211,13 +213,16 @@ export function useGame() {
     const g = gameRef.current;
     if (!g || g.phase !== 'plan') return;
     if (!g.board.length) {
-      pop(6, 1, 'PLACE A CREATURE', RUST, '12px');
+      pop(PLAYER_ROW_START + 1, 1, 'PLACE A CREATURE', RUST, '12px');
       return;
     }
     const difficulty = g.mode === 'bot' ? settingsRef.current.difficulty : 'normal';
-    makeFoeBoard(g, difficulty);
+    const playerHpSum = g.board.reduce((s, u) => s + Math.round(HERO_MAP[u.hid].hp * STARMUL[u.star]), 0);
+    makeFoeBoard(g, difficulty, playerHpSum);
     const mine = g.board.map((u) => combatant(u, 'me'));
-    const theirs = g.foe.map((u) => combatant(u, 'foe'));
+    const theirs = g.foe.map((u) =>
+      u.boss ? bossCombatant(u, playerHpSum, g.round, difficulty) : combatant(u, 'foe'),
+    );
     applyTraits(mine);
     applyTraits(theirs);
     if (g.mode === 'bot') scaleFoeCombatants(theirs, difficulty);
@@ -291,7 +296,7 @@ export function useGame() {
       const g = gameRef.current;
       if (!g) return;
       gameActions.tapCell(g, r, c, MATCH_DEFAULTS.matchRounds, (text) =>
-        pop(6, 1, text, RUST, '12px'),
+        pop(PLAYER_ROW_START + 1, 1, text, RUST, '12px'),
       );
       syncGame(g);
     },
@@ -390,7 +395,7 @@ export function useGame() {
     chooseRelic,
     bindRelic,
     autoDraft,
-    cap: game ? cap(game.round) : 3,
+    cap: game ? cap(game.round, MATCH_DEFAULTS.matchRounds, game.mode) : 3,
   };
 }
 

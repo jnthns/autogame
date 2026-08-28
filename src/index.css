@@ -32,10 +32,10 @@ body {
   --screen-pad-x: 16px;
   --screen-pad-bottom: calc(var(--safe-bottom) + 20px);
 
-  --unit-size: 38px;
-  --bench-size: 40px;
-  --sprite-size: 30px;
-  --board-min-h: clamp(190px, 36dvh, 360px);
+  --unit-size: 34px;
+  --bench-size: 36px;
+  --sprite-size: 26px;
+  --board-min-h: clamp(240px, 48dvh, 480px);
 
   --parade-size-lg: 48px;
   --parade-size-md: 44px;
@@ -55,10 +55,10 @@ body {
     --shell-max-w: min(560px, calc(100vw - 32px));
     --shell-pad-x: 0px;
     --screen-pad-x: 22px;
-    --unit-size: 44px;
-    --bench-size: 46px;
-    --sprite-size: 34px;
-    --board-min-h: clamp(260px, 42dvh, 480px);
+    --unit-size: 38px;
+    --bench-size: 40px;
+    --sprite-size: 30px;
+    --board-min-h: clamp(320px, 54dvh, 620px);
     --parade-size-lg: 56px;
     --parade-size-md: 50px;
     --parade-size-sm: 42px;
@@ -70,7 +70,7 @@ body {
   :root {
     --shell-w: min(720px, 100vw);
     --shell-max-w: min(720px, calc(100vw - 40px));
-    --board-min-h: clamp(220px, 58dvh, 520px);
+    --board-min-h: clamp(280px, 62dvh, 660px);
   }
 }
 
@@ -91,10 +91,10 @@ body {
   :root {
     --header-pad-top: calc(var(--safe-top) + 6px);
     --home-header-pad-top: calc(var(--safe-top) + 14px);
-    --unit-size: 34px;
-    --bench-size: 36px;
-    --sprite-size: 26px;
-    --board-min-h: clamp(160px, 32dvh, 280px);
+    --unit-size: 30px;
+    --bench-size: 32px;
+    --sprite-size: 22px;
+    --board-min-h: clamp(200px, 42dvh, 360px);
     --parade-size-lg: 40px;
     --parade-size-md: 36px;
     --parade-size-sm: 30px;
@@ -684,7 +684,7 @@ button:disabled {
   border-bottom: 3px solid var(--om-line);
   background-color: var(--om-board);
   background-image: var(--board-bg);
-  background-size: var(--board-bg-size, 25% 12.5%);
+  background-size: var(--board-bg-size, 16.6667% 8.3333%);
   background-repeat: var(--board-bg-repeat, repeat);
   background-position: var(--board-bg-position, initial);
   image-rendering: pixelated;

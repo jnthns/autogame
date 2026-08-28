@@ -11,6 +11,8 @@ export interface Unit {
   relics: string[];
   r?: number;
   c?: number;
+  /** Multi-cell boss entity (3×3 on a 6×6 foe half). */
+  boss?: boolean;
 }
 
 export interface Selection {
@@ -121,6 +123,9 @@ export interface Combatant {
   buffT?: number;
   buffAs?: number;
   dmgBuff?: number;
+  /** Grid footprint in cells (1 = normal, 3 = boss on 6×6). */
+  footprint?: number;
+  boss?: boolean;
 }
 
 export interface ActiveTrait {
