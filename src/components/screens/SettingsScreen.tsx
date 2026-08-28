@@ -3,7 +3,8 @@ import { BONE, INK, JADE } from '../../data/constants';
 import {
   BATTLEGROUNDS,
   BATTLEGROUND_MAP,
-  battlegroundTileUrl,
+  battlegroundBackgroundUrl,
+  battlegroundUsesImage,
   battlegroundUnlockCurrent,
   battlegroundUnlocked,
   battlegroundUnlockLabel,
@@ -283,7 +284,8 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
             {BATTLEGROUNDS.map((b) => {
               const open = battlegroundUnlocked(b.id, progress);
               const selected = settings.battlegroundId === b.id;
-              const tile = battlegroundTileUrl(b.id);
+              const tile = battlegroundBackgroundUrl(b.id);
+              const imageBg = battlegroundUsesImage(b.id);
               return (
                 <button
                   key={b.id}
@@ -312,8 +314,9 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                       width: '100%',
                       height: '100%',
                       backgroundImage: tile ? `url(${tile})` : undefined,
-                      backgroundSize: '16.66% 16.66%',
-                      backgroundRepeat: 'repeat',
+                      backgroundSize: imageBg ? 'cover' : '16.66% 16.66%',
+                      backgroundRepeat: imageBg ? 'no-repeat' : 'repeat',
+                      backgroundPosition: imageBg ? 'center' : undefined,
                       imageRendering: 'pixelated',
                       position: 'relative',
                     }}

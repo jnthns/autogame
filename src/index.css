@@ -684,8 +684,9 @@ button:disabled {
   border-bottom: 3px solid var(--om-line);
   background-color: var(--om-board);
   background-image: var(--board-bg);
-  background-size: 25% 12.5%;
-  background-repeat: repeat;
+  background-size: var(--board-bg-size, 25% 12.5%);
+  background-repeat: var(--board-bg-repeat, repeat);
+  background-position: var(--board-bg-position, initial);
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   overflow: hidden;

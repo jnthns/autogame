@@ -1,5 +1,9 @@
 import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL } from '../../data/constants';
-import { BATTLEGROUND_MAP, battlegroundTileUrl } from '../../data/battlegrounds';
+import {
+  BATTLEGROUND_MAP,
+  battlegroundBackgroundUrl,
+  battlegroundUsesImage,
+} from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
@@ -245,7 +249,10 @@ export function GameScreen({
       <div
         className="game-board"
         style={{
-          ['--board-bg' as string]: `url(${battlegroundTileUrl(battlegroundId)})`,
+          ['--board-bg' as string]: `url(${battlegroundBackgroundUrl(battlegroundId)})`,
+          ['--board-bg-size' as string]: battlegroundUsesImage(battlegroundId) ? 'cover' : '25% 12.5%',
+          ['--board-bg-repeat' as string]: battlegroundUsesImage(battlegroundId) ? 'no-repeat' : 'repeat',
+          ['--board-bg-position' as string]: battlegroundUsesImage(battlegroundId) ? 'center' : 'initial',
         }}
       >
         <div
@@ -1237,7 +1244,7 @@ export function OverlayModal({
                         style={{
                           width: 28,
                           height: 28,
-                          backgroundImage: `url(${battlegroundTileUrl(id)})`,
+                          backgroundImage: `url(${battlegroundBackgroundUrl(id)})`,
                           backgroundSize: 'cover',
                           border: '2px solid #14120E',
                           flexShrink: 0,
