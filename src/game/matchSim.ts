@@ -1,10 +1,14 @@
 import { HERO_MAP } from '../data/heroes';
 import {
+  applyMerges,
   combatOpponents,
+  countHeroStar,
   createGame,
   gameActions,
+  mergeUnitLists,
   resetUidCounter,
   sellValue,
+  uid,
 } from './engine';
 import {
   BOSS_ENCOUNTERS,
@@ -117,6 +121,64 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   const lockedGold = sellG.gold;
   gameActions.sell(sellG);
   assert(sellG.board.length === 1 && sellG.gold === lockedGold, 'cannot sell during combat');
+
+  resetUidCounter();
+  const bench: Unit[] = [
+    { u: uid(), hid: 'anans', star: 1, relics: [] },
+    { u: uid(), hid: 'anans', star: 1, relics: [] },
+    { u: uid(), hid: 'anans', star: 1, relics: [] },
+  ];
+  const board: Unit[] = [];
+  mergeUnitLists(board, bench);
+  assert(bench.length === 1 && bench[0].star === 2 && board.length === 0, '3×1★ → 2★');
+
+  resetUidCounter();
+  board.length = 0;
+  bench.length = 0;
+  board.push(
+    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
+    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
+    { u: uid(), hid: 'anans', star: 2, relics: [], r: 5, c: 0 },
+  );
+  mergeUnitLists(board, bench);
+  assert(board.length === 1 && board[0].star === 3, '3×2★ → 3★');
+  assert(
+    ![...board, ...bench].some((u) => u.hid === 'anans' && u.star === 2),
+    '3×2★ leaves no duplicate 2★',
+  );
+
+  resetUidCounter();
+  const mergeG = createGame('practice');
+  mergeG.board = [
+    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
+    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
+  ];
+  mergeG.bench = [];
+  mergeG.shop = ['anans', null, null, null, null];
+  mergeG.gold = 99;
+  const twoBefore = countHeroStar(mergeG, 'anans', 2);
+  gameActions.buy(mergeG, 0);
+  applyMerges(mergeG, { boughtHid: 'anans', twoStarBeforeBuy: twoBefore });
+  const all = [...mergeG.board, ...mergeG.bench].filter((u) => u.hid === 'anans');
+  assert(
+    all.filter((u) => u.star === 3).length === 1 &&
+      all.filter((u) => u.star === 1).length === 1 &&
+      all.filter((u) => u.star === 2).length === 0,
+    '2×2★ + buy 1★ → 1×3★ + 1×1★',
+  );
+
+  resetUidCounter();
+  const moveG = createGame('practice');
+  moveG.board = [
+    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
+    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
+  ];
+  moveG.bench = [{ u: uid(), hid: 'anans', star: 2, relics: [] }];
+  mergeUnitLists(moveG.board, moveG.bench);
+  assert(
+    moveG.board.length === 1 && moveG.board[0].star === 3 && moveG.bench.length === 0,
+    'bench+board 3×2★ merges on placement check',
+  );
 
   gameActions.nextRound(g, g.foeDraft);
   const snapshotLater = g.foe.map((u) => u.hid).sort().join(',');
