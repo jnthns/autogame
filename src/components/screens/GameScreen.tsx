@@ -1,10 +1,12 @@
 import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL } from '../../data/constants';
-import { BATTLEGROUND_MAP, battlegroundTileUrl } from '../../data/battlegrounds';
+import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
 import { activeSynergies, classCard, classCounts, sellValue, traitCard, traitCounts } from '../../game/engine';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
+import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
+import { BattlegroundPreview } from '../BattlegroundPreview';
 import { CombatFxLayer, getLungeTransform } from '../CombatFxLayer';
 import { PixelSprite } from '../PixelSprite';
 
@@ -244,10 +246,8 @@ export function GameScreen({
 
       <div
         className="game-board"
-        style={{
-          ['--board-bg' as string]: `url(${battlegroundTileUrl(battlegroundId)})`,
-        }}
       >
+        <BattlegroundBoardBackground id={battlegroundId} />
         <div
           style={{
             position: 'absolute',
@@ -268,13 +268,13 @@ export function GameScreen({
                 type="button"
                 onClick={() => onTapCell(r, c)}
                 style={{
-                  borderRight: '1px solid rgba(20,18,14,.16)',
-                  borderBottom: '1px solid rgba(20,18,14,.16)',
+                  borderRight: '1px solid rgba(20,18,14,.22)',
+                  borderBottom: '1px solid rgba(20,18,14,.22)',
                   background: mine
                     ? g.sel && !occupied
-                      ? 'rgba(232,163,23,.28)'
-                      : 'rgba(27,107,82,.18)'
-                    : 'rgba(180,68,43,.18)',
+                      ? 'rgba(232,163,23,.24)'
+                      : 'rgba(27,107,82,.12)'
+                    : 'rgba(180,68,43,.12)',
                 }}
               />
             );
@@ -1232,17 +1232,17 @@ export function OverlayModal({
                         padding: '7px 9px',
                       }}
                     >
-                      <span
-                        className="pixel"
+                      <div
                         style={{
                           width: 28,
                           height: 28,
-                          backgroundImage: `url(${battlegroundTileUrl(id)})`,
-                          backgroundSize: 'cover',
                           border: '2px solid #14120E',
                           flexShrink: 0,
+                          overflow: 'hidden',
                         }}
-                      />
+                      >
+                        <BattlegroundPreview id={id} />
+                      </div>
                       <span style={{ flex: 1 }}>
                         <span className="slab" style={{ display: 'block', fontSize: 15, lineHeight: 1.1 }}>
                           {b?.name ?? id}
