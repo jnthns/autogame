@@ -1,21 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { BATTLEGROUND_WALLPAPERS } from '../data/battlegroundWallpapers';
 
-interface BattlegroundPreviewProps {
+interface BattlegroundBoardBackgroundProps {
   id: string;
   animate?: boolean;
-  locked?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
 
-export function BattlegroundPreview({
+export function BattlegroundBoardBackground({
   id,
   animate = true,
-  locked = false,
   className = '',
   style,
-}: BattlegroundPreviewProps) {
+}: BattlegroundBoardBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
 
@@ -62,8 +60,17 @@ export function BattlegroundPreview({
     <canvas
       ref={canvasRef}
       aria-hidden
-      className={`battleground-preview pixel${locked ? ' pixel-locked' : ''}${className ? ` ${className}` : ''}`}
-      style={{ width: '100%', height: '100%', objectFit: 'cover', ...style }}
+      className={`board-wallpaper-canvas pixel ${className}`.trim()}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'fill',
+        pointerEvents: 'none',
+        imageRendering: 'pixelated',
+        ...style,
+      }}
     />
   );
 }
