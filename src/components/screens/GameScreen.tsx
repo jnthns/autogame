@@ -4,7 +4,7 @@ import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
-import { activeSynergies, classCard, classCounts, combatant, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { activeSynergies, classCard, classCounts, combatant, isRankedMode, sellValue, traitCard, traitCounts } from '../../game/engine';
 import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
 import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
@@ -61,10 +61,16 @@ export function GameScreen({
   const combat = g.phase === 'combat';
   const period = periodInfo(g.round, g.matchRounds);
   const foePreview =
-    !combat && g.mode === 'bot' ? (isBossRound(g.round) ? makeBossUnits(g.round) : g.foe) : [];
+    !combat && isRankedMode(g.mode)
+      ? g.mode === 'bot' && isBossRound(g.round)
+        ? makeBossUnits(g.round)
+        : g.foe
+      : [];
   const src: Combatant[] =
     combatants ??
-    g.board.concat(foePreview).map((u) => combatant(u, g.board.some((b) => b.u === u.u) ? 'me' : 'foe'));
+    g.board
+      .concat(foePreview)
+      .map((u) => combatant(u, g.board.some((b) => b.u === u.u) ? 'me' : 'foe', g.heroHpMul));
 
   const [sellArmed, setSellArmed] = useState(false);
   useEffect(() => {
@@ -80,7 +86,16 @@ export function GameScreen({
   const canReroll = g.mode === 'practice' || g.freeRerolls > 0 || g.gold >= rerollCost;
   const rerollLabel =
     g.mode === 'practice' ? 'FREE ROLL' : g.freeRerolls > 0 ? `FREE ROLL ×${g.freeRerolls}` : `ROLL ◈${rerollCost}`;
-  const fightLabel = g.mode === 'practice' ? 'SPAR' : period.isBoss ? 'FIGHT BOSS' : period.isFinal ? 'FINAL FIGHT' : 'FIGHT';
+  const fightLabel =
+    g.mode === 'practice'
+      ? 'SPAR'
+      : g.mode === 'marathon'
+        ? 'FIGHT'
+        : period.isBoss
+          ? 'FIGHT BOSS'
+          : period.isFinal
+            ? 'FINAL FIGHT'
+            : 'FIGHT';
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -103,7 +118,7 @@ export function GameScreen({
             ‹
           </button>
           <div className="slab" style={{ fontSize: 15, letterSpacing: '0.02em', color: SAF }}>
-            {g.mode === 'practice' ? 'SANDBOX' : `ROUND ${g.round} / ${g.matchRounds}`}
+            {g.mode === 'practice' ? 'SANDBOX' : g.mode === 'marathon' ? `MARATHON ${g.round} / ${g.matchRounds}` : `ROUND ${g.round} / ${g.matchRounds}`}
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, border: '2px solid #E8A317', padding: '2px 8px' }}>
@@ -116,7 +131,7 @@ export function GameScreen({
             {g.board.length}/{boardCap}
           </div>
         </div>
-        {g.mode === 'bot' && (
+        {isRankedMode(g.mode) && (
           <>
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', width: 34, color: '#8f8878' }}>
@@ -899,7 +914,7 @@ export function SheetModal({
         <div style={{ padding: '14px 16px 20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
             {[
-              { k: 'HP', v: Math.round(h.hp * m) },
+              { k: 'HP', v: Math.round(h.hp * m * game.heroHpMul) },
               { k: 'ATK', v: Math.round(h.dmg * m) },
               { k: 'SPD', v: h.as.toFixed(2) },
               { k: 'CRIT', v: `${Math.round(h.crit * 100)}%` },

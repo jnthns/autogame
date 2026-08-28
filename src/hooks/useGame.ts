@@ -23,6 +23,7 @@ import {
   countHeroStar,
   createGame,
   gameActions,
+  isRankedMode,
   makeFoeBoard,
   mergeUnits,
   pickRelics,
@@ -188,7 +189,7 @@ export function useGame() {
       const g = gameRef.current;
       if (!g) return;
       let result = gameActions.resolveRound(g, win, g.matchRounds);
-      if (result.kind === 'over' && g.mode === 'bot') {
+      if (result.kind === 'over' && isRankedMode(g.mode)) {
         const before = progressRef.current;
         let next: ProgressState = { ...before, botMatches: before.botMatches + 1 };
         let newlyUnlocked: string[] = [];
@@ -222,13 +223,13 @@ export function useGame() {
       pop(6, 1, 'PLACE A CREATURE', RUST, '12px');
       return;
     }
-    const difficulty = g.mode === 'bot' ? settingsRef.current.difficulty : 'normal';
+    const difficulty = isRankedMode(g.mode) ? settingsRef.current.difficulty : 'normal';
     if (g.mode === 'practice') makeFoeBoard(g, difficulty);
-    const mine = g.board.map((u) => combatant(u, 'me'));
-    const theirs = combatOpponents(g).map((u) => combatant(u, 'foe'));
+    const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
+    const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
     applyTraits(mine);
     applyTraits(theirs);
-    if (g.mode === 'bot') scaleFoeCombatants(theirs, difficulty);
+    if (isRankedMode(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
       (r, c, text, color, size) => pop(r, c, text, color, size),
       (text) => {

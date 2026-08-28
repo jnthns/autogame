@@ -184,5 +184,12 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   const snapshotLater = g.foe.map((u) => u.hid).sort().join(',');
   lines.push(`info bot round1 [${snapshot1}] later [${snapshotLater}] cap=${g.foe.length}`);
 
+  resetUidCounter();
+  const marathon = createGame('marathon');
+  assert(marathon.matchRounds === 18, 'marathon is 18 rounds');
+  assert(marathon.heroHpMul === 1.5, 'marathon uses 1.5× hero HP');
+  assert(marathon.foe.length > 0, 'marathon starts with a bot board');
+  assert(combatOpponents(marathon).every((u) => !u.u.startsWith('boss-')), 'marathon has no period bosses');
+
   return { ok, lines };
 }
