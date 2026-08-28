@@ -28,6 +28,7 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Neutral yard',
     group: 'Starter',
     unlock: { kind: 'always' },
+    image: 'img/training-sands-battleground.png',
     p: { a: '#E8D9B0', b: '#D4C294', c: '#C4B07A', k: '#B3A06A' },
     d: [
       'abababababab',
