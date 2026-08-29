@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, PLAYER_ROW_START, RUST, SAF } from '../data/constants';
+import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, PLAYER_ROW_START, RUST, SAF, USER_DRAFT_MAX } from '../data/constants';
 import {
   battlegroundUnlocked,
   newlyUnlockedBattlegrounds,
 } from '../data/battlegrounds';
 import {
+  applyGauntletMilestones,
   applyMatchWin,
   heroUnlocked,
   loadProgress,
   saveProgress,
   unlockedHeroIds,
+  updateGauntletBest,
   type ProgressState,
 } from '../data/progress';
 import { DEFAULT_BATTLEGROUND_ID, loadSettings, saveSettings, type SettingsState } from '../data/settings';
@@ -23,6 +25,7 @@ import {
   countHeroStar,
   createGame,
   gameActions,
+  isGauntletMode,
   isRankedMode,
   makeFoeBoard,
   mergeUnits,
@@ -30,7 +33,9 @@ import {
   resetUidCounter,
   rollShop,
   scaleFoeCombatants,
+  usesDifficulty,
 } from '../game/engine';
+import { pickGauntletRelics } from '../game/gauntlet';
 import { debugRoundFromUrl } from '../game/hyperRoll';
 import type {
   Combatant,
@@ -53,13 +58,13 @@ function loadDraft(unlocked: string[]): string[] {
       const d = JSON.parse(s);
       if (Array.isArray(d) && d.length) {
         const kept = d.filter((id: unknown): id is string => typeof id === 'string' && allow.has(id));
-        if (kept.length) return kept.slice(0, 6);
+        if (kept.length) return kept.slice(0, USER_DRAFT_MAX);
       }
     }
   } catch {
     /* ignore */
   }
-  return DEFAULT_DRAFT.filter((id) => allow.has(id)).slice(0, 6);
+  return DEFAULT_DRAFT.filter((id) => allow.has(id)).slice(0, USER_DRAFT_MAX);
 }
 
 export function useGame() {
@@ -151,7 +156,7 @@ export function useGame() {
       const d = draft.slice();
       const i = d.indexOf(id);
       if (i >= 0) d.splice(i, 1);
-      else if (d.length < 6) d.push(id);
+      else if (d.length < USER_DRAFT_MAX) d.push(id);
       else return;
       saveDraft(d);
     },
@@ -204,7 +209,21 @@ export function useGame() {
       const g = gameRef.current;
       if (!g) return;
       let result = gameActions.resolveRound(g, win, g.matchRounds);
-      if (result.kind === 'over' && isRankedMode(g.mode)) {
+      if (result.kind === 'over' && isGauntletMode(g.mode)) {
+        const before = progressRef.current;
+        const peakRound = g.gauntletRoundsCleared ?? Math.max(0, g.round - 1);
+        const lives = g.gauntletLives ?? 0;
+        let next = updateGauntletBest(before, peakRound, lives);
+        const milestone = applyGauntletMilestones(next, peakRound);
+        next = milestone.next;
+        saveProgress(next);
+        progressRef.current = next;
+        setProgress(next);
+        result = {
+          ...result,
+          unlocked: milestone.newlyUnlocked,
+        };
+      } else if (result.kind === 'over' && isRankedMode(g.mode)) {
         const before = progressRef.current;
         let next: ProgressState = { ...before, botMatches: before.botMatches + 1 };
         let newlyUnlocked: string[] = [];
@@ -238,13 +257,13 @@ export function useGame() {
       pop(PLAYER_ROW_START + 1, 1, 'PLACE A CREATURE', RUST, '12px');
       return;
     }
-    const difficulty = isRankedMode(g.mode) ? settingsRef.current.difficulty : 'normal';
+    const difficulty = usesDifficulty(g.mode) ? settingsRef.current.difficulty : 'normal';
     if (g.mode === 'practice') makeFoeBoard(g, difficulty);
     const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
     const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
     applyTraits(mine);
     applyTraits(theirs);
-    if (isRankedMode(g.mode)) scaleFoeCombatants(theirs, difficulty);
+    if (usesDifficulty(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
       (r, c, text, color, size, variant) => pop(r, c, text, color, size, variant),
       (text) => {
@@ -336,7 +355,29 @@ export function useGame() {
   const nextRound = useCallback(() => {
     const g = gameRef.current;
     if (!g) return;
+    const prevRound = g.round;
     gameActions.nextRound(g, draft);
+    if (isGauntletMode(g.mode)) {
+      const before = progressRef.current;
+      let next = before;
+      let newlyUnlocked: string[] = [];
+      if (
+        (prevRound < 20 && g.round >= 20) ||
+        (prevRound < 40 && g.round >= 40)
+      ) {
+        const milestone = applyGauntletMilestones(before, g.round);
+        next = milestone.next;
+        newlyUnlocked = milestone.newlyUnlocked;
+      }
+      if (g.gauntletRoundsCleared != null && g.gauntletLives != null) {
+        next = updateGauntletBest(next, g.gauntletRoundsCleared, g.gauntletLives);
+      }
+      if (next !== before || newlyUnlocked.length) {
+        saveProgress(next);
+        progressRef.current = next;
+        setProgress(next);
+      }
+    }
     setOverlay(null);
     setFloaters([]);
     setCombatFx([]);
@@ -344,7 +385,10 @@ export function useGame() {
   }, [draft, syncGame]);
 
   const offerRelics = useCallback(() => {
-    setOverlay({ kind: 'relic', picks: pickRelics() });
+    const g = gameRef.current;
+    const picks =
+      g && isGauntletMode(g.mode) ? pickGauntletRelics(g.round) : pickRelics();
+    setOverlay({ kind: 'relic', picks });
   }, []);
 
   const chooseRelic = useCallback((rid: string) => {
@@ -377,7 +421,7 @@ export function useGame() {
   const autoDraft = useCallback(() => {
     const pool = unlockedHeroIds(progressRef.current)
       .sort(() => Math.random() - 0.5)
-      .slice(0, 6);
+      .slice(0, USER_DRAFT_MAX);
     saveDraft(pool);
   }, [saveDraft]);
 

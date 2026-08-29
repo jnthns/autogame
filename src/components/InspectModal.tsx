@@ -1,5 +1,5 @@
 import { CLASSES } from '../data/classes';
-import { BONE, INK, JADE, RUST, SAF, costTone } from '../data/constants';
+import { BONE, INK, JADE, RUST, SAF, USER_DRAFT_MAX, costTone } from '../data/constants';
 import { HERO_MAP } from '../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../data/progress';
 import { spriteCss } from '../data/sprites';
@@ -16,7 +16,7 @@ interface InspectModalProps {
 export function InspectModal({ heroId, draft, progress, onClose, onToggle }: InspectModalProps) {
   const h = HERO_MAP[heroId];
   const on = draft.includes(heroId);
-  const full = draft.length >= 6;
+  const full = draft.length >= USER_DRAFT_MAX;
   const unlocked = heroUnlocked(heroId, progress);
   const req = unlockReq(heroId);
   const have = req ? unlockCurrent(req, progress) : 0;
@@ -146,6 +146,38 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
           </div>
           <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.4, color: '#d8cfb8', textWrap: 'pretty' }}>
             {h.abilityText}
+          </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 11,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: '#6b6455',
+            }}
+          >
+            Lore
+          </div>
+          <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.45, color: '#4a4436', textWrap: 'pretty' }}>
+            {h.lore}
+          </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 11,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: '#6b6455',
+            }}
+          >
+            {CLASSES[h.heroClass].glyph} {h.heroClass}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.45, color: '#6b6455', textWrap: 'pretty' }}>
+            {CLASSES[h.heroClass].desc}
           </div>
         </div>
         <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.4, color: '#6b6455', textWrap: 'pretty' }}>{h.quirk}</div>

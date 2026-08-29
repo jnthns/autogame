@@ -36,7 +36,9 @@ export default function App() {
             unboundIds={unlockedHeroIds(game.progress)}
             totalHeroes={HEROES.length}
             wins={game.progress.wins}
+            gauntletBest={game.progress.gauntletBest}
             onPlay={() => game.setScreen('modes')}
+            onGauntlet={() => game.startGame('gauntlet')}
             onBuild={() => game.setScreen('build')}
             onSettings={() => game.setScreen('settings')}
           />
@@ -55,7 +57,9 @@ export default function App() {
             onPractice={() => game.startGame('practice')}
             onBot={() => game.startGame('bot')}
             onMarathon={() => game.startGame('marathon')}
+            onGauntlet={() => game.startGame('gauntlet')}
             difficulty={game.settings.difficulty}
+            gauntletBest={game.progress.gauntletBest}
           />
         )}
         {game.screen === 'build' && (

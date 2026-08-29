@@ -14,8 +14,8 @@ export const BOARD_ROWS = BOARD_SIDE_ROWS * 2;
 export const PLAYER_ROW_START = BOARD_SIDE_ROWS;
 export const BOARD_CELL_COUNT = BOARD_COLS * BOARD_ROWS;
 
-/** Boss occupies a 3×3 block on the 6×6 foe half. */
-export const BOSS_FOOTPRINT = 3;
+/** Boss occupies a 4×4 block on the 6×6 foe half. */
+export const BOSS_FOOTPRINT = 4;
 export const BOSS_ANCHOR = { r: 1, c: 1 } as const;
 
 export const BOARD_CELL_WIDTH_PCT = 100 / BOARD_COLS;
@@ -37,6 +37,14 @@ export const CAPS = [...BOT_BOARD_CAPS];
 export const DEFAULT_DRAFT = ['jorm', 'anans', 'kitsu', 'taniw', 'ifrit', 'thund'];
 export const DRAFT_STORAGE_KEY = 'om_draft';
 
+/** Player shop pool cap for Hyper Roll, Marathon, and other ranked bot matches. */
+export const USER_DRAFT_MAX = 6;
+/** Bot shop draws from a wider hero pool than the player. */
+export const BOT_DRAFT_SIZE = 12;
+
+/** Global combat HP multiplier — applied before mode-specific bonuses. */
+export const HERO_HP_MUL = 1.5;
+
 export const MATCH_DEFAULTS = {
   matchRounds: 13,
   startHealth: 100,
@@ -49,6 +57,27 @@ export const BOSS_ROUNDS = [4, 8, 12] as const;
 export const MARATHON = {
   matchRounds: 18,
   heroHpMul: 1.5,
+} as const;
+
+/** Endless boss-only mode — board caps ramp like marathon then plateau at 12. */
+export const GAUNTLET_BOARD_CAPS = [
+  2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11, 12,
+] as const;
+
+export const GAUNTLET = {
+  /** Effectively endless — UI shows round count only. */
+  matchRounds: 9999,
+  startLives: 3,
+  startGold: 8,
+  goldPenalty: 2,
+  baseGoldReward: 8,
+  goldPerRound: 2,
+  baseRoundIncome: 4,
+  roundScalePerRound: 0.07,
+  boardPowerDivisor: 180,
+  unlockCost4Round: 20,
+  unlockCost5Round: 40,
+  exclusiveRelicRound: 12,
 } as const;
 
 export function costTone(c: number): string {

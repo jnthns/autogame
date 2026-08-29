@@ -747,6 +747,11 @@ button:disabled {
   padding: var(--header-pad-top) var(--screen-pad-x) 8px;
 }
 
+.screen-header-game {
+  padding: calc(var(--safe-top) + 4px) var(--screen-pad-x) 4px;
+  flex-shrink: 0;
+}
+
 .screen-header-nav {
   padding: var(--header-pad-top) var(--screen-pad-x) 14px;
 }
@@ -765,8 +770,8 @@ button:disabled {
   border-bottom: 3px solid var(--om-line);
   background-color: var(--om-board);
   overflow: hidden;
-  flex: 1 1 auto;
-  min-height: var(--board-min-h);
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .game-board--shake {

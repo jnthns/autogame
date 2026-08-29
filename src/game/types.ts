@@ -1,5 +1,5 @@
 export type Screen = 'home' | 'modes' | 'build' | 'game' | 'settings';
-export type GameMode = 'practice' | 'bot' | 'marathon';
+export type GameMode = 'practice' | 'bot' | 'marathon' | 'gauntlet';
 export type Phase = 'plan' | 'combat' | 'result';
 export type Difficulty = 'normal' | 'hard' | 'mythic';
 export type CombatSpeed = 1 | 2 | 4;
@@ -52,6 +52,12 @@ export interface GameState {
   phase: Phase;
   log: string;
   lastResult: { win: boolean; dmg: number; boss?: boolean } | null;
+  /** Gauntlet-only: remaining lives (starts at 3). */
+  gauntletLives?: number;
+  /** Gold deducted at the start of the next shop phase after a boss loss. */
+  gauntletGoldPenalty?: number;
+  /** Bosses defeated this run (score). */
+  gauntletRoundsCleared?: number;
 }
 
 export type FloaterVariant = 'damage' | 'crit' | 'heal' | 'death' | 'info';
