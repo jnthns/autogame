@@ -6,7 +6,7 @@ import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
 import { activeSynergies, applyTraits, classCard, classCounts, combatant, fitBossToTeam, isGauntletMode, isRankedMode, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
 import { getGauntletEncounter, makeGauntletBossUnits, boardPower } from '../../game/gauntlet';
-import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines } from '../../game/hyperRoll';
+import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines, shopPrice } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
 import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
 import { BattlegroundPreview } from '../BattlegroundPreview';
@@ -66,8 +66,8 @@ export function GameScreen({
     !combat && (isRankedMode(g.mode) || gauntlet)
       ? gauntlet
         ? makeGauntletBossUnits(g.round, boardPower(g.board))
-        : g.mode === 'bot' && isBossRound(g.round)
-          ? makeBossUnits(g.round)
+        : (g.mode === 'bot' || g.mode === 'marathon') && isBossRound(g.round, g.matchRounds)
+          ? makeBossUnits(g.round, g.matchRounds)
           : g.foe
       : [];
   const src: Combatant[] =
@@ -77,7 +77,9 @@ export function GameScreen({
       const theirs = foePreview.map((u) => combatant(u, 'foe', g.heroHpMul));
       applyTraits(mine);
       applyTraits(theirs);
-      if (theirs.some((u) => u.boss)) fitBossToTeam(theirs, mine, g.round);
+      if (theirs.some((u) => u.boss)) {
+        fitBossToTeam(theirs, mine, g.round, { gauntlet });
+      }
       return mine.concat(theirs);
     })();
 
@@ -118,15 +120,13 @@ export function GameScreen({
   const fightLabel =
     g.mode === 'practice'
       ? 'SPAR'
-      : gauntlet
+        : gauntlet
         ? 'FIGHT BOSS'
-        : g.mode === 'marathon'
-          ? 'FIGHT'
-          : period.isBoss
-            ? 'FIGHT BOSS'
-            : period.isFinal
-              ? 'FINAL FIGHT'
-              : 'FIGHT';
+        : period.isBoss
+          ? 'FIGHT BOSS'
+          : period.isFinal
+            ? 'FINAL FIGHT'
+            : 'FIGHT';
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -576,7 +576,7 @@ export function GameScreen({
             </span>
           </div>
         )}
-        {plan && g.mode === 'bot' && (period.isBoss || period.isFinal) && !banner && (
+        {plan && (g.mode === 'bot' || g.mode === 'marathon') && (period.isBoss || period.isFinal) && !banner && (
           <div style={{ position: 'absolute', left: 0, right: 0, top: 8, textAlign: 'center', pointerEvents: 'none', zIndex: 31 }}>
             <span
               className="slab"
@@ -589,7 +589,7 @@ export function GameScreen({
                 fontSize: 13,
               }}
             >
-              {period.isBoss ? getBossEncounter(g.round)?.name ?? 'BOSS ROUND' : 'FINAL VS THE ADVERSARY'}
+              {period.isBoss ? getBossEncounter(g.round, g.matchRounds)?.name ?? 'BOSS ROUND' : 'FINAL VS THE ADVERSARY'}
             </span>
           </div>
         )}
@@ -714,8 +714,8 @@ export function GameScreen({
         {plan && (
           <>
             <div style={{ display: 'flex', gap: 5, padding: '8px 10px 6px', alignItems: 'stretch' }}>
-              {g.shop.map((hid, i) => {
-                if (!hid) {
+              {g.shop.map((offer, i) => {
+                if (!offer) {
                   return (
                     <div
                       key={i}
@@ -737,8 +737,9 @@ export function GameScreen({
                     </div>
                   );
                 }
-                const h = HERO_MAP[hid];
-                const afford = g.gold >= h.cost && g.bench.length < 8;
+                const h = HERO_MAP[offer.hid];
+                const price = shopPrice(offer);
+                const afford = g.gold >= price && g.bench.length < 8;
                 return (
                   <button
                     key={i}
@@ -758,7 +759,7 @@ export function GameScreen({
                       opacity: afford ? 1 : 0.55,
                     }}
                   >
-                    <PixelSprite src={spriteCss(hid)} />
+                    <PixelSprite src={spriteCss(offer.hid)} />
                     <span
                       style={{
                         fontSize: 9,
@@ -773,6 +774,7 @@ export function GameScreen({
                       }}
                     >
                       {h.name.split(' ')[0]}
+                      {offer.star > 1 ? ` ${'★'.repeat(offer.star)}` : ''}
                     </span>
                     <span
                       className="mono"
@@ -784,7 +786,7 @@ export function GameScreen({
                         padding: '0 4px',
                       }}
                     >
-                      ◈{h.cost}
+                      ◈{price}
                     </span>
                   </button>
                 );

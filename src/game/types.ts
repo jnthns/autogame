@@ -4,6 +4,11 @@ export type Phase = 'plan' | 'combat' | 'result';
 export type Difficulty = 'normal' | 'hard' | 'mythic';
 export type CombatSpeed = 1 | 2 | 4;
 
+export interface ShopOffer {
+  hid: string;
+  star: 1 | 2;
+}
+
 export interface Unit {
   u: string;
   hid: string;
@@ -46,8 +51,8 @@ export interface GameState {
   foeBench: Unit[];
   foeGold: number;
   foeDraft: string[];
-  foeShop: (string | null)[];
-  shop: (string | null)[];
+  foeShop: (ShopOffer | null)[];
+  shop: (ShopOffer | null)[];
   freeRerolls: number;
   sel: Selection | null;
   speed: number;
@@ -162,7 +167,8 @@ export interface Combatant {
   footprint?: number;
   boss?: boolean;
   bossKit?: string;
-  /** Stationary — bosses never step off their anchor. */
+  /** Incoming damage multiplier vs this boss (set from trial difficulty). */
+  bossTaken?: number;
   rooted?: boolean;
 }
 

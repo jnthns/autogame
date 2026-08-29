@@ -11,6 +11,7 @@ import {
   BOSS_FOOTPRINT,
   BOSS_HP_TEAM_MULT,
   BOSS_RANGE,
+  BOSS_TAKEN_BY_DIFFICULTY,
   BOT_BOARD_CAPS,
   BOT_DRAFT_SIZE,
   COMBAT_LIMIT,
@@ -32,12 +33,14 @@ import { HEROES, HERO_MAP, isMeleeHero } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
 import {
+  collapseShopOffers,
   getBossEncounter,
   isBossRound,
   lossDamage,
   makeBossUnits,
   roundIncome,
   maxShopCost,
+  shopPrice,
   shopWeight,
   unitPower,
 } from './hyperRoll';
@@ -59,6 +62,7 @@ import type {
   GameState,
   OverlayKind,
   Selection,
+  ShopOffer,
   Unit,
   FloaterVariant,
 } from './types';
@@ -119,7 +123,7 @@ export function createGame(
     matchRounds: matchRoundsFor(mode),
     heroHpMul: heroHpMulFor(mode),
     round: 1,
-    gold: mode === 'practice' ? 999 : mode === 'gauntlet' ? GAUNTLET.startGold : 14,
+    gold: mode === 'practice' ? 999 : mode === 'gauntlet' ? GAUNTLET.startGold : MATCH_DEFAULTS.startGold,
     myHp: hp,
     foeHp: hp,
     maxHp: hp,
@@ -129,7 +133,7 @@ export function createGame(
     board: [],
     foe: [],
     foeBench: [],
-    foeGold: mode === 'practice' ? 0 : mode === 'gauntlet' ? 0 : 14,
+    foeGold: mode === 'practice' ? 0 : mode === 'gauntlet' ? 0 : MATCH_DEFAULTS.startGold,
     foeDraft: mode === 'practice' || mode === 'gauntlet' ? [] : pickBotDraft(),
     foeShop: [],
     shop: [],
@@ -214,7 +218,7 @@ export function rollShopOffers(
   draft: string[],
   round = 1,
   matchRounds: number = MATCH_DEFAULTS.matchRounds,
-): (string | null)[] {
+): (ShopOffer | null)[] {
   const maxCost = maxShopCost(round, matchRounds);
   const base = playerShopPool(draft);
   let pool = base.filter((id) => HERO_MAP[id].cost <= maxCost);
@@ -224,7 +228,7 @@ export function rollShopOffers(
   }
   const w = pool.map((id) => shopWeight(HERO_MAP[id].cost));
   const tot = w.reduce((a, b) => a + b, 0);
-  return [0, 0, 0, 0, 0].map(() => {
+  const raw = [0, 0, 0, 0, 0].map(() => {
     let r = Math.random() * tot;
     for (let i = 0; i < pool.length; i++) {
       r -= w[i];
@@ -232,6 +236,7 @@ export function rollShopOffers(
     }
     return pool[0];
   });
+  return collapseShopOffers(raw);
 }
 
 export function rollShop(g: GameState, draft: string[], silent = false): void {
@@ -455,17 +460,19 @@ export function applyMerges(
   }
 }
 
-/** 1★ refunds full cost; combined units refund copies spent minus a small combine tax at 3★. */
+/** 1★ refunds full cost; combined units pay a combine tax so 2-copy merges do not print gold. */
 export function sellValue(u: Unit): number {
   const cost = HERO_MAP[u.hid].cost;
   if (u.star === 1) return cost;
-  if (u.star === 2) return cost * MERGE_COPIES;
-  return Math.max(1, cost * MERGE_COPIES * MERGE_COPIES - 1);
+  if (u.star === 2) return Math.max(1, cost * MERGE_COPIES - 1);
+  return Math.max(1, cost * 3);
 }
 
 export function combatOpponents(g: GameState): Unit[] {
   if (g.mode === 'gauntlet') return makeGauntletBossUnits(g.round, boardPower(g.board));
-  if (g.mode === 'bot' && isBossRound(g.round)) return makeBossUnits(g.round);
+  if ((g.mode === 'bot' || g.mode === 'marathon') && isBossRound(g.round, g.matchRounds)) {
+    return makeBossUnits(g.round, g.matchRounds);
+  }
   return g.foe;
 }
 
@@ -514,13 +521,13 @@ function botOwns(g: GameState, hid: string): boolean {
 }
 
 function botBuy(g: GameState, i: number): boolean {
-  const hid = g.foeShop[i];
-  if (!hid) return false;
-  const cost = HERO_MAP[hid].cost;
+  const offer = g.foeShop[i];
+  if (!offer) return false;
+  const cost = shopPrice(offer);
   if (g.foeGold < cost || g.foeBench.length >= 8) return false;
   g.foeGold -= cost;
   g.foeShop = g.foeShop.map((s, j) => (j === i ? null : s));
-  g.foeBench.push({ u: uid(), hid, star: 1, relics: [] });
+  g.foeBench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   return true;
 }
 
@@ -566,7 +573,7 @@ export function runBotTurn(g: GameState): void {
   const tryBuys = () => {
     let bought = false;
     for (let i = 0; i < g.foeShop.length; i++) {
-      const hid = g.foeShop[i];
+      const hid = g.foeShop[i]?.hid;
       if (!hid || !botWanted(g, hid)) continue;
       if (g.foeBench.length >= 8) botSellWeakest(g);
       if (botBuy(g, i)) bought = true;
@@ -579,7 +586,7 @@ export function runBotTurn(g: GameState): void {
     if (!tryBuys()) break;
   }
 
-  const usefulLeft = g.foeShop.some((hid) => hid && botOwns(g, hid));
+  const usefulLeft = g.foeShop.some((offer) => offer && botOwns(g, offer.hid));
   if (!usefulLeft && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
     g.foeGold -= MATCH_DEFAULTS.rerollCost;
     g.foeShop = rollShopOffers(g.foeDraft, g.round, g.matchRounds);
@@ -706,6 +713,7 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
     cast2: false,
     boss: isBoss,
     bossKit: u.bossKit,
+    bossTaken: isBoss ? BOSS_DAMAGE_TAKEN : undefined,
     footprint: isBoss ? BOSS_FOOTPRINT : 1,
     rooted: isBoss,
   };
@@ -726,7 +734,12 @@ function teamDps(list: Combatant[]): number {
  * Extra HP is added when player DPS (crit included) would burn that floor too fast,
  * because damage compounds harder than raw health.
  */
-export function fitBossToTeam(foes: Combatant[], allies: Combatant[], round: number): void {
+export function fitBossToTeam(
+  foes: Combatant[],
+  allies: Combatant[],
+  round: number,
+  opts?: { difficulty?: Difficulty; gauntlet?: boolean },
+): void {
   const bosses = foes.filter((u) => u.boss);
   if (!bosses.length) return;
   const teamHp = Math.max(
@@ -735,15 +748,15 @@ export function fitBossToTeam(foes: Combatant[], allies: Combatant[], round: num
   );
   const dps = Math.max(1, teamDps(allies));
   const n = Math.max(1, allies.length);
-  const roundMul = 1 + Math.max(0, round - 1) * 0.04;
+  const difficulty = opts?.difficulty ?? 'normal';
+  const taken = BOSS_TAKEN_BY_DIFFICULTY[difficulty];
+  const roundMul = 1 + Math.max(0, round - 1) * (opts?.gauntlet ? 0.09 : 0.04);
   const floor = BOSS_HP_TEAM_MULT * teamHp * roundMul;
-  const effectiveDps = dps * BOSS_DAMAGE_TAKEN;
+  const effectiveDps = dps * taken;
   const burn = floor / effectiveDps;
   const pad = burn < BOSS_DPS_BURN_SECONDS ? BOSS_DPS_BURN_SECONDS / burn : 1;
   const target = Math.max(1, Math.round(floor * pad));
   const avgHp = teamHp / n;
-  // AOE autos hit the whole board — ATK is set from average toughness, not raw DPS,
-  // so late-game compounding crit/haste does not one-shot the line.
   const atk = Math.max(16, avgHp / (BOSS_AS * BOSS_BOARD_SURVIVAL));
 
   bosses.forEach((b) => {
@@ -758,6 +771,7 @@ export function fitBossToTeam(foes: Combatant[], allies: Combatant[], round: num
     b.c = BOSS_ANCHOR.c;
     b.footprint = BOSS_FOOTPRINT;
     b.rooted = true;
+    b.bossTaken = taken;
   });
 }
 
@@ -944,7 +958,7 @@ export class CombatEngine {
     if (!t.alive) return 0;
     let dmg = amount * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
     if (kind === 'true') dmg = amount;
-    if (t.boss) dmg *= BOSS_DAMAGE_TAKEN;
+    if (t.boss) dmg *= t.bossTaken ?? BOSS_DAMAGE_TAKEN;
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
       t.shield -= a;
@@ -1028,10 +1042,33 @@ export class CombatEngine {
     }
   }
 
+  stepAway(u: Combatant, t: Combatant) {
+    if (u.rooted || u.boss) return false;
+    const dr = Math.sign(u.r - t.r) || (u.r <= t.r ? -1 : 1);
+    const dc = Math.sign(u.c - t.c) || (u.c <= t.c ? -1 : 1);
+    const tries: [number, number][] = [
+      [dr, dc],
+      [dr, 0],
+      [0, dc],
+      [-dr, 0],
+      [0, -dc],
+    ];
+    for (const [a, b] of tries) {
+      const nr = u.r + a;
+      const nc = u.c + b;
+      if (nr < 0 || nr > BOARD_ROWS - 1 || nc < 0 || nc > BOARD_COLS - 1) continue;
+      if (cellBlocked(this.C, nr, nc, u.u)) continue;
+      u.r = nr;
+      u.c = nc;
+      return true;
+    }
+    return false;
+  }
+
   inAttackRange(u: Combatant, d: number): boolean {
     if (u.boss) return d <= u.range;
     if (u.melee) return d <= 1;
-    return d <= u.range;
+    return d >= 2 && d <= u.range;
   }
 
   private bossCast(u: Combatant) {
@@ -1274,11 +1311,9 @@ export class CombatEngine {
           });
         break;
       case 'camaz': {
-        const far = E.slice().sort((a, b) => this.dist(u, b) - this.dist(u, a))[0];
-        if (far) {
-          const dealt = this.hurt(u, far, (240 + sp) * m, 'phys');
-          this.heal(u, dealt);
-        }
+        const nearTarget = near(1)[0] || t;
+        const dealt = this.hurt(u, nearTarget, (240 + sp) * m, 'phys');
+        this.heal(u, dealt);
         break;
       }
       case 'simur':
@@ -1367,7 +1402,8 @@ export class CombatEngine {
         u.mv -= dt;
         if (u.mv <= 0) {
           u.mv = 0.45;
-          this.stepToward(u, t);
+          if (!u.melee && d < 2) this.stepAway(u, t);
+          else this.stepToward(u, t);
         }
       }
     });
@@ -1411,13 +1447,13 @@ export class CombatEngine {
 export const gameActions = {
   buy(g: GameState, i: number) {
     if (g.phase !== 'plan') return;
-    const hid = g.shop[i];
-    if (!hid) return;
-    const cost = HERO_MAP[hid].cost;
+    const offer = g.shop[i];
+    if (!offer) return;
+    const cost = shopPrice(offer);
     if (g.gold < cost || g.bench.length >= 8) return;
     g.gold -= cost;
     g.shop = g.shop.map((s, j) => (j === i ? null : s));
-    g.bench.push({ u: uid(), hid, star: 1, relics: [] });
+    g.bench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   },
 
   sell(g: GameState) {
@@ -1519,7 +1555,8 @@ export const gameActions = {
         boss: { name: enc.name, period: enc.period },
       };
     }
-    const boss = g.mode === 'bot' ? getBossEncounter(g.round) : null;
+    const boss =
+      g.mode === 'bot' || g.mode === 'marathon' ? getBossEncounter(g.round, g.matchRounds) : null;
     let dmg = 0;
     if (boss) {
       if (win) {

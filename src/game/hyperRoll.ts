@@ -1,7 +1,14 @@
 import { BOSS_KITS, type BossKitId } from '../data/bosses';
-import { BOSS_ANCHOR, BOSS_ROUNDS, HYPER_ROLL_ROUNDS, MATCH_DEFAULTS } from '../data/constants';
+import {
+  BOSS_ANCHOR,
+  BOSS_ROUNDS,
+  HYPER_ROLL_ROUNDS,
+  MARATHON_BOSS_ROUNDS,
+  MATCH_DEFAULTS,
+  MERGE_COPIES,
+} from '../data/constants';
 import { HERO_MAP } from '../data/heroes';
-import type { BossRewardGrant, Unit } from './types';
+import type { BossRewardGrant, ShopOffer, Unit } from './types';
 
 export { BOSS_ROUNDS, HYPER_ROLL_ROUNDS };
 
@@ -44,14 +51,18 @@ export function shopWeight(cost: number): number {
 
 /** Max hero cost tier available in the shop for a given round. */
 export function maxShopCost(round: number, matchRounds: number = HYPER_ROLL_ROUNDS): number {
-  if (round >= matchRounds || round >= 10) return 5;
-  if (round >= 7) return 4;
-  if (round >= 4) return 3;
+  if (round >= matchRounds || round >= 12) return 5;
+  if (round >= 9) return 4;
+  if (round >= 5) return 3;
   return 2;
 }
 
-export function isBossRound(round: number): boolean {
-  return (BOSS_ROUNDS as readonly number[]).includes(round);
+export function bossRoundsFor(matchRounds: number = HYPER_ROLL_ROUNDS): readonly number[] {
+  return matchRounds > HYPER_ROLL_ROUNDS ? MARATHON_BOSS_ROUNDS : BOSS_ROUNDS;
+}
+
+export function isBossRound(round: number, matchRounds: number = HYPER_ROLL_ROUNDS): boolean {
+  return bossRoundsFor(matchRounds).includes(round);
 }
 
 export function isFinalRound(round: number, matchRounds = HYPER_ROLL_ROUNDS): boolean {
@@ -59,10 +70,11 @@ export function isFinalRound(round: number, matchRounds = HYPER_ROLL_ROUNDS): bo
 }
 
 export function periodInfo(round: number, matchRounds = HYPER_ROLL_ROUNDS): PeriodInfo {
+  const rounds = bossRoundsFor(matchRounds);
   const isFinal = round >= matchRounds;
-  const isBoss = isBossRound(round);
-  const period = isFinal ? 4 : Math.min(3, Math.max(1, Math.ceil(round / 4)));
-  const nextBoss = BOSS_ROUNDS.find((r) => r >= round) ?? null;
+  const isBoss = !isFinal && rounds.includes(round);
+  const period = isFinal ? rounds.length + 1 : Math.min(rounds.length, Math.max(1, Math.ceil(round / 4)));
+  const nextBoss = rounds.find((r) => r >= round) ?? null;
   const encounter: PeriodInfo['encounter'] = isFinal ? 'final' : isBoss ? 'boss' : 'bot';
   return {
     round,
@@ -77,8 +89,8 @@ export function periodInfo(round: number, matchRounds = HYPER_ROLL_ROUNDS): Peri
 }
 
 export function roundIncome(roundAfter: number, pvpWin: boolean | null): number {
-  const winBonus = pvpWin === true ? 2 : 0;
-  return 5 + winBonus + Math.min(3, Math.floor(roundAfter / 4));
+  const winBonus = pvpWin === true ? 1 : 0;
+  return 4 + winBonus + Math.min(2, Math.floor(roundAfter / 5));
 }
 
 export function lossDamage(round: number, streak: number): number {
@@ -103,7 +115,6 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
         boss: true,
         bossKit: 'clay',
       },
-      { hid: 'barng', star: 1, r: 0, c: 0, scaleHp: 1.1, scaleAtk: 0.85 },
     ],
     reward: { gold: 6, freeRerolls: 1, relic: false },
   },
@@ -124,9 +135,6 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
         boss: true,
         bossKit: 'storm',
       },
-      { hid: 'golem', star: 1, r: 0, c: 0, scaleHp: 1.15, scaleAtk: 0.9 },
-      { hid: 'thund', star: 2, r: 0, c: 5, scaleHp: 1.05, scaleAtk: 0.95 },
-      { hid: 'kitsu', star: 1, r: 5, c: 0, scaleHp: 1.0, scaleAtk: 0.9 },
     ],
     reward: { gold: 10, freeRerolls: 1, relic: true },
   },
@@ -147,21 +155,26 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
         boss: true,
         bossKit: 'coil',
       },
-      { hid: 'hydra', star: 2, r: 0, c: 0, scaleHp: 1.1, scaleAtk: 0.9 },
-      { hid: 'levia', star: 2, r: 0, c: 5, scaleHp: 1.1, scaleAtk: 0.9 },
-      { hid: 'ifrit', star: 2, r: 5, c: 0, scaleHp: 1.05, scaleAtk: 0.95 },
-      { hid: 'taniw', star: 1, r: 5, c: 5, scaleHp: 1.0, scaleAtk: 0.85 },
     ],
     reward: { gold: 14, freeRerolls: 2, relic: true },
   },
 ];
 
-export function getBossEncounter(round: number): BossEncounter | null {
-  return BOSS_ENCOUNTERS.find((b) => b.round === round) ?? null;
+export function getBossEncounter(round: number, matchRounds: number = HYPER_ROLL_ROUNDS): BossEncounter | null {
+  const rounds = bossRoundsFor(matchRounds);
+  const idx = rounds.indexOf(round);
+  if (idx < 0) return null;
+  const template = BOSS_ENCOUNTERS[idx % BOSS_ENCOUNTERS.length];
+  return {
+    ...template,
+    round,
+    period: idx + 1,
+    name: idx >= BOSS_ENCOUNTERS.length ? `${template.name} · Reprise` : template.name,
+  };
 }
 
-export function makeBossUnits(round: number): Unit[] {
-  const enc = getBossEncounter(round);
+export function makeBossUnits(round: number, matchRounds: number = HYPER_ROLL_ROUNDS): Unit[] {
+  const enc = getBossEncounter(round, matchRounds);
   if (!enc) return [];
   return enc.units.map((spec, i) => {
     const isBoss = spec.boss ?? i === 0;
@@ -178,6 +191,30 @@ export function makeBossUnits(round: number): Unit[] {
       scaleAtk: spec.scaleAtk,
     };
   });
+}
+
+export function shopPrice(offer: ShopOffer): number {
+  const cost = HERO_MAP[offer.hid].cost;
+  return offer.star === 1 ? cost : cost * MERGE_COPIES;
+}
+
+/** Collapse duplicate 1★ shop rolls into a single 2★ offer (pay for both copies). */
+export function collapseShopOffers(hids: (string | null)[]): (ShopOffer | null)[] {
+  const slots: (ShopOffer | null)[] = hids.map((hid) => (hid ? { hid, star: 1 as const } : null));
+  const pending = new Map<string, number>();
+  for (let i = 0; i < slots.length; i++) {
+    const s = slots[i];
+    if (!s || s.star !== 1) continue;
+    const prev = pending.get(s.hid);
+    if (prev != null && slots[prev]) {
+      slots[prev] = { hid: s.hid, star: 2 };
+      slots[i] = null;
+      pending.delete(s.hid);
+    } else {
+      pending.set(s.hid, i);
+    }
+  }
+  return slots;
 }
 
 export function rewardLines(reward: BossRewardGrant): string[] {
@@ -202,6 +239,6 @@ export function debugRoundFromUrl(): number | undefined {
 
 export function unitPower(u: Unit): number {
   const cost = HERO_MAP[u.hid]?.cost ?? 1;
-  const copies = u.star === 3 ? 9 : u.star === 2 ? 3 : 1;
+  const copies = u.star === 1 ? 1 : u.star === 2 ? MERGE_COPIES : MERGE_COPIES * MERGE_COPIES;
   return cost * copies;
 }

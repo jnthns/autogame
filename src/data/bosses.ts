@@ -20,7 +20,7 @@ export const BOSS_KITS: Record<BossKitId, BossKit> = {
     id: 'storm',
     ability: 'Judgment Gale',
     abilityText:
-      'Lightning rakes every enemy. Surviving omen-allies gain attack speed and a ward. The two weakest heroes are stunned.',
+      'Lightning rakes every enemy. The court steels itself: attack speed and a ward. The two weakest heroes are stunned.',
     banner: 'Judgment Gale — the court strikes',
   },
   coil: {

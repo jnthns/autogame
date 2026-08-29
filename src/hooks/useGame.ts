@@ -264,7 +264,12 @@ export function useGame() {
     const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
     applyTraits(mine);
     applyTraits(theirs);
-    if (theirs.some((u) => u.boss)) fitBossToTeam(theirs, mine, g.round);
+    if (theirs.some((u) => u.boss)) {
+      fitBossToTeam(theirs, mine, g.round, {
+        difficulty,
+        gauntlet: isGauntletMode(g.mode),
+      });
+    }
     if (usesDifficulty(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
       (r, c, text, color, size, variant) => pop(r, c, text, color, size, variant),
@@ -300,7 +305,8 @@ export function useGame() {
     (i: number) => {
       const g = gameRef.current;
       if (!g) return;
-      const hid = g.shop[i];
+      const offer = g.shop[i];
+      const hid = offer?.hid;
       const twoStarBefore = hid ? countHeroStar(g, hid, 2) : 0;
       gameActions.buy(g, i);
       if (hid) applyMerges(g, { boughtHid: hid, twoStarBeforeBuy: twoStarBefore }, (r, c, text) => pop(r, c, text));
