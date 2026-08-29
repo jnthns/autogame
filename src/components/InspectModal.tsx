@@ -1,6 +1,6 @@
 import { CLASSES } from '../data/classes';
 import { BONE, INK, JADE, RUST, SAF, USER_DRAFT_MAX, costTone } from '../data/constants';
-import { HERO_MAP } from '../data/heroes';
+import { attackLabel, HERO_MAP } from '../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../data/progress';
 import { spriteCss } from '../data/sprites';
 import { PixelSprite } from './PixelSprite';
@@ -90,6 +90,20 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
                 }}
               >
                 {CLASSES[h.heroClass].glyph} {h.heroClass}
+              </span>
+              <span
+                style={{
+                  border: '2px solid #14120E',
+                  padding: '2px 6px',
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  background: h.attack === 'melee' ? RUST : JADE,
+                  color: BONE,
+                }}
+              >
+                {attackLabel(h)}
               </span>
               {h.traits.map((t) => (
                 <span

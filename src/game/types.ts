@@ -4,6 +4,11 @@ export type Phase = 'plan' | 'combat' | 'result';
 export type Difficulty = 'normal' | 'hard' | 'mythic';
 export type CombatSpeed = 1 | 2 | 4;
 
+export interface ShopOffer {
+  hid: string;
+  star: 1 | 2;
+}
+
 export interface Unit {
   u: string;
   hid: string;
@@ -12,6 +17,8 @@ export interface Unit {
   r?: number;
   c?: number;
   boss?: boolean;
+  /** Encounter kit id for boss casts (aoe / buff / debuff). */
+  bossKit?: string;
   scaleHp?: number;
   scaleAtk?: number;
 }
@@ -44,8 +51,8 @@ export interface GameState {
   foeBench: Unit[];
   foeGold: number;
   foeDraft: string[];
-  foeShop: (string | null)[];
-  shop: (string | null)[];
+  foeShop: (ShopOffer | null)[];
+  shop: (ShopOffer | null)[];
   freeRerolls: number;
   sel: Selection | null;
   speed: number;
@@ -132,6 +139,8 @@ export interface Combatant {
   atk: number;
   as: number;
   range: number;
+  /** Melee heroes only attack adjacent; ranged heroes only attack at range. */
+  melee: boolean;
   crit: number;
   critDmg: number;
   mana: number;
@@ -154,9 +163,13 @@ export interface Combatant {
   buffT?: number;
   buffAs?: number;
   dmgBuff?: number;
-  /** Grid footprint in cells (1 = normal, 3 = multi-tile boss). */
+  /** Grid footprint in cells (1 = normal, 4 = multi-tile boss). */
   footprint?: number;
   boss?: boolean;
+  bossKit?: string;
+  /** Incoming damage multiplier vs this boss (set from trial difficulty). */
+  bossTaken?: number;
+  rooted?: boolean;
 }
 
 export interface ActiveTrait {

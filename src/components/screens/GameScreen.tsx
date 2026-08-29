@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL, BOARD_CELL_COUNT, BOARD_CELL_HEIGHT_PCT, BOARD_CELL_WIDTH_PCT, BOARD_COLS, BOARD_ROWS, BOSS_FOOTPRINT, PLAYER_ROW_START } from '../../data/constants';
 import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
-import { HERO_MAP } from '../../data/heroes';
+import { attackLabel, HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
-import { activeSynergies, classCard, classCounts, combatant, isGauntletMode, isRankedMode, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { activeSynergies, applyTraits, classCard, classCounts, combatant, fitBossToTeam, isGauntletMode, isRankedMode, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
 import { getGauntletEncounter, makeGauntletBossUnits, boardPower } from '../../game/gauntlet';
-import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines } from '../../game/hyperRoll';
+import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines, shopPrice } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
 import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
 import { BattlegroundPreview } from '../BattlegroundPreview';
@@ -66,15 +66,22 @@ export function GameScreen({
     !combat && (isRankedMode(g.mode) || gauntlet)
       ? gauntlet
         ? makeGauntletBossUnits(g.round, boardPower(g.board))
-        : g.mode === 'bot' && isBossRound(g.round)
-          ? makeBossUnits(g.round)
+        : (g.mode === 'bot' || g.mode === 'marathon') && isBossRound(g.round, g.matchRounds)
+          ? makeBossUnits(g.round, g.matchRounds)
           : g.foe
       : [];
   const src: Combatant[] =
     combatants ??
-    g.board
-      .concat(foePreview)
-      .map((u) => combatant(u, g.board.some((b) => b.u === u.u) ? 'me' : 'foe', g.heroHpMul));
+    (() => {
+      const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
+      const theirs = foePreview.map((u) => combatant(u, 'foe', g.heroHpMul));
+      applyTraits(mine);
+      applyTraits(theirs);
+      if (theirs.some((u) => u.boss)) {
+        fitBossToTeam(theirs, mine, g.round, { gauntlet });
+      }
+      return mine.concat(theirs);
+    })();
 
   const [sellArmed, setSellArmed] = useState(false);
   const [boardShake, setBoardShake] = useState(false);
@@ -113,15 +120,13 @@ export function GameScreen({
   const fightLabel =
     g.mode === 'practice'
       ? 'SPAR'
-      : gauntlet
+        : gauntlet
         ? 'FIGHT BOSS'
-        : g.mode === 'marathon'
-          ? 'FIGHT'
-          : period.isBoss
-            ? 'FIGHT BOSS'
-            : period.isFinal
-              ? 'FINAL FIGHT'
-              : 'FIGHT';
+        : period.isBoss
+          ? 'FIGHT BOSS'
+          : period.isFinal
+            ? 'FINAL FIGHT'
+            : 'FIGHT';
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -390,7 +395,7 @@ export function GameScreen({
                     boxShadow: u.stun > 0 && !sel ? '0 0 0 2px #4C7BD1' : undefined,
                   }}
                 >
-                  <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 112 : undefined} />
+                  <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 132 : undefined} />
                   {boardUnit && boardUnit.relics.length > 0 && (
                     <span className="relic-strip" aria-hidden>
                       {boardUnit.relics.slice(0, 3).map((rid) => {
@@ -571,7 +576,7 @@ export function GameScreen({
             </span>
           </div>
         )}
-        {plan && g.mode === 'bot' && (period.isBoss || period.isFinal) && !banner && (
+        {plan && (g.mode === 'bot' || g.mode === 'marathon') && (period.isBoss || period.isFinal) && !banner && (
           <div style={{ position: 'absolute', left: 0, right: 0, top: 8, textAlign: 'center', pointerEvents: 'none', zIndex: 31 }}>
             <span
               className="slab"
@@ -584,7 +589,7 @@ export function GameScreen({
                 fontSize: 13,
               }}
             >
-              {period.isBoss ? getBossEncounter(g.round)?.name ?? 'BOSS ROUND' : 'FINAL VS THE ADVERSARY'}
+              {period.isBoss ? getBossEncounter(g.round, g.matchRounds)?.name ?? 'BOSS ROUND' : 'FINAL VS THE ADVERSARY'}
             </span>
           </div>
         )}
@@ -709,8 +714,8 @@ export function GameScreen({
         {plan && (
           <>
             <div style={{ display: 'flex', gap: 5, padding: '8px 10px 6px', alignItems: 'stretch' }}>
-              {g.shop.map((hid, i) => {
-                if (!hid) {
+              {g.shop.map((offer, i) => {
+                if (!offer) {
                   return (
                     <div
                       key={i}
@@ -732,8 +737,9 @@ export function GameScreen({
                     </div>
                   );
                 }
-                const h = HERO_MAP[hid];
-                const afford = g.gold >= h.cost && g.bench.length < 8;
+                const h = HERO_MAP[offer.hid];
+                const price = shopPrice(offer);
+                const afford = g.gold >= price && g.bench.length < 8;
                 return (
                   <button
                     key={i}
@@ -753,7 +759,7 @@ export function GameScreen({
                       opacity: afford ? 1 : 0.55,
                     }}
                   >
-                    <PixelSprite src={spriteCss(hid)} />
+                    <PixelSprite src={spriteCss(offer.hid)} />
                     <span
                       style={{
                         fontSize: 9,
@@ -768,6 +774,7 @@ export function GameScreen({
                       }}
                     >
                       {h.name.split(' ')[0]}
+                      {offer.star > 1 ? ` ${'★'.repeat(offer.star)}` : ''}
                     </span>
                     <span
                       className="mono"
@@ -779,7 +786,7 @@ export function GameScreen({
                         padding: '0 4px',
                       }}
                     >
-                      ◈{h.cost}
+                      ◈{price}
                     </span>
                   </button>
                 );
@@ -977,7 +984,7 @@ export function SheetModal({
             </div>
             <div style={{ marginTop: 7, fontSize: 14, lineHeight: 1.4, color: '#d8cfb8', textWrap: 'pretty' }}>{h.abilityText}</div>
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #3a352b', fontSize: 13, lineHeight: 1.35, color: SAF }}>
-              At ★{sheet.star} every number above is multiplied by {m}× · range {h.range} · {h.quirk}
+              At ★{sheet.star} every number above is multiplied by {m}× · {attackLabel(h)} only · {h.quirk}
             </div>
           </div>
           <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>

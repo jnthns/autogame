@@ -1,6 +1,8 @@
 import type { ClassName } from './classes';
 import type { TraitName } from './traits';
 
+export type AttackStyle = 'melee' | 'ranged';
+
 export interface HeroDef {
   id: string;
   name: string;
@@ -13,12 +15,22 @@ export interface HeroDef {
   hp: number;
   dmg: number;
   as: number;
+  /** melee = adjacent only; ranged = cannot close — attacks at `range` tiles. */
+  attack: AttackStyle;
   range: number;
   crit: number;
   ability: string;
   abilityText: string;
   lore: string;
   quirk: string;
+}
+
+export function isMeleeHero(h: HeroDef): boolean {
+  return h.attack === 'melee';
+}
+
+export function attackLabel(h: HeroDef): string {
+  return h.attack === 'melee' ? 'Melee' : `Range ${h.range}`;
 }
 
 export const HEROES: HeroDef[] = [
@@ -34,6 +46,7 @@ export const HEROES: HeroDef[] = [
     hp: 450,
     dmg: 62,
     as: 0.65,
+    attack: 'melee',
     range: 1,
     crit: 0.1,
     ability: 'Ouroboros Coil',
@@ -54,13 +67,14 @@ export const HEROES: HeroDef[] = [
     hp: 325,
     dmg: 55,
     as: 0.85,
-    range: 3,
+    attack: 'ranged',
+    range: 4,
     crit: 0.15,
     ability: 'Dawn Wind',
     abilityText:
       'Sends a gale down the row: 300 magic damage split among all enemies hit, and allies gain +25% attack speed for 4s.',
     lore: 'The feathered serpent brought maize, laws, and fire to the people before vanishing eastward on a raft of snakes.',
-    quirk: 'Backline carry with a board-wide attack speed buff.',
+    quirk: 'Backline carry with a board-wide attack speed buff. Ranged only.',
   },
   {
     id: 'thund',
@@ -74,13 +88,14 @@ export const HEROES: HeroDef[] = [
     hp: 300,
     dmg: 48,
     as: 0.95,
-    range: 3,
+    attack: 'ranged',
+    range: 4,
     crit: 0.2,
     ability: 'Split Sky',
     abilityText:
       'Chain lightning arcs to 3 enemies for 180 each; every arc after the first crits automatically.',
     lore: 'Wakíŋyaŋ rides the storm clouds, wings flashing lightning. Where it stoops, the prairie remembers thunder.',
-    quirk: 'High crit, multi-target burst. Rewards Trickster stacking.',
+    quirk: 'High crit, multi-target burst. Rewards Trickster stacking. Ranged only.',
   },
   {
     id: 'anans',
@@ -94,13 +109,14 @@ export const HEROES: HeroDef[] = [
     hp: 260,
     dmg: 40,
     as: 1.1,
-    range: 2,
+    attack: 'melee',
+    range: 1,
     crit: 0.35,
     ability: 'Web of Tales',
     abilityText:
       'Snares the two nearest enemies for 2s and marks them: marked foes take +20% damage from everyone.',
     lore: 'The spider who stole stories from Nyame still weaves traps in every tale told around the fire.',
-    quirk: 'Cheapest crit engine. 35% base crit rate, damage amplifier.',
+    quirk: 'Cheapest crit engine. 35% base crit rate, damage amplifier. Melee only.',
   },
   {
     id: 'bunyi',
@@ -114,6 +130,7 @@ export const HEROES: HeroDef[] = [
     hp: 400,
     dmg: 38,
     as: 0.7,
+    attack: 'melee',
     range: 1,
     crit: 0.05,
     ability: 'Drowning Grasp',
@@ -134,13 +151,14 @@ export const HEROES: HeroDef[] = [
     hp: 390,
     dmg: 58,
     as: 0.9,
+    attack: 'melee',
     range: 1,
     crit: 0.12,
-    ability: 'Sunward Dive',
+    ability: 'Sunward Strike',
     abilityText:
-      'Leaps to the enemy backline for 260 physical damage and gains a 300-point shield for 5s.',
+      'Rakes the current target for 260 physical damage and gains a 300-point shield for 5s.',
     lore: "Vishnu's mount, sworn enemy of serpents, dives from the sun with talons that never miss their mark.",
-    quirk: 'Dive bruiser that reaches past the enemy frontline.',
+    quirk: 'Melee bruiser. Stays adjacent — no leap past the frontline.',
   },
   {
     id: 'kitsu',
@@ -154,13 +172,14 @@ export const HEROES: HeroDef[] = [
     hp: 270,
     dmg: 44,
     as: 1.0,
-    range: 2,
+    attack: 'melee',
+    range: 1,
     crit: 0.28,
     ability: 'Foxfire Nine',
     abilityText:
       'Nine wisps seek random enemies, 70 magic damage each. Every wisp can crit independently.',
     lore: 'Each tail a century of cunning. Foxfire dances ahead of her, and bargains made with a smile rarely end well.',
-    quirk: 'Spray damage that scales absurdly with crit sources.',
+    quirk: 'Spray damage that scales absurdly with crit sources. Melee only.',
   },
   {
     id: 'ifrit',
@@ -174,13 +193,14 @@ export const HEROES: HeroDef[] = [
     hp: 310,
     dmg: 52,
     as: 0.8,
-    range: 2,
+    attack: 'ranged',
+    range: 3,
     crit: 0.18,
     ability: 'Pillar of Smokeless Fire',
     abilityText:
       'Erupts a 2×2 pillar for 280 magic damage and leaves burning ground dealing 40/s for 4s.',
     lore: 'Smokeless fire given shape and will. Djinn of the desert forge pillars of flame that outlast their makers.',
-    quirk: "The board's best AOE zone control.",
+    quirk: "The board's best AOE zone control. Ranged only.",
   },
   {
     id: 'zirni',
@@ -194,13 +214,14 @@ export const HEROES: HeroDef[] = [
     hp: 475,
     dmg: 70,
     as: 0.6,
-    range: 2,
+    attack: 'ranged',
+    range: 3,
     crit: 0.1,
     ability: 'Three Throats',
     abilityText:
       'Breathes three cones in sequence, 200 magic damage each. Heads regrow: casts a second time at 30% HP for free.',
     lore: 'Three heads, three hungers. Cut one throat and two more argue over which grows back first.',
-    quirk: 'Late-game monster. Enormous double-cast damage ceiling.',
+    quirk: 'Late-game monster. Enormous double-cast damage ceiling. Ranged only.',
   },
   {
     id: 'taniw',
@@ -214,6 +235,7 @@ export const HEROES: HeroDef[] = [
     hp: 430,
     dmg: 42,
     as: 0.75,
+    attack: 'melee',
     range: 1,
     crit: 0.05,
     ability: 'Tide Ward',
@@ -234,6 +256,7 @@ export const HEROES: HeroDef[] = [
     hp: 350,
     dmg: 46,
     as: 0.85,
+    attack: 'melee',
     range: 1,
     crit: 0.1,
     ability: 'Tablet Thief',
@@ -254,13 +277,14 @@ export const HEROES: HeroDef[] = [
     hp: 410,
     dmg: 50,
     as: 0.7,
-    range: 2,
+    attack: 'ranged',
+    range: 3,
     crit: 0.1,
     ability: 'Unanswerable Riddle',
     abilityText:
       'Poses a riddle: the two lowest-HP enemies are stunned for 2.5s and take 240 true damage.',
     lore: 'She devoured those who failed her riddles. The desert keeps her secrets, and her silence is a weapon.',
-    quirk: 'Execution and lockdown. True damage ignores all armor.',
+    quirk: 'Execution and lockdown. True damage ignores all armor. Ranged only.',
   },
   {
     id: 'kelpi',
@@ -274,6 +298,7 @@ export const HEROES: HeroDef[] = [
     hp: 320,
     dmg: 40,
     as: 0.9,
+    attack: 'melee',
     range: 1,
     crit: 0.12,
     ability: 'Drowning Bridle',
@@ -294,6 +319,7 @@ export const HEROES: HeroDef[] = [
     hp: 380,
     dmg: 36,
     as: 0.75,
+    attack: 'melee',
     range: 1,
     crit: 0.08,
     ability: 'Calonarang Ward',
@@ -314,13 +340,14 @@ export const HEROES: HeroDef[] = [
     hp: 250,
     dmg: 42,
     as: 1.15,
-    range: 2,
+    attack: 'melee',
+    range: 1,
     crit: 0.3,
     ability: 'Star Joke',
     abilityText:
       'A joke lands wrong: a random enemy is stunned for 1.5s and takes 140 magic damage. Allies gain +15% crit for the round.',
     lore: 'Old Man Coyote rearranged the stars for a joke and never apologized. Chaos follows wherever he grins.',
-    quirk: 'Cheapest Sky crit engine. Fast hands, chaos CC, and a board-wide crit tilt.',
+    quirk: 'Cheapest Sky crit engine. Fast hands, chaos CC, and a board-wide crit tilt. Melee only.',
   },
   {
     id: 'griff',
@@ -334,6 +361,7 @@ export const HEROES: HeroDef[] = [
     hp: 360,
     dmg: 50,
     as: 0.9,
+    attack: 'melee',
     range: 1,
     crit: 0.12,
     ability: 'Aegis Stoop',
@@ -354,6 +382,7 @@ export const HEROES: HeroDef[] = [
     hp: 440,
     dmg: 40,
     as: 0.65,
+    attack: 'melee',
     range: 1,
     crit: 0.05,
     ability: 'Name Upon Clay',
@@ -374,13 +403,14 @@ export const HEROES: HeroDef[] = [
     hp: 280,
     dmg: 46,
     as: 0.95,
-    range: 3,
+    attack: 'ranged',
+    range: 4,
     crit: 0.18,
     ability: 'Caoineadh',
     abilityText:
       'Wails at the lowest-HP enemy: 200 damage and a 2s stun. If they are below 40% HP, the damage is true.',
     lore: 'Her wail foretells death in the family. Those who hear it twice rarely hear anything again.',
-    quirk: 'Backline execute. Ancestor mana lets the keen land early; Trickster crits the rest.',
+    quirk: 'Backline execute. Ancestor mana lets the keen land early; Trickster crits the rest. Ranged only.',
   },
   {
     id: 'hydra',
@@ -394,6 +424,7 @@ export const HEROES: HeroDef[] = [
     hp: 420,
     dmg: 56,
     as: 0.7,
+    attack: 'melee',
     range: 1,
     crit: 0.1,
     ability: 'Heads Eternal',
@@ -414,13 +445,14 @@ export const HEROES: HeroDef[] = [
     hp: 340,
     dmg: 50,
     as: 0.8,
-    range: 2,
+    attack: 'melee',
+    range: 1,
     crit: 0.12,
     ability: 'Mend the Sky',
     abilityText:
       'Repairs the two most wounded allies: each heals 200 and gains 15% damage reduction for the rest of the round.',
     lore: 'She mended the broken sky with five-colored stones and shaped humanity from yellow earth.',
-    quirk: 'Sustain enabler. Keeps the frontline alive so Serpent lifesteal can finish the job.',
+    quirk: 'Sustain enabler. Keeps the frontline alive so Serpent lifesteal can finish the job. Melee only.',
   },
   {
     id: 'camaz',
@@ -434,13 +466,14 @@ export const HEROES: HeroDef[] = [
     hp: 300,
     dmg: 60,
     as: 1.0,
+    attack: 'melee',
     range: 1,
     crit: 0.16,
     ability: 'House of Bats',
     abilityText:
-      'Dives the farthest enemy for 240 physical damage and heals for all damage dealt.',
+      'Tears the nearest enemy for 240 physical damage and heals for all damage dealt.',
     lore: 'Lord of the bat house in the underworld. His wings blot out the moon when he hunts the living.',
-    quirk: 'Backline assassin. High speed, high attack, pays itself back in blood.',
+    quirk: 'Melee assassin. High speed, high attack, pays itself back in blood.',
   },
   {
     id: 'simur',
@@ -454,13 +487,14 @@ export const HEROES: HeroDef[] = [
     hp: 350,
     dmg: 52,
     as: 0.9,
-    range: 3,
+    attack: 'ranged',
+    range: 4,
     crit: 0.14,
     ability: 'Conference of Birds',
     abilityText:
       'A host of wings: all allies heal 160 and gain +20% attack speed for 4s. The two nearest enemies take 200 magic damage.',
     lore: 'Thirty birds sought the Simurgh and found themselves reflected in her all-seeing plumage.',
-    quirk: 'Carry-enabler. Heals the board, then lets Sky haste convert the rest of the fight.',
+    quirk: 'Carry-enabler. Heals the board, then lets Sky haste convert the rest of the fight. Ranged only.',
   },
   {
     id: 'levia',
@@ -474,6 +508,7 @@ export const HEROES: HeroDef[] = [
     hp: 490,
     dmg: 68,
     as: 0.55,
+    attack: 'melee',
     range: 1,
     crit: 0.08,
     ability: 'Tehom Rising',
@@ -494,6 +529,7 @@ export const HEROES: HeroDef[] = [
     hp: 400,
     dmg: 66,
     as: 0.75,
+    attack: 'melee',
     range: 1,
     crit: 0.12,
     ability: 'Endless Hunger',

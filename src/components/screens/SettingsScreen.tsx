@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { BONE, JADE } from '../../data/constants';
+import { BONE, JADE, BOSS_TAKEN_BY_DIFFICULTY } from '../../data/constants';
 import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
 import { BattlegroundPreview } from '../BattlegroundPreview';
 import {
@@ -21,10 +21,10 @@ interface SettingsScreenProps {
   onBack: () => void;
 }
 
-const DIFFICULTIES: { id: Difficulty; label: string }[] = [
-  { id: 'normal', label: 'Mortal' },
-  { id: 'hard', label: 'Hard' },
-  { id: 'mythic', label: 'Mythic' },
+const DIFFICULTIES: { id: Difficulty; label: string; hint: string }[] = [
+  { id: 'normal', label: 'Mortal', hint: `Bosses take ${Math.round(BOSS_TAKEN_BY_DIFFICULTY.normal * 100)}% dmg` },
+  { id: 'hard', label: 'Hard', hint: `Bosses take ${Math.round(BOSS_TAKEN_BY_DIFFICULTY.hard * 100)}% dmg · +25% HP` },
+  { id: 'mythic', label: 'Mythic', hint: `Bosses take ${Math.round(BOSS_TAKEN_BY_DIFFICULTY.mythic * 100)}% dmg · +50% HP` },
 ];
 
 const SPEEDS: CombatSpeed[] = [1, 2, 4];
@@ -226,7 +226,7 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                 lineHeight: 1.3,
               }}
             >
-              Bot matches only · practice stays sandbox
+              Ranked and Gauntlet · bosses take less damage at higher trials
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {DIFFICULTIES.map((d) => (
@@ -238,6 +238,18 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                   {d.label}
                 </SegBtn>
               ))}
+            </div>
+            <div
+              className="om-muted"
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                lineHeight: 1.3,
+              }}
+            >
+              {DIFFICULTIES.find((d) => d.id === settings.difficulty)?.hint}
             </div>
           </div>
           <div style={{ marginBottom: 14 }}>

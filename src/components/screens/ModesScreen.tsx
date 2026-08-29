@@ -146,10 +146,10 @@ export function ModesScreen({
             <span style={{ fontSize: 25, color: SAF }}>∞</span>
           </div>
           <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
-            Eighteen rounds against the Adversary. Creatures hold 50% more health. No period bosses — pure endurance. Wins still unseal omens.
+            Eighteen rounds against the Adversary. Creatures hold 50% more health. Period bosses on 4, 8, 12 and 16 — same 4×4 omens as Hyper Roll. Wins still unseal omens.
           </div>
           <div style={{ display: 'flex', gap: 7, padding: '0 16px 16px', flexWrap: 'wrap' }}>
-            {['18 rounds', '+50% HP', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
+            {['18 rounds', '+50% HP', 'Period bosses', 'Unseals', DIFFICULTY_TAG[difficulty]].map((tag) => (
               <span
                 key={tag}
                 style={{
@@ -223,7 +223,7 @@ export function ModesScreen({
             lineHeight: 1.4,
           }}
         >
-          Your shop only rolls the <strong style={{ color: 'var(--om-fg)' }}>six</strong> creatures you drafted. Draft narrow to hit 3★ fast; draft wide for trait depth.
+          Your shop only rolls the <strong style={{ color: 'var(--om-fg)' }}>six</strong> creatures you drafted. Two of the same star on the board, bench, or shop merge into the next star. Income and board caps stay tight early so 2-copy merges do not snowball. Draft narrow to hit 3★; draft wide for trait depth.
         </div>
       </div>
     </div>
