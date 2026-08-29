@@ -54,6 +54,8 @@ export interface GameState {
   lastResult: { win: boolean; dmg: number; boss?: boolean } | null;
 }
 
+export type FloaterVariant = 'damage' | 'crit' | 'heal' | 'death' | 'info';
+
 export interface Floater {
   k: string;
   r: number;
@@ -61,6 +63,9 @@ export interface Floater {
   text: string;
   color: string;
   size: string;
+  variant: FloaterVariant;
+  /** Horizontal offset as fraction of cell width (±15%). */
+  jitter: number;
   t: number;
 }
 

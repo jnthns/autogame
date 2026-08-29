@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL, BOARD_CELL_COUNT, BOARD_CELL_HEIGHT_PCT, BOARD_CELL_WIDTH_PCT, BOARD_COLS, BOARD_ROWS, BOSS_FOOTPRINT, PLAYER_ROW_START } from '../../data/constants';
 import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
@@ -73,9 +73,29 @@ export function GameScreen({
       .map((u) => combatant(u, g.board.some((b) => b.u === u.u) ? 'me' : 'foe', g.heroHpMul));
 
   const [sellArmed, setSellArmed] = useState(false);
+  const [boardShake, setBoardShake] = useState(false);
+  const seenFx = useRef(new Set<string>());
   useEffect(() => {
     setSellArmed(false);
   }, [g.sel?.u]);
+
+  useEffect(() => {
+    if (!combat || reduceVfx) return;
+    let shake = false;
+    for (const f of combatFx) {
+      if (seenFx.current.has(f.k)) continue;
+      seenFx.current.add(f.k);
+      if (f.kind === 'crit') shake = true;
+    }
+    if (!shake) return;
+    setBoardShake(true);
+    const t = setTimeout(() => setBoardShake(false), 400);
+    return () => clearTimeout(t);
+  }, [combat, combatFx, reduceVfx]);
+
+  useEffect(() => {
+    if (!combat) seenFx.current.clear();
+  }, [combat]);
 
   const selUnit = g.sel
     ? (g.sel.from === 'bench' ? g.bench : g.board).find((x) => x.u === g.sel!.u)
@@ -273,9 +293,7 @@ export function GameScreen({
         )}
       </div>
 
-      <div
-        className="game-board"
-      >
+      <div className={`game-board${boardShake ? ' game-board--shake' : ''}`}>
         <BattlegroundBoardBackground id={battlegroundId} />
         <div
           style={{
@@ -498,28 +516,35 @@ export function GameScreen({
             );
           })}
         {combat && !reduceVfx && <CombatFxLayer fx={combatFx} />}
-        {floaters.map((f) => (
-          <div
-            key={f.k}
-            className="mono"
-            style={{
-              position: 'absolute',
-              left: `${f.c * BOARD_CELL_WIDTH_PCT}%`,
-              top: `${f.r * BOARD_CELL_HEIGHT_PCT}%`,
-              width: `${BOARD_CELL_WIDTH_PCT}%`,
-              textAlign: 'center',
-              pointerEvents: 'none',
-              animation: 'omFloat 0.9s ease-out forwards',
-              fontWeight: 700,
-              fontSize: f.size,
-              color: f.color,
-              textShadow: '0 1px 0 #14120E',
-              zIndex: 30,
-            }}
-          >
-            {f.text}
-          </div>
-        ))}
+        {floaters.map((f) => {
+          const anim =
+            f.variant === 'crit'
+              ? 'omCritFloat 1.3s ease-out forwards'
+              : f.variant === 'heal'
+                ? 'omFloatUp 1.3s ease-out forwards'
+                : 'omFloatUp 1.3s ease-out forwards';
+          return (
+            <div
+              key={f.k}
+              className="mono damage-floater"
+              style={{
+                position: 'absolute',
+                left: `calc(${f.c * BOARD_CELL_WIDTH_PCT}% + ${f.jitter * BOARD_CELL_WIDTH_PCT}%)`,
+                top: `${f.r * BOARD_CELL_HEIGHT_PCT}%`,
+                width: `${BOARD_CELL_WIDTH_PCT}%`,
+                textAlign: 'center',
+                pointerEvents: 'none',
+                animation: anim,
+                fontWeight: 700,
+                fontSize: f.size,
+                color: f.color,
+                textShadow: '0 1px 0 #14120E',
+              }}
+            >
+              {f.text}
+            </div>
+          );
+        })}
         {banner && (
           <div style={{ position: 'absolute', left: 0, right: 0, top: 8, textAlign: 'center', pointerEvents: 'none', zIndex: 31 }}>
             <span

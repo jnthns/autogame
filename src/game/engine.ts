@@ -37,6 +37,7 @@ import type {
   OverlayKind,
   Selection,
   Unit,
+  FloaterVariant,
 } from './types';
 
 let uidCounter = 0;
@@ -770,7 +771,14 @@ export class CombatEngine {
   time = 0;
 
   constructor(
-    private onPop: (r: number, c: number, text: string, color: string, size?: string) => void,
+    private onPop: (
+      r: number,
+      c: number,
+      text: string,
+      color: string,
+      size?: string,
+      variant?: FloaterVariant,
+    ) => void,
     private onBanner: (text: string) => void,
     private onFx?: (fx: CombatFxPayload) => void,
   ) {}
@@ -830,12 +838,15 @@ export class CombatEngine {
     t.mana = Math.min(100, t.mana + 5);
     if (dmg > 0) {
       const popPos = unitCenter(t);
+      const isCrit = kind === 'crit';
+      const isMagic = kind === 'magic';
       this.onPop(
         popPos.r,
         popPos.c,
         `-${Math.round(dmg)}`,
-        kind === 'magic' ? '#4C7BD1' : kind === 'crit' ? SAF : '#F2E9D4',
-        '13px',
+        isMagic ? '#4C7BD1' : isCrit ? SAF : '#F2E9D4',
+        isCrit ? 'var(--crit-font)' : 'var(--damage-font)',
+        isCrit ? 'crit' : 'damage',
       );
       if (src) {
         const fxKind: CombatFxKind =
@@ -849,7 +860,7 @@ export class CombatEngine {
       t.alive = false;
       t.hp = 0;
       const popPos = unitCenter(t);
-      this.onPop(popPos.r, popPos.c, '✕', '#B4442B', '16px');
+      this.onPop(popPos.r, popPos.c, '✕', '#B4442B', 'var(--crit-font)', 'death');
     }
     return dmg;
   }
@@ -860,7 +871,7 @@ export class CombatEngine {
     if (t.hp <= 0) {
       t.hp = 0;
       t.alive = false;
-      this.onPop(t.r, t.c, '✕', '#B4442B', '16px');
+      this.onPop(t.r, t.c, '✕', '#B4442B', 'var(--crit-font)', 'death');
     }
   }
 
@@ -870,7 +881,7 @@ export class CombatEngine {
     if (got <= 0) return;
     u.hp += got;
     const popPos = unitCenter(u);
-    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, '#1B6B52', '13px');
+    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, '#1B6B52', 'var(--heal-font)', 'heal');
   }
 
   enemiesOf(u: Combatant) {

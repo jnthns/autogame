@@ -37,6 +37,7 @@ import type {
   CombatFx,
   CombatFxPayload,
   Floater,
+  FloaterVariant,
   GameMode,
   GameState,
   OverlayKind,
@@ -108,17 +109,31 @@ export function useGame() {
     setTick((t) => t + 1);
   }, []);
 
-  const pop = useCallback((r: number, c: number, text: string, color = SAF, size = '14px') => {
-    const f: Floater = { k: `f${Date.now()}${Math.random()}`, r, c, text, color, size, t: Date.now() };
-    setFloaters((prev) => [...prev, f].slice(-14));
-    setTimeout(() => setFloaters((prev) => prev.filter((x) => x.k !== f.k)), 900);
-  }, []);
+  const pop = useCallback(
+    (r: number, c: number, text: string, color = SAF, size = 'var(--damage-font)', variant: FloaterVariant = 'damage') => {
+      const jitter = (Math.random() - 0.5) * 0.3;
+      const f: Floater = {
+        k: `f${Date.now()}${Math.random()}`,
+        r,
+        c,
+        text,
+        color,
+        size,
+        variant,
+        jitter,
+        t: Date.now(),
+      };
+      setFloaters((prev) => [...prev, f].slice(-14));
+      setTimeout(() => setFloaters((prev) => prev.filter((x) => x.k !== f.k)), 1300);
+    },
+    [],
+  );
 
   const spawnFx = useCallback((payload: CombatFxPayload) => {
     if (settingsRef.current.reduceVfx) return;
     const item: CombatFx = { ...payload, k: `fx${Date.now()}${Math.random()}`, t: Date.now() };
     setCombatFx((prev) => [...prev, item].slice(-28));
-    setTimeout(() => setCombatFx((prev) => prev.filter((x) => x.k !== item.k)), 420);
+    setTimeout(() => setCombatFx((prev) => prev.filter((x) => x.k !== item.k)), 700);
   }, []);
 
   const saveDraft = useCallback((d: string[]) => {
@@ -231,7 +246,7 @@ export function useGame() {
     applyTraits(theirs);
     if (isRankedMode(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
-      (r, c, text, color, size) => pop(r, c, text, color, size),
+      (r, c, text, color, size, variant) => pop(r, c, text, color, size, variant),
       (text) => {
         setBanner(text);
         setTimeout(() => setBanner(''), 1100);

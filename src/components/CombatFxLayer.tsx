@@ -14,6 +14,13 @@ interface CombatFxLayerProps {
 
 const INK = '#14120E';
 
+/** Scale a VFX dimension relative to --unit-size (34px baseline). */
+const u = (factor: number) => `calc(var(--unit-size) * ${factor})`;
+
+const BOLT_DUR = '0.5s';
+const SLASH_DUR = '0.45s';
+const ZIGZAG_DUR = '0.5s';
+
 function Pos({
   left,
   top,
@@ -54,7 +61,7 @@ function RotatedBolt({
   from: { left: number; top: number };
   len: number;
   angle: number;
-  height: number;
+  height: string | number;
   color: string;
   glow?: string;
   anim: string;
@@ -79,7 +86,7 @@ function RotatedBolt({
           background: color,
           boxShadow: `0 0 0 1px ${INK}${glow ? `, 0 0 8px ${glow}` : ''}${crit ? ', 0 0 6px rgba(232,163,23,.8)' : ''}`,
           transformOrigin: '0 50%',
-          animation: `${anim} 0.24s ease-out forwards`,
+          animation: `${anim} ${BOLT_DUR} ease-out forwards`,
         }}
       />
     </div>
@@ -98,7 +105,7 @@ function ZigzagBolt({ from, len, angle, profile, crit }: { from: { left: number;
         transformOrigin: '0 50%',
         zIndex: 27,
         pointerEvents: 'none',
-        animation: 'omZigzag 0.28s ease-out forwards',
+        animation: `omZigzag ${ZIGZAG_DUR} ease-out forwards`,
       }}
     >
       {Array.from({ length: segs }, (_, i) => (
@@ -107,9 +114,9 @@ function ZigzagBolt({ from, len, angle, profile, crit }: { from: { left: number;
           style={{
             position: 'absolute',
             left: `${(i / segs) * Math.max(len, 8)}%`,
-            top: i % 2 ? -4 : 4,
+            top: i % 2 ? `calc(${u(-0.12)})` : u(0.12),
             width: `${Math.max(len, 8) / segs + 2}%`,
-            height: crit ? 3 : 2,
+            height: crit ? u(0.088) : u(0.059),
             background: profile.bolt,
             boxShadow: `0 0 0 1px ${INK}, 0 0 6px ${profile.glow}`,
             transform: `rotate(${i % 2 ? 35 : -35}deg)`,
@@ -140,11 +147,11 @@ function CoilBolt({ from, len, angle, profile }: { from: { left: number; top: nu
           style={{
             position: 'absolute',
             left: `${i * 3}%`,
-            top: i === 1 ? -3 : i === 2 ? 3 : 0,
+            top: i === 1 ? u(-0.088) : i === 2 ? u(0.088) : 0,
             width: `${Math.max(len, 8) - i * 2}%`,
-            height: 3,
+            height: u(0.088),
             borderRadius: '50%',
-            borderTop: `3px solid ${profile.bolt}`,
+            borderTop: `${u(0.088)} solid ${profile.bolt}`,
             borderBottom: 'none',
             borderLeft: 'none',
             borderRight: 'none',
@@ -168,8 +175,8 @@ function WispBolt({ from, target, profile }: { from: { left: number; top: number
             position: 'absolute',
             left: `${from.left + (target.left - from.left) * (0.2 + i * 0.25)}%`,
             top: `${from.top + (target.top - from.top) * (0.2 + i * 0.25) + (i - 1) * 2}%`,
-            width: 8,
-            height: 8,
+            width: u(0.235),
+            height: u(0.235),
             borderRadius: '50%',
             background: profile.bolt,
             border: `2px solid ${INK}`,
@@ -184,7 +191,7 @@ function WispBolt({ from, target, profile }: { from: { left: number; top: number
   );
 }
 
-function HitFlash({ target, profile, size, anim = 'omHitFlash' }: { target: { left: number; top: number }; profile: FxProfile; size: number; anim?: string }) {
+function HitFlash({ target, profile, size, anim = 'omHitFlash' }: { target: { left: number; top: number }; profile: FxProfile; size: string | number; anim?: string }) {
   return (
     <div
       style={{
@@ -196,8 +203,8 @@ function HitFlash({ target, profile, size, anim = 'omHitFlash' }: { target: { le
         transform: 'translate(-50%, -50%)',
         borderRadius: '50%',
         background: profile.flash,
-        border: `2px solid ${INK}`,
-        animation: `${anim} 0.24s ease-out forwards`,
+        border: `${u(0.059)} solid ${INK}`,
+        animation: `${anim} ${BOLT_DUR} ease-out forwards`,
         zIndex: 26,
         pointerEvents: 'none',
       }}
@@ -205,7 +212,10 @@ function HitFlash({ target, profile, size, anim = 'omHitFlash' }: { target: { le
   );
 }
 
-function WebHit({ target, profile, size }: { target: { left: number; top: number }; profile: FxProfile; size: number }) {
+function WebHit({ target, profile, melee, large }: { target: { left: number; top: number }; profile: FxProfile; melee: boolean; large?: boolean }) {
+  const size = large ? u(0.941) : melee ? u(0.706) : u(0.588);
+  const spoke = `calc(${size} * 0.45)`;
+  const ring = `calc(${size} * 0.55)`;
   return (
     <Pos left={target.left} top={target.top} zIndex={29}>
       <div style={{ position: 'relative', width: size, height: size, animation: 'omWeb 0.28s ease-out forwards' }}>
@@ -216,10 +226,10 @@ function WebHit({ target, profile, size }: { target: { left: number; top: number
               position: 'absolute',
               left: '50%',
               top: '50%',
-              width: size * 0.45,
-              height: 2,
-              marginLeft: -(size * 0.45) / 2,
-              marginTop: -1,
+              width: spoke,
+              height: u(0.059),
+              marginLeft: `calc(${spoke} / -2)`,
+              marginTop: u(-0.029),
               background: profile.slash,
               boxShadow: `0 0 0 1px ${INK}`,
               transform: `rotate(${i * 45}deg)`,
@@ -232,12 +242,12 @@ function WebHit({ target, profile, size }: { target: { left: number; top: number
             position: 'absolute',
             left: '50%',
             top: '50%',
-            width: size * 0.55,
-            height: size * 0.55,
-            marginLeft: -(size * 0.55) / 2,
-            marginTop: -(size * 0.55) / 2,
+            width: ring,
+            height: ring,
+            marginLeft: `calc(${ring} / -2)`,
+            marginTop: `calc(${ring} / -2)`,
             borderRadius: '50%',
-            border: `2px solid ${profile.bolt}`,
+            border: `${u(0.059)} solid ${profile.bolt}`,
             opacity: 0.7,
           }}
         />
@@ -247,9 +257,10 @@ function WebHit({ target, profile, size }: { target: { left: number; top: number
 }
 
 function SplashHit({ target, profile }: { target: { left: number; top: number }; profile: FxProfile }) {
+  const sz = u(0.824);
   return (
     <Pos left={target.left} top={target.top} zIndex={29}>
-      <div style={{ position: 'relative', width: 28, height: 28, animation: 'omSplash 0.26s ease-out forwards' }}>
+      <div style={{ position: 'relative', width: sz, height: sz, animation: 'omSplash 0.26s ease-out forwards' }}>
         {[0, 60, 120, 180, 240, 300].map((deg) => (
           <span
             key={deg}
@@ -257,14 +268,14 @@ function SplashHit({ target, profile }: { target: { left: number; top: number };
               position: 'absolute',
               left: '50%',
               top: '50%',
-              width: 6,
-              height: 6,
-              marginLeft: -3,
-              marginTop: -3,
+              width: u(0.176),
+              height: u(0.176),
+              marginLeft: u(-0.088),
+              marginTop: u(-0.088),
               borderRadius: '50%',
               background: profile.bolt,
               border: `1px solid ${INK}`,
-              transform: `rotate(${deg}deg) translateY(-10px)`,
+              transform: `rotate(${deg}deg) translateY(${u(-0.294)})`,
             }}
           />
         ))}
@@ -276,9 +287,9 @@ function SplashHit({ target, profile }: { target: { left: number; top: number };
 function EmberHit({ target, profile, crit }: { target: { left: number; top: number }; profile: FxProfile; crit?: boolean }) {
   return (
     <>
-      <HitFlash target={target} profile={profile} size={crit ? 30 : 24} anim="omEmberFlash" />
+      <HitFlash target={target} profile={profile} size={crit ? u(0.882) : u(0.706)} anim="omEmberFlash" />
       <Pos left={target.left} top={target.top} zIndex={29}>
-        <div style={{ position: 'relative', width: 22, height: 22, animation: 'omEmber 0.3s ease-out forwards' }}>
+        <div style={{ position: 'relative', width: u(0.647), height: u(0.647), animation: 'omEmber 0.3s ease-out forwards' }}>
           {[0, 1, 2, 3].map((i) => (
             <span
               key={i}
@@ -286,8 +297,8 @@ function EmberHit({ target, profile, crit }: { target: { left: number; top: numb
                 position: 'absolute',
                 left: `${20 + (i % 2) * 30}%`,
                 top: `${10 + i * 18}%`,
-                width: 5,
-                height: 7,
+                width: u(0.147),
+                height: u(0.206),
                 background: i % 2 ? profile.glow : profile.bolt,
                 border: `1px solid ${INK}`,
                 borderRadius: '40% 40% 20% 20%',
@@ -301,7 +312,7 @@ function EmberHit({ target, profile, crit }: { target: { left: number; top: numb
 }
 
 function RuneHit({ target, profile, melee }: { target: { left: number; top: number }; profile: FxProfile; melee: boolean }) {
-  const sz = melee ? 24 : 20;
+  const sz = melee ? u(0.706) : u(0.588);
   return (
     <Pos left={target.left} top={target.top} zIndex={29}>
       <div
@@ -311,7 +322,7 @@ function RuneHit({ target, profile, melee }: { target: { left: number; top: numb
           height: sz,
           animation: 'omRune 0.28s ease-out forwards',
           color: profile.slash,
-          fontSize: sz * 0.7,
+          fontSize: `calc(${sz} * 0.7)`,
           lineHeight: 1,
           textAlign: 'center',
           textShadow: `0 0 6px ${profile.glow}`,
@@ -324,19 +335,22 @@ function RuneHit({ target, profile, melee }: { target: { left: number; top: numb
 }
 
 function SlashHit({ target, profile, melee, crit }: { target: { left: number; top: number }; profile: FxProfile; melee: boolean; crit?: boolean }) {
-  const sz = melee ? 22 : 18;
+  const sz = melee ? u(0.647) : u(0.529);
+  const arm = melee ? u(0.588) : u(0.471);
+  const thick = crit ? u(0.088) : u(0.059);
+  const thin = u(0.059);
   return (
     <Pos left={target.left} top={target.top} zIndex={29}>
-      <div style={{ position: 'relative', width: sz, height: sz, animation: 'omSlash 0.2s ease-out forwards' }}>
+      <div style={{ position: 'relative', width: sz, height: sz, animation: `omSlash ${SLASH_DUR} ease-out forwards` }}>
         <span
           style={{
             position: 'absolute',
             left: '50%',
             top: '50%',
-            width: melee ? 20 : 16,
-            height: crit ? 3 : 2,
-            marginLeft: melee ? -10 : -8,
-            marginTop: crit ? -1.5 : -1,
+            width: arm,
+            height: thick,
+            marginLeft: `calc(${arm} / -2)`,
+            marginTop: `calc(${thick} / -2)`,
             background: profile.slash,
             boxShadow: `0 0 0 1px ${INK}${crit ? `, 0 0 4px ${profile.glow}` : ''}`,
           }}
@@ -346,10 +360,10 @@ function SlashHit({ target, profile, melee, crit }: { target: { left: number; to
             position: 'absolute',
             left: '50%',
             top: '50%',
-            width: 2,
-            height: melee ? 20 : 16,
-            marginLeft: -1,
-            marginTop: melee ? -10 : -8,
+            width: thin,
+            height: arm,
+            marginLeft: `calc(${thin} / -2)`,
+            marginTop: `calc(${arm} / -2)`,
             background: profile.slash,
             boxShadow: `0 0 0 1px ${INK}`,
           }}
@@ -378,7 +392,7 @@ function AttackFx({
 }) {
   const crit = kind === 'crit';
   const showBolt = !melee && kind !== 'cast';
-  const boltH = crit ? 4 : kind === 'magic' ? 3 : 2;
+  const boltH = crit ? u(0.118) : kind === 'magic' ? u(0.088) : u(0.059);
 
   return (
     <>
@@ -391,7 +405,7 @@ function AttackFx({
             from={from}
             len={len}
             angle={angle}
-            height={profile.attack === 'dive' ? boltH + 2 : profile.attack === 'wind' ? 2 : boltH}
+            height={profile.attack === 'dive' ? u(0.147) : profile.attack === 'wind' ? u(0.059) : boltH}
             color={profile.bolt}
             glow={profile.glow}
             anim={profile.attack === 'wind' ? 'omWindBolt' : profile.attack === 'dive' ? 'omDiveBolt' : 'omBolt'}
@@ -399,23 +413,23 @@ function AttackFx({
           />
         )}
       {melee && profile.attack === 'dive' && (
-        <RotatedBolt from={from} len={len} angle={angle} height={4} color={profile.bolt} glow={profile.glow} anim="omDiveBolt" crit={crit} />
+        <RotatedBolt from={from} len={len} angle={angle} height={u(0.118)} color={profile.bolt} glow={profile.glow} anim="omDiveBolt" crit={crit} />
       )}
-      {profile.attack === 'web' && <WebHit target={target} profile={profile} size={melee ? 24 : 20} />}
+      {profile.attack === 'web' && <WebHit target={target} profile={profile} melee={melee} />}
       {profile.attack === 'splash' && <SplashHit target={target} profile={profile} />}
       {profile.attack === 'ember' && <EmberHit target={target} profile={profile} crit={crit} />}
       {profile.attack === 'rune' && <RuneHit target={target} profile={profile} melee={melee} />}
       {profile.attack === 'tide' && (
         <>
-          <HitFlash target={target} profile={profile} size={22} anim="omTideFlash" />
+          <HitFlash target={target} profile={profile} size={u(0.647)} anim="omTideFlash" />
           <Pos left={target.left} top={target.top} zIndex={28}>
             <div
               style={{
-                width: 26,
-                height: 8,
-                borderRadius: 4,
+                width: u(0.765),
+                height: u(0.235),
+                borderRadius: u(0.118),
                 background: profile.bolt,
-                border: `2px solid ${INK}`,
+                border: `${u(0.059)} solid ${INK}`,
                 animation: 'omTide 0.24s ease-out forwards',
               }}
             />
@@ -424,22 +438,22 @@ function AttackFx({
       )}
       {profile.attack === 'storm' && (
         <>
-          <HitFlash target={target} profile={profile} size={20} />
+          <HitFlash target={target} profile={profile} size={u(0.588)} />
           <Pos left={target.left} top={target.top - 3} zIndex={29}>
-            <div style={{ fontSize: 14, animation: 'omStorm 0.26s ease-out forwards' }}>⌃</div>
+            <div style={{ fontSize: u(0.412), animation: 'omStorm 0.26s ease-out forwards' }}>⌃</div>
           </Pos>
         </>
       )}
       {!['web', 'splash', 'ember', 'rune', 'tide', 'storm'].includes(profile.attack) && (
         <>
           <SlashHit target={target} profile={profile} melee={melee} crit={crit} />
-          <HitFlash target={target} profile={profile} size={crit ? 30 : 22} />
+          <HitFlash target={target} profile={profile} size={crit ? u(0.882) : u(0.647)} />
         </>
       )}
       {['web', 'splash', 'tide', 'storm'].includes(profile.attack) && (
-        <HitFlash target={target} profile={profile} size={crit ? 28 : 20} />
+        <HitFlash target={target} profile={profile} size={crit ? u(0.824) : u(0.588)} />
       )}
-      {profile.attack === 'ember' && crit && <HitFlash target={target} profile={profile} size={18} anim="omHitFlash" />}
+      {profile.attack === 'ember' && crit && <HitFlash target={target} profile={profile} size={u(0.529)} anim="omHitFlash" />}
     </>
   );
 }
@@ -530,7 +544,7 @@ function CastFx({
         </>
       )}
 
-      {cast === 'web-net' && <WebHit target={target} profile={profile} size={32} />}
+      {cast === 'web-net' && <WebHit target={target} profile={profile} melee={false} large />}
 
       {cast === 'drag' && (
         <RotatedBolt
@@ -660,7 +674,7 @@ function CastFx({
 
 export function CombatFxLayer({ fx }: CombatFxLayerProps) {
   return (
-    <>
+    <div className="combat-fx">
       {fx.map((f) => {
         const profile = getFxProfile(f.hid, f.kind);
         const { from, len, angle } = attackGeometry(f.fromR, f.fromC, f.toR, f.toC);
@@ -668,7 +682,7 @@ export function CombatFxLayer({ fx }: CombatFxLayerProps) {
         const isCast = f.kind === 'cast';
 
         return (
-          <div key={f.k} style={{ pointerEvents: 'none' }}>
+          <div key={f.k}>
             {isCast ? (
               <CastFx profile={profile} from={from} target={target} len={len} angle={angle} />
             ) : (
@@ -685,7 +699,7 @@ export function CombatFxLayer({ fx }: CombatFxLayerProps) {
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -696,7 +710,7 @@ export function getLungeTransform(
   now = Date.now(),
 ): string | undefined {
   const hit = fx.find(
-    (f) => f.melee && f.fromR === r && f.fromC === c && now - f.t < 180 && f.kind !== 'cast',
+    (f) => f.melee && f.fromR === r && f.fromC === c && now - f.t < 350 && f.kind !== 'cast',
   );
   if (!hit) return undefined;
   const dr = Math.sign(hit.toR - hit.fromR);
