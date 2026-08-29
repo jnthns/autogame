@@ -2,22 +2,33 @@ import {
   BOARD_COLS,
   BOARD_ROWS,
   BOARD_SIDE_ROWS,
+  BOSS_ANCHOR,
+  BOSS_AS,
+  BOSS_BOARD_SURVIVAL,
+  BOSS_COMBAT_LIMIT,
+  BOSS_DAMAGE_TAKEN,
+  BOSS_DPS_BURN_SECONDS,
   BOSS_FOOTPRINT,
+  BOSS_HP_TEAM_MULT,
+  BOSS_RANGE,
   BOT_BOARD_CAPS,
   BOT_DRAFT_SIZE,
+  COMBAT_LIMIT,
   GAUNTLET,
   HERO_HP_MUL,
   MARATHON,
   MARATHON_BOARD_CAPS,
   MATCH_DEFAULTS,
+  MERGE_COPIES,
   PLAYER_ROW_START,
   PRACTICE_BOARD_CAP,
   SAF,
   STARMUL,
   USER_DRAFT_MAX,
 } from '../data/constants';
+import { BOSS_KITS, type BossKitId } from '../data/bosses';
 import { CLASSES, type ClassName } from '../data/classes';
-import { HEROES, HERO_MAP } from '../data/heroes';
+import { HEROES, HERO_MAP, isMeleeHero } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
 import {
@@ -382,7 +393,7 @@ export function countHeroStar(g: GameState, hid: string, star: 1 | 2 | 3): numbe
   return [...g.board, ...g.bench].filter((u) => u.hid === hid && u.star === star).length;
 }
 
-/** When 2× 2★ already exist, buying any copy merges them to 3★ (TFT shop trigger). */
+/** When 2× 2★ already exist, buying any copy merges them to 3★ (shop trigger). */
 function pairMergeTwos(
   g: GameState,
   hid: string,
@@ -395,9 +406,9 @@ function pairMergeTwos(
   g.bench.forEach((u) => {
     if (u.hid === hid && u.star === 2) twos.push({ u, on: 'bench' });
   });
-  if (twos.length !== 2) return;
+  if (twos.length < MERGE_COPIES) return;
   twos.sort((a, b) => (a.on === 'board' ? -1 : 1) - (b.on === 'board' ? -1 : 1));
-  combineUnits(g.board, g.bench, twos, hid, 3, onPop);
+  combineUnits(g.board, g.bench, twos.slice(0, MERGE_COPIES), hid, 3, onPop);
 }
 
 export function mergeUnitLists(
@@ -418,9 +429,9 @@ export function mergeUnitLists(
       });
       for (const hid in groups) {
         const arr = groups[hid];
-        if (arr.length < 3) continue;
+        if (arr.length < MERGE_COPIES) continue;
         arr.sort((a, b) => (a.on === 'board' ? -1 : 1) - (b.on === 'board' ? -1 : 1));
-        combineUnits(board, bench, arr.slice(0, 3), hid, (star + 1) as 2 | 3, onPop);
+        combineUnits(board, bench, arr.slice(0, MERGE_COPIES), hid, (star + 1) as 2 | 3, onPop);
         changed = true;
         break;
       }
@@ -444,12 +455,12 @@ export function applyMerges(
   }
 }
 
-/** TFT/DAC-style: 1★ refunds full cost; combined units pay a small combine tax. */
+/** 1★ refunds full cost; combined units refund copies spent minus a small combine tax at 3★. */
 export function sellValue(u: Unit): number {
   const cost = HERO_MAP[u.hid].cost;
   if (u.star === 1) return cost;
-  if (u.star === 2) return Math.max(1, cost * 3 - 1);
-  return Math.max(1, cost * 5 - 1);
+  if (u.star === 2) return cost * MERGE_COPIES;
+  return Math.max(1, cost * MERGE_COPIES * MERGE_COPIES - 1);
 }
 
 export function combatOpponents(g: GameState): Unit[] {
@@ -462,8 +473,8 @@ function placeBotBoard(units: Unit[], capN: number): { board: Unit[]; bench: Uni
   const ranked = units.slice().sort((a, b) => unitPower(b) - unitPower(a));
   const board = ranked.slice(0, capN);
   const bench = ranked.slice(capN);
-  const tanks = board.filter((u) => (HERO_MAP[u.hid]?.range ?? 1) <= 1);
-  const ranged = board.filter((u) => (HERO_MAP[u.hid]?.range ?? 1) > 1);
+  const tanks = board.filter((u) => isMeleeHero(HERO_MAP[u.hid]));
+  const ranged = board.filter((u) => !isMeleeHero(HERO_MAP[u.hid]));
   const cells: { r: number; c: number }[] = [];
   for (const r of [5, 4, 3, 2, 1, 0]) {
     for (const c of [2, 3, 1, 4, 0, 5]) cells.push({ r, c });
@@ -658,25 +669,27 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
   const m = STARMUL[u.star];
   const hpScale = u.scaleHp ?? 1;
   const atkScale = u.scaleAtk ?? 1;
-  const fp = u.boss && hpScale >= 1.5 ? BOSS_FOOTPRINT : 1;
+  const isBoss = !!u.boss;
+  const melee = isBoss ? false : isMeleeHero(h);
   const o: Combatant = {
     u: u.u,
     hid: u.hid,
     star: u.star,
     side,
-    r: u.r!,
-    c: u.c!,
+    r: isBoss ? BOSS_ANCHOR.r : u.r!,
+    c: isBoss ? BOSS_ANCHOR.c : u.c!,
     glyph: h.glyph,
     name: h.name,
     maxHp: Math.round(h.hp * m * hpScale * heroHpMul),
     hp: 0,
     atk: h.dmg * m * atkScale,
-    as: h.as,
-    range: h.range,
+    as: isBoss ? BOSS_AS : h.as,
+    range: isBoss ? BOSS_RANGE : h.range,
+    melee,
     crit: h.crit,
     critDmg: 0.8,
     mana: 0,
-    startMana: 0,
+    startMana: isBoss ? 40 : 0,
     sp: 0,
     dr: 0,
     lifesteal: 0,
@@ -687,12 +700,14 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
     snare: 0,
     burn: 0,
     burnT: 0,
-    cd: 1 / h.as,
+    cd: 1 / (isBoss ? BOSS_AS : h.as),
     mv: 0.4,
     alive: true,
     cast2: false,
-    boss: !!u.boss,
-    footprint: fp,
+    boss: isBoss,
+    bossKit: u.bossKit,
+    footprint: isBoss ? BOSS_FOOTPRINT : 1,
+    rooted: isBoss,
   };
   o.hp = o.maxHp;
   (u.relics || []).forEach((rid) => {
@@ -700,6 +715,50 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
     if (r) r.apply(o);
   });
   return o;
+}
+
+function teamDps(list: Combatant[]): number {
+  return list.reduce((s, u) => s + u.atk * u.as * (1 + (u.crit || 0) * (u.critDmg || 0)), 0);
+}
+
+/**
+ * Pin every boss to the 4×4 anchor and set HP to at least 10× the living team's total HP.
+ * Extra HP is added when player DPS (crit included) would burn that floor too fast,
+ * because damage compounds harder than raw health.
+ */
+export function fitBossToTeam(foes: Combatant[], allies: Combatant[], round: number): void {
+  const bosses = foes.filter((u) => u.boss);
+  if (!bosses.length) return;
+  const teamHp = Math.max(
+    1,
+    allies.reduce((s, u) => s + Math.max(0, u.maxHp), 0),
+  );
+  const dps = Math.max(1, teamDps(allies));
+  const n = Math.max(1, allies.length);
+  const roundMul = 1 + Math.max(0, round - 1) * 0.04;
+  const floor = BOSS_HP_TEAM_MULT * teamHp * roundMul;
+  const effectiveDps = dps * BOSS_DAMAGE_TAKEN;
+  const burn = floor / effectiveDps;
+  const pad = burn < BOSS_DPS_BURN_SECONDS ? BOSS_DPS_BURN_SECONDS / burn : 1;
+  const target = Math.max(1, Math.round(floor * pad));
+  const avgHp = teamHp / n;
+  // AOE autos hit the whole board — ATK is set from average toughness, not raw DPS,
+  // so late-game compounding crit/haste does not one-shot the line.
+  const atk = Math.max(16, avgHp / (BOSS_AS * BOSS_BOARD_SURVIVAL));
+
+  bosses.forEach((b) => {
+    b.maxHp = target;
+    b.hp = target;
+    b.atk = atk;
+    b.as = BOSS_AS;
+    b.cd = 1 / BOSS_AS;
+    b.range = BOSS_RANGE;
+    b.melee = false;
+    b.r = BOSS_ANCHOR.r;
+    b.c = BOSS_ANCHOR.c;
+    b.footprint = BOSS_FOOTPRINT;
+    b.rooted = true;
+  });
 }
 
 export function applyTraits(list: Combatant[]): void {
@@ -838,14 +897,16 @@ export class CombatEngine {
   ) {}
 
   private emitFx(src: Combatant, t: Combatant, kind: CombatFxKind) {
+    const from = unitCenter(src);
+    const to = unitCenter(t);
     this.onFx?.({
       kind,
       hid: src.hid,
-      fromR: src.r,
-      fromC: src.c,
-      toR: t.r,
-      toC: t.c,
-      melee: this.dist(src, t) <= 1,
+      fromR: from.r,
+      fromC: from.c,
+      toR: to.r,
+      toC: to.c,
+      melee: src.melee || this.dist(src, t) <= 1,
     });
   }
 
@@ -883,6 +944,7 @@ export class CombatEngine {
     if (!t.alive) return 0;
     let dmg = amount * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
     if (kind === 'true') dmg = amount;
+    if (t.boss) dmg *= BOSS_DAMAGE_TAKEN;
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
       t.shield -= a;
@@ -947,6 +1009,7 @@ export class CombatEngine {
   }
 
   stepToward(u: Combatant, t: Combatant) {
+    if (u.rooted || u.boss) return;
     const dr = Math.sign(t.r - u.r);
     const dc = Math.sign(t.c - u.c);
     const tries: [number, number][] = [
@@ -965,8 +1028,75 @@ export class CombatEngine {
     }
   }
 
+  inAttackRange(u: Combatant, d: number): boolean {
+    if (u.boss) return d <= u.range;
+    if (u.melee) return d <= 1;
+    return d <= u.range;
+  }
+
+  private bossCast(u: Combatant) {
+    const E = this.enemiesOf(u);
+    const A = this.alliesOf(u).filter((a) => a.u !== u.u);
+    const sp = u.sp || 0;
+    const m = STARMUL[u.star as 1 | 2 | 3];
+    const kit = (u.bossKit as BossKitId) || 'clay';
+    const fxTarget = E[0] || u;
+    this.emitFx(u, fxTarget, 'cast');
+
+    if (kit === 'storm') {
+      E.forEach((o) => this.hurt(u, o, (190 + sp) * m, 'magic'));
+      A.forEach((a) => {
+        a.shield += (160 + sp) * m;
+        if (!a.buffAs) {
+          a.buffAs = 1.22;
+          a.as *= 1.22;
+          a.buffT = 4;
+        }
+      });
+      if (!u.buffAs) {
+        u.buffAs = 1.12;
+        u.as *= 1.12;
+        u.buffT = 4;
+      }
+      E.slice()
+        .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)
+        .slice(0, 2)
+        .forEach((o) => {
+          o.stun = Math.max(o.stun, 2);
+        });
+      return;
+    }
+
+    if (kit === 'coil') {
+      E.forEach((o) => {
+        this.hurt(u, o, (210 + sp) * m, 'magic');
+        o.burn = 32 * m;
+        o.burnT = 4;
+        o.amp = Math.max(o.amp || 0, 0.16);
+        o.silence = Math.max(o.silence, 1.4);
+      });
+      this.heal(u, Math.round(u.maxHp * 0.035));
+      u.lifesteal = Math.min(0.35, (u.lifesteal || 0) + 0.08);
+      u.shield += (180 + sp) * m;
+      return;
+    }
+
+    // clay — default
+    E.forEach((o) => {
+      this.hurt(u, o, (170 + sp) * m, 'magic');
+      o.snare = Math.max(o.snare, 2.2);
+      o.amp = Math.max(o.amp || 0, 0.14);
+    });
+    u.shield += (300 + sp) * m;
+    u.dr = Math.min(0.5, (u.dr || 0) + 0.1);
+  }
+
   cast(u: Combatant, t: Combatant) {
     u.mana = 0;
+    if (u.boss) {
+      this.bossCast(u);
+      return;
+    }
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
     this.emitFx(u, t, 'cast');
@@ -1206,13 +1336,15 @@ export class CombatEngine {
       const t = this.target(u);
       if (!t) return;
       if (u.mana >= 100 && u.silence <= 0) {
-        if (u.boss) this.onBanner('Cataclysm — all allies struck');
-        else if (u.side === 'me') this.onBanner(HERO_MAP[u.hid].ability);
+        if (u.boss) {
+          const kit = BOSS_KITS[(u.bossKit as BossKitId) || 'clay'];
+          this.onBanner(kit?.banner ?? 'Cataclysm — all allies struck');
+        } else if (u.side === 'me') this.onBanner(HERO_MAP[u.hid].ability);
         this.cast(u, t);
         return;
       }
       const d = this.dist(u, t);
-      if (d <= u.range) {
+      if (this.inAttackRange(u, d)) {
         u.cd -= dt;
         if (u.cd <= 0) {
           u.cd = 1 / u.as;
@@ -1231,7 +1363,7 @@ export class CombatEngine {
             });
           }
         }
-      } else if (u.snare <= 0) {
+      } else if (!u.rooted && !u.boss && u.snare <= 0) {
         u.mv -= dt;
         if (u.mv <= 0) {
           u.mv = 0.45;
@@ -1251,6 +1383,11 @@ export class CombatEngine {
   getWinner(): boolean {
     const mine = this.C.filter((u) => u.side === 'me' && u.alive);
     const theirs = this.C.filter((u) => u.side === 'foe' && u.alive);
+    const bosses = this.C.filter((u) => u.boss);
+    if (bosses.length) {
+      if (!mine.length) return false;
+      return bosses.every((b) => !b.alive);
+    }
     if (mine.length && !theirs.length) return true;
     if (!mine.length && theirs.length) return false;
     const f = (a: Combatant[]) => a.reduce((s, u) => s + u.hp / u.maxHp, 0);
@@ -1260,7 +1397,14 @@ export class CombatEngine {
   isDone(): boolean {
     const mine = this.C.filter((u) => u.side === 'me' && u.alive);
     const theirs = this.C.filter((u) => u.side === 'foe' && u.alive);
-    return !mine.length || !theirs.length || this.time > 45;
+    const bosses = this.C.filter((u) => u.boss);
+    const limit = bosses.length ? BOSS_COMBAT_LIMIT : COMBAT_LIMIT;
+    if (bosses.length) {
+      if (!mine.length) return true;
+      if (bosses.every((b) => !b.alive)) return true;
+      return this.time > limit;
+    }
+    return !mine.length || !theirs.length || this.time > limit;
   }
 }
 

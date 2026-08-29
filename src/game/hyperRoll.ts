@@ -1,4 +1,5 @@
-import { BOSS_ROUNDS, HYPER_ROLL_ROUNDS, MATCH_DEFAULTS } from '../data/constants';
+import { BOSS_KITS, type BossKitId } from '../data/bosses';
+import { BOSS_ANCHOR, BOSS_ROUNDS, HYPER_ROLL_ROUNDS, MATCH_DEFAULTS } from '../data/constants';
 import { HERO_MAP } from '../data/heroes';
 import type { BossRewardGrant, Unit } from './types';
 
@@ -12,6 +13,7 @@ export interface BossUnitSpec {
   scaleHp: number;
   scaleAtk: number;
   boss?: boolean;
+  bossKit?: BossKitId;
 }
 
 export interface BossEncounter {
@@ -89,10 +91,19 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
     period: 1,
     id: 'clay-colossus',
     name: 'Clay Colossus',
-    blurb: 'A clay sentinel and its attendant. Fat HP, slow swings.',
+    blurb: `A 4×4 clay sentinel that never moves. ${BOSS_KITS.clay.abilityText}`,
     units: [
-      { hid: 'golem', star: 1, r: 1, c: 1, scaleHp: 1.7, scaleAtk: 0.78, boss: true },
-      { hid: 'barng', star: 1, r: 0, c: 0, scaleHp: 1.1, scaleAtk: 0.9 },
+      {
+        hid: 'golem',
+        star: 1,
+        r: BOSS_ANCHOR.r,
+        c: BOSS_ANCHOR.c,
+        scaleHp: 1,
+        scaleAtk: 1,
+        boss: true,
+        bossKit: 'clay',
+      },
+      { hid: 'barng', star: 1, r: 0, c: 0, scaleHp: 1.1, scaleAtk: 0.85 },
     ],
     reward: { gold: 6, freeRerolls: 1, relic: false },
   },
@@ -101,12 +112,21 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
     period: 2,
     id: 'storm-court',
     name: 'Storm Court',
-    blurb: 'A sky court: two-star frontline and a backline spark.',
+    blurb: `A rooted 4×4 sky court. ${BOSS_KITS.storm.abilityText}`,
     units: [
-      { hid: 'griff', star: 2, r: 1, c: 1, scaleHp: 1.15, scaleAtk: 0.95, boss: true },
-      { hid: 'golem', star: 1, r: 0, c: 0, scaleHp: 1.2, scaleAtk: 0.9 },
-      { hid: 'thund', star: 2, r: 0, c: 5, scaleHp: 1.1, scaleAtk: 1.0 },
-      { hid: 'kitsu', star: 1, r: 5, c: 0, scaleHp: 1.05, scaleAtk: 0.95 },
+      {
+        hid: 'griff',
+        star: 2,
+        r: BOSS_ANCHOR.r,
+        c: BOSS_ANCHOR.c,
+        scaleHp: 1,
+        scaleAtk: 1,
+        boss: true,
+        bossKit: 'storm',
+      },
+      { hid: 'golem', star: 1, r: 0, c: 0, scaleHp: 1.15, scaleAtk: 0.9 },
+      { hid: 'thund', star: 2, r: 0, c: 5, scaleHp: 1.05, scaleAtk: 0.95 },
+      { hid: 'kitsu', star: 1, r: 5, c: 0, scaleHp: 1.0, scaleAtk: 0.9 },
     ],
     reward: { gold: 10, freeRerolls: 1, relic: true },
   },
@@ -115,13 +135,22 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
     period: 3,
     id: 'world-coil',
     name: 'World Coil',
-    blurb: 'The last omen before the Adversary. Heavy two-stars, beatable with a built board.',
+    blurb: `The World Serpent fills four tiles and does not leave them. ${BOSS_KITS.coil.abilityText}`,
     units: [
-      { hid: 'jorm', star: 2, r: 1, c: 1, scaleHp: 1.3, scaleAtk: 0.95, boss: true },
-      { hid: 'hydra', star: 2, r: 0, c: 0, scaleHp: 1.15, scaleAtk: 0.95 },
-      { hid: 'levia', star: 2, r: 0, c: 5, scaleHp: 1.15, scaleAtk: 0.95 },
-      { hid: 'ifrit', star: 2, r: 5, c: 0, scaleHp: 1.1, scaleAtk: 1.0 },
-      { hid: 'taniw', star: 1, r: 5, c: 5, scaleHp: 1.05, scaleAtk: 0.9 },
+      {
+        hid: 'jorm',
+        star: 2,
+        r: BOSS_ANCHOR.r,
+        c: BOSS_ANCHOR.c,
+        scaleHp: 1,
+        scaleAtk: 1,
+        boss: true,
+        bossKit: 'coil',
+      },
+      { hid: 'hydra', star: 2, r: 0, c: 0, scaleHp: 1.1, scaleAtk: 0.9 },
+      { hid: 'levia', star: 2, r: 0, c: 5, scaleHp: 1.1, scaleAtk: 0.9 },
+      { hid: 'ifrit', star: 2, r: 5, c: 0, scaleHp: 1.05, scaleAtk: 0.95 },
+      { hid: 'taniw', star: 1, r: 5, c: 5, scaleHp: 1.0, scaleAtk: 0.85 },
     ],
     reward: { gold: 14, freeRerolls: 2, relic: true },
   },
@@ -134,17 +163,21 @@ export function getBossEncounter(round: number): BossEncounter | null {
 export function makeBossUnits(round: number): Unit[] {
   const enc = getBossEncounter(round);
   if (!enc) return [];
-  return enc.units.map((spec, i) => ({
-    u: `boss-${round}-${i}`,
-    hid: spec.hid,
-    star: spec.star,
-    relics: [],
-    r: spec.r,
-    c: spec.c,
-    boss: spec.boss ?? i === 0,
-    scaleHp: spec.scaleHp,
-    scaleAtk: spec.scaleAtk,
-  }));
+  return enc.units.map((spec, i) => {
+    const isBoss = spec.boss ?? i === 0;
+    return {
+      u: `boss-${round}-${i}`,
+      hid: spec.hid,
+      star: spec.star,
+      relics: [],
+      r: isBoss ? BOSS_ANCHOR.r : spec.r,
+      c: isBoss ? BOSS_ANCHOR.c : spec.c,
+      boss: isBoss,
+      bossKit: isBoss ? spec.bossKit ?? 'clay' : undefined,
+      scaleHp: spec.scaleHp,
+      scaleAtk: spec.scaleAtk,
+    };
+  });
 }
 
 export function rewardLines(reward: BossRewardGrant): string[] {

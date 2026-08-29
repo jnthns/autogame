@@ -223,7 +223,7 @@ export function ModesScreen({
             lineHeight: 1.4,
           }}
         >
-          Your shop only rolls the <strong style={{ color: 'var(--om-fg)' }}>six</strong> creatures you drafted. Draft narrow to hit 3★ fast; draft wide for trait depth.
+          Your shop only rolls the <strong style={{ color: 'var(--om-fg)' }}>six</strong> creatures you drafted. Two of the same star on the board or bench merge into the next star. Draft narrow to hit 3★ fast; draft wide for trait depth.
         </div>
       </div>
     </div>

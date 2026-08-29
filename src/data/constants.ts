@@ -14,9 +14,29 @@ export const BOARD_ROWS = BOARD_SIDE_ROWS * 2;
 export const PLAYER_ROW_START = BOARD_SIDE_ROWS;
 export const BOARD_CELL_COUNT = BOARD_COLS * BOARD_ROWS;
 
-/** Boss occupies a 4×4 block on the 6×6 foe half. */
+/** Boss occupies a 4×4 block on the 6×6 foe half and never leaves it. */
 export const BOSS_FOOTPRINT = 4;
 export const BOSS_ANCHOR = { r: 1, c: 1 } as const;
+/** Chebyshev range that covers the whole 12×6 board from the 4×4 boss. */
+export const BOSS_RANGE = 12;
+/** Same-star copies needed to combine into the next star (board + bench). */
+export const MERGE_COPIES = 2;
+/** Boss HP is at least this many times the current player board's total HP. */
+export const BOSS_HP_TEAM_MULT = 10;
+/** If player DPS would burn the HP floor faster than this, pad boss HP. */
+export const BOSS_DPS_BURN_SECONDS = 42;
+/** Seconds for boss AOE autos to wipe an idle board. */
+export const BOSS_BOARD_SURVIVAL = 24;
+export const BOSS_AS = 0.52;
+/** Boss fights last longer so the 10× HP pool can actually be burned. */
+export const BOSS_COMBAT_LIMIT = 75;
+export const COMBAT_LIMIT = 45;
+/**
+ * Incoming damage vs bosses. Player DPS compounds (stars × crit × haste × spells)
+ * much faster than HP, so the 10× health pool would be unkillable on a thin board
+ * and trivial on a stacked one without this lever.
+ */
+export const BOSS_DAMAGE_TAKEN = 2.35;
 
 export const BOARD_CELL_WIDTH_PCT = 100 / BOARD_COLS;
 export const BOARD_CELL_HEIGHT_PCT = 100 / BOARD_ROWS;

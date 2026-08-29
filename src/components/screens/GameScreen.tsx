@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { BONE, INK, JADE, MATCH_DEFAULTS, RUST, SAF, STARMUL, BOARD_CELL_COUNT, BOARD_CELL_HEIGHT_PCT, BOARD_CELL_WIDTH_PCT, BOARD_COLS, BOARD_ROWS, BOSS_FOOTPRINT, PLAYER_ROW_START } from '../../data/constants';
 import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
-import { HERO_MAP } from '../../data/heroes';
+import { attackLabel, HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
-import { activeSynergies, classCard, classCounts, combatant, isGauntletMode, isRankedMode, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
+import { activeSynergies, applyTraits, classCard, classCounts, combatant, fitBossToTeam, isGauntletMode, isRankedMode, occupiesCell, sellValue, traitCard, traitCounts } from '../../game/engine';
 import { getGauntletEncounter, makeGauntletBossUnits, boardPower } from '../../game/gauntlet';
 import { getBossEncounter, isBossRound, makeBossUnits, periodInfo, rewardLines } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, OverlayKind, SheetState } from '../../game/types';
@@ -72,9 +72,14 @@ export function GameScreen({
       : [];
   const src: Combatant[] =
     combatants ??
-    g.board
-      .concat(foePreview)
-      .map((u) => combatant(u, g.board.some((b) => b.u === u.u) ? 'me' : 'foe', g.heroHpMul));
+    (() => {
+      const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
+      const theirs = foePreview.map((u) => combatant(u, 'foe', g.heroHpMul));
+      applyTraits(mine);
+      applyTraits(theirs);
+      if (theirs.some((u) => u.boss)) fitBossToTeam(theirs, mine, g.round);
+      return mine.concat(theirs);
+    })();
 
   const [sellArmed, setSellArmed] = useState(false);
   const [boardShake, setBoardShake] = useState(false);
@@ -390,7 +395,7 @@ export function GameScreen({
                     boxShadow: u.stun > 0 && !sel ? '0 0 0 2px #4C7BD1' : undefined,
                   }}
                 >
-                  <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 112 : undefined} />
+                  <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 132 : undefined} />
                   {boardUnit && boardUnit.relics.length > 0 && (
                     <span className="relic-strip" aria-hidden>
                       {boardUnit.relics.slice(0, 3).map((rid) => {
@@ -977,7 +982,7 @@ export function SheetModal({
             </div>
             <div style={{ marginTop: 7, fontSize: 14, lineHeight: 1.4, color: '#d8cfb8', textWrap: 'pretty' }}>{h.abilityText}</div>
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #3a352b', fontSize: 13, lineHeight: 1.35, color: SAF }}>
-              At ★{sheet.star} every number above is multiplied by {m}× · range {h.range} · {h.quirk}
+              At ★{sheet.star} every number above is multiplied by {m}× · {attackLabel(h)} only · {h.quirk}
             </div>
           </div>
           <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>

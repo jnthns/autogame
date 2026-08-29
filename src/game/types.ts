@@ -12,6 +12,8 @@ export interface Unit {
   r?: number;
   c?: number;
   boss?: boolean;
+  /** Encounter kit id for boss casts (aoe / buff / debuff). */
+  bossKit?: string;
   scaleHp?: number;
   scaleAtk?: number;
 }
@@ -132,6 +134,8 @@ export interface Combatant {
   atk: number;
   as: number;
   range: number;
+  /** Melee heroes only attack adjacent; ranged heroes only attack at range. */
+  melee: boolean;
   crit: number;
   critDmg: number;
   mana: number;
@@ -154,9 +158,12 @@ export interface Combatant {
   buffT?: number;
   buffAs?: number;
   dmgBuff?: number;
-  /** Grid footprint in cells (1 = normal, 3 = multi-tile boss). */
+  /** Grid footprint in cells (1 = normal, 4 = multi-tile boss). */
   footprint?: number;
   boss?: boolean;
+  bossKit?: string;
+  /** Stationary — bosses never step off their anchor. */
+  rooted?: boolean;
 }
 
 export interface ActiveTrait {

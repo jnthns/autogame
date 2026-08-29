@@ -24,6 +24,7 @@ import {
   combatOpponents,
   countHeroStar,
   createGame,
+  fitBossToTeam,
   gameActions,
   isGauntletMode,
   isRankedMode,
@@ -263,6 +264,7 @@ export function useGame() {
     const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
     applyTraits(mine);
     applyTraits(theirs);
+    if (theirs.some((u) => u.boss)) fitBossToTeam(theirs, mine, g.round);
     if (usesDifficulty(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
       (r, c, text, color, size, variant) => pop(r, c, text, color, size, variant),

@@ -1,4 +1,4 @@
-import { GAUNTLET, GAUNTLET_BOARD_CAPS } from '../data/constants';
+import { BOSS_ANCHOR, GAUNTLET, GAUNTLET_BOARD_CAPS } from '../data/constants';
 import { HERO_MAP } from '../data/heroes';
 import { CLASSES, type ClassName } from '../data/classes';
 import { GAUNTLET_RELIC_IDS, RELICS } from '../data/relics';
@@ -74,9 +74,11 @@ function buildScaledUnits(template: BossUnitSpec[], round: number, power: number
   return template.map((spec) => ({
     ...spec,
     star: scaledStar(spec.star, round),
-    scaleHp: spec.scaleHp * combined,
-    scaleAtk: spec.scaleAtk * Math.sqrt(combined),
+    // The 4×4 boss HP/ATK is fitted to the live player board in combat; minions still scale.
+    scaleHp: spec.boss ? 1 : spec.scaleHp * combined,
+    scaleAtk: spec.boss ? 1 : spec.scaleAtk * Math.sqrt(combined),
     boss: spec.boss ?? false,
+    bossKit: spec.bossKit,
   }));
 }
 
@@ -115,17 +117,21 @@ export function gauntletBoardCap(round: number): number {
 
 export function makeGauntletBossUnits(round: number, power: number): Unit[] {
   const enc = getGauntletEncounter(round, power);
-  return enc.units.map((spec, i) => ({
-    u: `gauntlet-${round}-${i}`,
-    hid: spec.hid,
-    star: spec.star,
-    relics: [],
-    r: spec.r,
-    c: spec.c,
-    boss: spec.boss ?? i === 0,
-    scaleHp: spec.scaleHp,
-    scaleAtk: spec.scaleAtk,
-  }));
+  return enc.units.map((spec, i) => {
+    const isBoss = spec.boss ?? i === 0;
+    return {
+      u: `gauntlet-${round}-${i}`,
+      hid: spec.hid,
+      star: spec.star,
+      relics: [],
+      r: isBoss ? BOSS_ANCHOR.r : spec.r,
+      c: isBoss ? BOSS_ANCHOR.c : spec.c,
+      boss: isBoss,
+      bossKit: isBoss ? spec.bossKit ?? 'clay' : undefined,
+      scaleHp: spec.scaleHp,
+      scaleAtk: spec.scaleAtk,
+    };
+  });
 }
 
 /** Pick relic offers — gauntlet exclusives appear at higher rounds. */

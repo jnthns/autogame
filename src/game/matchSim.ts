@@ -1,10 +1,14 @@
-import { HERO_HP_MUL, GAUNTLET, MARATHON, BOT_DRAFT_SIZE } from '../data/constants';
-import { HERO_MAP } from '../data/heroes';
+import { BOSS_ANCHOR, BOSS_FOOTPRINT, BOSS_HP_TEAM_MULT, BOSS_RANGE, HERO_HP_MUL, GAUNTLET, MARATHON, MERGE_COPIES, BOT_DRAFT_SIZE } from '../data/constants';
+import { HEROES, HERO_MAP } from '../data/heroes';
 import {
   applyMerges,
+  applyTraits,
+  CombatEngine,
+  combatant,
   combatOpponents,
   countHeroStar,
   createGame,
+  fitBossToTeam,
   gameActions,
   mergeUnitLists,
   resetUidCounter,
@@ -63,8 +67,11 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   const three: Unit = { u: 'c', hid: 'anans', star: 3, relics: [] };
   const cost = HERO_MAP.anans.cost;
   assert(sellValue(one) === cost, `1★ sells for full cost (${cost})`);
-  assert(sellValue(two) === cost * 3 - 1, `2★ sells for 3×cost − 1 (${cost * 3 - 1})`);
-  assert(sellValue(three) === cost * 5 - 1, `3★ sells for 5×cost − 1 (${cost * 5 - 1})`);
+  assert(sellValue(two) === cost * MERGE_COPIES, `2★ sells for ${MERGE_COPIES}×cost (${cost * MERGE_COPIES})`);
+  assert(
+    sellValue(three) === cost * MERGE_COPIES * MERGE_COPIES - 1,
+    `3★ sells for ${MERGE_COPIES * MERGE_COPIES}×cost − 1 (${cost * MERGE_COPIES * MERGE_COPIES - 1})`,
+  );
 
   resetUidCounter();
   const g = createGame('bot');
@@ -138,11 +145,10 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   const bench: Unit[] = [
     { u: uid(), hid: 'anans', star: 1, relics: [] },
     { u: uid(), hid: 'anans', star: 1, relics: [] },
-    { u: uid(), hid: 'anans', star: 1, relics: [] },
   ];
   const board: Unit[] = [];
   mergeUnitLists(board, bench);
-  assert(bench.length === 1 && bench[0].star === 2 && board.length === 0, '3×1★ → 2★');
+  assert(bench.length === 1 && bench[0].star === 2 && board.length === 0, '2×1★ on bench → 2★');
 
   resetUidCounter();
   board.length = 0;
@@ -150,13 +156,12 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   board.push(
     { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
     { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
-    { u: uid(), hid: 'anans', star: 2, relics: [], r: 5, c: 0 },
   );
   mergeUnitLists(board, bench);
-  assert(board.length === 1 && board[0].star === 3, '3×2★ → 3★');
+  assert(board.length === 1 && board[0].star === 3, '2×2★ on board → 3★');
   assert(
     ![...board, ...bench].some((u) => u.hid === 'anans' && u.star === 2),
-    '3×2★ leaves no duplicate 2★',
+    '2×2★ leaves no duplicate 2★',
   );
 
   resetUidCounter();
@@ -181,15 +186,25 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
 
   resetUidCounter();
   const moveG = createGame('practice');
-  moveG.board = [
-    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
-    { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
-  ];
+  moveG.board = [{ u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 }];
   moveG.bench = [{ u: uid(), hid: 'anans', star: 2, relics: [] }];
   mergeUnitLists(moveG.board, moveG.bench);
   assert(
     moveG.board.length === 1 && moveG.board[0].star === 3 && moveG.bench.length === 0,
-    'bench+board 3×2★ merges on placement check',
+    'bench+board 2×2★ merges across deck and board',
+  );
+
+  resetUidCounter();
+  const leftover: Unit[] = [
+    { u: uid(), hid: 'anans', star: 1, relics: [] },
+    { u: uid(), hid: 'anans', star: 1, relics: [] },
+    { u: uid(), hid: 'anans', star: 1, relics: [] },
+  ];
+  const leftoverBoard: Unit[] = [];
+  mergeUnitLists(leftoverBoard, leftover);
+  assert(
+    leftover.filter((u) => u.star === 2).length === 1 && leftover.filter((u) => u.star === 1).length === 1,
+    '3×1★ → 1×2★ + leftover 1★',
   );
 
   gameActions.nextRound(g, g.foeDraft);
@@ -241,6 +256,78 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   gLoss.phase = 'plan';
   const over = gameActions.resolveRound(gLoss, false, gLoss.matchRounds);
   assert(over.kind === 'over', 'gauntlet ends at zero lives');
+
+  for (const h of HEROES) {
+    if (h.attack === 'melee') {
+      assert(h.range === 1, `${h.id} melee-only uses range 1`);
+    } else {
+      assert(h.range >= 3 && h.range <= 4, `${h.id} ranged-only uses range 3–4`);
+    }
+  }
+  assert(
+    HEROES.filter((h) => h.attack === 'melee').length >= 8 &&
+      HEROES.filter((h) => h.attack === 'ranged').length >= 8,
+    'roster splits melee-only and ranged-only',
+  );
+
+  resetUidCounter();
+  const hpG = createGame('bot');
+  hpG.round = 4;
+  hpG.board = [
+    { u: uid(), hid: 'anans', star: 1, relics: [], r: 8, c: 1 },
+    { u: uid(), hid: 'golem', star: 1, relics: [], r: 8, c: 2 },
+    { u: uid(), hid: 'taniw', star: 1, relics: [], r: 9, c: 1 },
+  ];
+  const mine = hpG.board.map((u) => combatant(u, 'me', hpG.heroHpMul));
+  applyTraits(mine);
+  const theirs = combatOpponents(hpG).map((u) => combatant(u, 'foe', hpG.heroHpMul));
+  fitBossToTeam(theirs, mine, hpG.round);
+  const teamHp = mine.reduce((s, u) => s + u.maxHp, 0);
+  const boss = theirs.find((u) => u.boss);
+  assert(!!boss, 'period 1 fight has a boss unit');
+  assert(boss!.footprint === BOSS_FOOTPRINT, 'boss occupies a 4×4 footprint');
+  assert(boss!.r === BOSS_ANCHOR.r && boss!.c === BOSS_ANCHOR.c, 'boss is pinned to the 4×4 anchor');
+  assert(boss!.rooted === true, 'boss is rooted');
+  assert(boss!.range >= BOSS_RANGE, 'boss has board-wide range');
+  assert(boss!.maxHp >= BOSS_HP_TEAM_MULT * teamHp, 'boss HP is at least 10× the current team');
+  assert(theirs.filter((u) => u.boss).length === 1, 'exactly one 4×4 boss per encounter');
+  theirs
+    .filter((u) => !u.boss)
+    .forEach((u) => {
+      assert(
+        u.r < BOSS_ANCHOR.r ||
+          u.r >= BOSS_ANCHOR.r + BOSS_FOOTPRINT ||
+          u.c < BOSS_ANCHOR.c ||
+          u.c >= BOSS_ANCHOR.c + BOSS_FOOTPRINT,
+        `${u.hid} minion does not overlap the 4×4 boss`,
+      );
+    });
+
+  const later = createGame('bot');
+  later.round = 12;
+  later.board = hpG.board.map((u) => ({ ...u, star: 2 as const, u: uid() }));
+  const mine2 = later.board.map((u) => combatant(u, 'me', later.heroHpMul));
+  applyTraits(mine2);
+  const theirs2 = combatOpponents(later).map((u) => combatant(u, 'foe', later.heroHpMul));
+  fitBossToTeam(theirs2, mine2, later.round);
+  const boss12 = theirs2.find((u) => u.boss)!;
+  const team2 = mine2.reduce((s, u) => s + u.maxHp, 0);
+  assert(boss12.maxHp >= BOSS_HP_TEAM_MULT * team2, 'later bosses still hold the 10× HP floor');
+  assert(boss12.maxHp > boss!.maxHp, 'boss HP scales up with a stronger board and later round');
+
+  const player = combatant({ u: 'p', hid: 'anans', star: 1, relics: [], r: 10, c: 0 }, 'me', HERO_HP_MUL);
+  const rooted = { ...boss! };
+  rooted.r = BOSS_ANCHOR.r;
+  rooted.c = BOSS_ANCHOR.c;
+  rooted.hp = rooted.maxHp;
+  rooted.alive = true;
+  const eng = new CombatEngine(
+    () => undefined,
+    () => undefined,
+  );
+  eng.C = [player, rooted];
+  for (let i = 0; i < 80; i++) eng.simTick(0.1);
+  assert(rooted.r === BOSS_ANCHOR.r && rooted.c === BOSS_ANCHOR.c, 'boss never walks off its anchor');
 
   return { ok, lines };
 }
