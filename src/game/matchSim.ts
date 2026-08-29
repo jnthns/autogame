@@ -1,3 +1,4 @@
+import { HERO_HP_MUL, GAUNTLET, MARATHON, BOT_DRAFT_SIZE } from '../data/constants';
 import { HERO_MAP } from '../data/heroes';
 import {
   applyMerges,
@@ -11,11 +12,19 @@ import {
   uid,
 } from './engine';
 import {
+  boardPower,
+  gauntletGoldReward,
+  getGauntletEncounter,
+  makeGauntletBossUnits,
+  pickGauntletRelics,
+} from './gauntlet';
+import {
   BOSS_ENCOUNTERS,
   BOSS_ROUNDS,
   HYPER_ROLL_ROUNDS,
   getBossEncounter,
   isBossRound,
+  maxShopCost,
   periodInfo,
   shopWeight,
 } from './hyperRoll';
@@ -47,6 +56,7 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   assert(getBossEncounter(8)?.reward.relic === true, 'mid boss offers a relic');
   assert(getBossEncounter(12)?.reward.gold === 14, 'final boss pays 14 gold');
   assert(shopWeight(1) === 6 && shopWeight(5) === 2, 'shop odds match cost table 7-cost');
+  assert(maxShopCost(1) === 2 && maxShopCost(4) === 3 && maxShopCost(7) === 4 && maxShopCost(10) === 5, 'shop tier unlocks by round');
 
   const one: Unit = { u: 'a', hid: 'anans', star: 1, relics: [] };
   const two: Unit = { u: 'b', hid: 'anans', star: 2, relics: [] };
@@ -59,6 +69,8 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   resetUidCounter();
   const g = createGame('bot');
   assert(g.matchRounds === 13, 'bot match is 13 rounds');
+  assert(g.heroHpMul === HERO_HP_MUL, 'bot match uses global hero HP multiplier');
+  assert(g.foeDraft.length === BOT_DRAFT_SIZE, `bot shop pool is ${BOT_DRAFT_SIZE} heroes`);
   assert(g.round === 1, 'starts round 1');
   assert(g.foe.length > 0, 'bot places a board on round 1');
   const ids1 = new Set([...g.foe, ...g.foeBench].map((u) => u.u));
@@ -187,9 +199,48 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   resetUidCounter();
   const marathon = createGame('marathon');
   assert(marathon.matchRounds === 18, 'marathon is 18 rounds');
-  assert(marathon.heroHpMul === 1.5, 'marathon uses 1.5× hero HP');
+  assert(marathon.heroHpMul === HERO_HP_MUL * MARATHON.heroHpMul, 'marathon stacks global and mode HP multipliers');
+  assert(marathon.foeDraft.length === BOT_DRAFT_SIZE, `marathon bot pool is ${BOT_DRAFT_SIZE} heroes`);
   assert(marathon.foe.length > 0, 'marathon starts with a bot board');
   assert(combatOpponents(marathon).every((u) => !u.u.startsWith('boss-')), 'marathon has no period bosses');
+
+  resetUidCounter();
+  const gauntlet = createGame('gauntlet');
+  assert(gauntlet.mode === 'gauntlet', 'gauntlet mode flag');
+  assert(gauntlet.gold === GAUNTLET.startGold, 'gauntlet starts with 8 gold');
+  assert(gauntlet.gauntletLives === GAUNTLET.startLives, 'gauntlet starts with 3 lives');
+  assert(gauntlet.foe.length === 0, 'gauntlet has no bot board');
+  const gBoss = combatOpponents(gauntlet);
+  assert(gBoss.length > 0 && gBoss.every((u) => u.u.startsWith('gauntlet-')), 'gauntlet round 1 is a boss pack');
+  assert(gBoss.some((u) => u.boss), 'gauntlet boss pack includes a boss unit');
+  const power = boardPower([{ u: 'x', hid: 'anans', star: 2, relics: [], r: 4, c: 0 }]);
+  assert(power === HERO_MAP.anans.cost * 2, 'board power uses cost × star');
+  assert(gauntletGoldReward(1) === GAUNTLET.baseGoldReward + GAUNTLET.goldPerRound, 'gauntlet gold scales by round');
+  assert(getGauntletEncounter(5, power).reward.relic === true, 'every gauntlet boss offers a relic');
+  assert(makeGauntletBossUnits(10, 20).length >= 2, 'gauntlet bosses scale with round');
+  assert(pickGauntletRelics(25).length === 3, 'gauntlet relic picker returns 3 offers');
+
+  gauntlet.phase = 'plan';
+  gauntlet.board = [{ u: 'me', hid: 'anans', star: 1, relics: [], r: 4, c: 0 }];
+  const gWin = gameActions.resolveRound(gauntlet, true, gauntlet.matchRounds);
+  assert(gWin.kind === 'result' && gWin.win && gWin.offer, 'gauntlet boss win always offers relic');
+  assert(gauntlet.gauntletRoundsCleared === 1, 'gauntlet tracks cleared rounds');
+
+  resetUidCounter();
+  const gLoss = createGame('gauntlet');
+  gLoss.phase = 'plan';
+  const gLossGoldBefore = gLoss.gold;
+  const lossResult = gameActions.resolveRound(gLoss, false, gLoss.matchRounds);
+  assert(lossResult.kind === 'result' && !lossResult.win, 'gauntlet boss loss continues with lives');
+  assert(gLoss.gauntletLives === 2, 'gauntlet loses one life on boss defeat');
+  assert(gLoss.gauntletGoldPenalty === GAUNTLET.goldPenalty, 'gauntlet sets gold penalty after loss');
+  gameActions.nextRound(gLoss, []);
+  assert(gLoss.gold === gLossGoldBefore - GAUNTLET.goldPenalty + 4, 'gauntlet applies gold penalty then round income');
+
+  gLoss.gauntletLives = 0;
+  gLoss.phase = 'plan';
+  const over = gameActions.resolveRound(gLoss, false, gLoss.matchRounds);
+  assert(over.kind === 'over', 'gauntlet ends at zero lives');
 
   return { ok, lines };
 }

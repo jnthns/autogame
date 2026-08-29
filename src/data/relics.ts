@@ -7,6 +7,9 @@ export interface RelicDef {
   color: string;
   desc: string;
   apply: (u: Combatant) => void;
+  /** Gauntlet-only relics appear in offers at high rounds. */
+  gauntletOnly?: boolean;
+  minRound?: number;
 }
 
 export const RELICS: RelicDef[] = [
@@ -91,7 +94,63 @@ export const RELICS: RelicDef[] = [
       u.dr = (u.dr || 0) + 0.18;
     },
   },
+  {
+    id: 'aegis',
+    name: 'Trial Aegis',
+    glyph: '⬡',
+    color: '#C17F3A',
+    desc: '+220 max health and +12% damage reduction.',
+    gauntletOnly: true,
+    minRound: 12,
+    apply: (u) => {
+      u.maxHp += 220;
+      u.hp += 220;
+      u.dr = (u.dr || 0) + 0.12;
+    },
+  },
+  {
+    id: 'fury',
+    name: 'Gauntlet Fury',
+    glyph: '⚡',
+    color: '#D0553A',
+    desc: '+28% attack damage and +15% crit chance.',
+    gauntletOnly: true,
+    minRound: 12,
+    apply: (u) => {
+      u.atk *= 1.28;
+      u.crit += 0.15;
+    },
+  },
+  {
+    id: 'oracle',
+    name: 'Oracle Lens',
+    glyph: '◎',
+    color: '#7A3E9D',
+    desc: '+55 spell power and starts with 70 mana.',
+    gauntletOnly: true,
+    minRound: 20,
+    apply: (u) => {
+      u.sp = (u.sp || 0) + 55;
+      u.startMana = (u.startMana || 0) + 70;
+    },
+  },
+  {
+    id: 'titan',
+    name: 'Titan Heart',
+    glyph: '♥',
+    color: '#B4442B',
+    desc: '+35% max health and +20% attack speed.',
+    gauntletOnly: true,
+    minRound: 30,
+    apply: (u) => {
+      u.maxHp = Math.round(u.maxHp * 1.35);
+      u.hp = u.maxHp;
+      u.as *= 1.2;
+    },
+  },
 ];
+
+export const GAUNTLET_RELIC_IDS = RELICS.filter((r) => r.gauntletOnly).map((r) => r.id);
 
 export const RELIC_MAP = Object.fromEntries(RELICS.map((r) => [r.id, r])) as Record<
   string,

@@ -1,4 +1,5 @@
-import { BONE, JADE, RUST, SAF } from '../../data/constants';
+﻿import { BONE, INK, JADE, RUST, SAF } from '../../data/constants';
+import type { GauntletBestRun } from '../../game/gauntlet';
 import type { Difficulty } from '../../game/types';
 
 interface ModesScreenProps {
@@ -6,7 +7,9 @@ interface ModesScreenProps {
   onPractice: () => void;
   onBot: () => void;
   onMarathon: () => void;
+  onGauntlet: () => void;
   difficulty: Difficulty;
+  gauntletBest?: GauntletBestRun;
 }
 const DIFFICULTY_TAG: Record<Difficulty, string> = {
   normal: 'Mortal',
@@ -14,7 +17,15 @@ const DIFFICULTY_TAG: Record<Difficulty, string> = {
   mythic: 'Mythic',
 };
 
-export function ModesScreen({ onBack, onPractice, onBot, onMarathon, difficulty }: ModesScreenProps) {
+export function ModesScreen({
+  onBack,
+  onPractice,
+  onBot,
+  onMarathon,
+  onGauntlet,
+  difficulty,
+  gauntletBest,
+}: ModesScreenProps) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div
@@ -65,7 +76,7 @@ export function ModesScreen({ onBack, onPractice, onBot, onMarathon, difficulty 
             <span className="slab" style={{ fontSize: 24, lineHeight: 1 }}>
               PRACTICE
             </span>
-            <span style={{ fontSize: 25 }}>☴</span>
+            <span style={{ fontSize: 25 }}>◇</span>
           </div>
           <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
             Sandbox. Infinite gold, free rerolls, no opponent. Test placements, merges and traits for as long as you like.
@@ -90,7 +101,7 @@ export function ModesScreen({ onBack, onPractice, onBot, onMarathon, difficulty 
             <span className="slab" style={{ fontSize: 24, lineHeight: 1, color: BONE }}>
               HYPER ROLL
             </span>
-            <span style={{ fontSize: 25, color: SAF }}>☳</span>
+            <span style={{ fontSize: 25, color: SAF }}>◈</span>
           </div>
           <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
             Thirteen rounds against the Adversary. Period bosses on 4, 8 and 12; round 13 is the final fight. Wins unseal sealed omens — some ask for a synergy, not just a count.
@@ -132,7 +143,7 @@ export function ModesScreen({ onBack, onPractice, onBot, onMarathon, difficulty 
             <span className="slab" style={{ fontSize: 24, lineHeight: 1, color: BONE }}>
               MARATHON
             </span>
-            <span style={{ fontSize: 25, color: SAF }}>☷</span>
+            <span style={{ fontSize: 25, color: SAF }}>∞</span>
           </div>
           <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
             Eighteen rounds against the Adversary. Creatures hold 50% more health. No period bosses — pure endurance. Wins still unseal omens.
@@ -155,7 +166,56 @@ export function ModesScreen({ onBack, onPractice, onBot, onMarathon, difficulty 
             ))}
           </div>
         </button>
-        <div          className="modes-list-note om-muted"
+        <button
+          type="button"
+          className="btn-active om-card"
+          onClick={onGauntlet}
+          style={{ textAlign: 'left', border: '3px solid var(--om-line)', boxShadow: '5px 5px 0 var(--om-line)', overflow: 'hidden' }}
+        >
+          <div
+            style={{
+              background: INK,
+              borderBottom: '3px solid #14120E',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span className="slab" style={{ fontSize: 24, lineHeight: 1, color: BONE }}>
+              THE GAUNTLET
+            </span>
+            <span style={{ fontSize: 25, color: SAF }}>☠</span>
+          </div>
+          <div className="om-muted" style={{ padding: '14px 16px 12px', fontSize: 15, lineHeight: 1.4 }}>
+            Endless boss waves. Three lives, full shop between fights, a relic after every win. Reach round 20 or 40 to unseal cost-4 and cost-5 omens forever.
+          </div>
+          <div style={{ display: 'flex', gap: 7, padding: '0 16px 16px', flexWrap: 'wrap' }}>
+            {[
+              'Endless',
+              '3 lives',
+              'Boss scaling',
+              gauntletBest ? `Best R${gauntletBest.round}` : 'No best yet',
+              DIFFICULTY_TAG[difficulty],
+            ].map((tag) => (
+              <span
+                key={tag}
+                style={{
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '0.13em',
+                  textTransform: 'uppercase',
+                  border: '2px solid var(--om-line)',
+                  padding: '3px 7px',
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </button>
+        <div
+          className="modes-list-note om-muted"
           style={{
             padding: 14,
             border: '2px dashed var(--om-muted)',

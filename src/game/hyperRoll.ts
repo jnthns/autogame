@@ -40,6 +40,14 @@ export function shopWeight(cost: number): number {
   return Math.max(1, 7 - cost);
 }
 
+/** Max hero cost tier available in the shop for a given round. */
+export function maxShopCost(round: number, matchRounds: number = HYPER_ROLL_ROUNDS): number {
+  if (round >= matchRounds || round >= 10) return 5;
+  if (round >= 7) return 4;
+  if (round >= 4) return 3;
+  return 2;
+}
+
 export function isBossRound(round: number): boolean {
   return (BOSS_ROUNDS as readonly number[]).includes(round);
 }
@@ -83,8 +91,8 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
     name: 'Clay Colossus',
     blurb: 'A clay sentinel and its attendant. Fat HP, slow swings.',
     units: [
-      { hid: 'golem', star: 1, r: 2, c: 1, scaleHp: 1.7, scaleAtk: 0.78, boss: true },
-      { hid: 'barng', star: 1, r: 3, c: 2, scaleHp: 1.1, scaleAtk: 0.9 },
+      { hid: 'golem', star: 1, r: 1, c: 1, scaleHp: 1.7, scaleAtk: 0.78, boss: true },
+      { hid: 'barng', star: 1, r: 0, c: 0, scaleHp: 1.1, scaleAtk: 0.9 },
     ],
     reward: { gold: 6, freeRerolls: 1, relic: false },
   },
@@ -95,10 +103,10 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
     name: 'Storm Court',
     blurb: 'A sky court: two-star frontline and a backline spark.',
     units: [
-      { hid: 'griff', star: 2, r: 3, c: 1, scaleHp: 1.15, scaleAtk: 0.95, boss: true },
-      { hid: 'golem', star: 1, r: 3, c: 2, scaleHp: 1.2, scaleAtk: 0.9 },
-      { hid: 'thund', star: 2, r: 1, c: 2, scaleHp: 1.1, scaleAtk: 1.0 },
-      { hid: 'kitsu', star: 1, r: 0, c: 1, scaleHp: 1.05, scaleAtk: 0.95 },
+      { hid: 'griff', star: 2, r: 1, c: 1, scaleHp: 1.15, scaleAtk: 0.95, boss: true },
+      { hid: 'golem', star: 1, r: 0, c: 0, scaleHp: 1.2, scaleAtk: 0.9 },
+      { hid: 'thund', star: 2, r: 0, c: 5, scaleHp: 1.1, scaleAtk: 1.0 },
+      { hid: 'kitsu', star: 1, r: 5, c: 0, scaleHp: 1.05, scaleAtk: 0.95 },
     ],
     reward: { gold: 10, freeRerolls: 1, relic: true },
   },
@@ -109,11 +117,11 @@ export const BOSS_ENCOUNTERS: BossEncounter[] = [
     name: 'World Coil',
     blurb: 'The last omen before the Adversary. Heavy two-stars, beatable with a built board.',
     units: [
-      { hid: 'jorm', star: 2, r: 2, c: 1, scaleHp: 1.3, scaleAtk: 0.95, boss: true },
-      { hid: 'hydra', star: 2, r: 3, c: 0, scaleHp: 1.15, scaleAtk: 0.95 },
-      { hid: 'levia', star: 2, r: 3, c: 3, scaleHp: 1.15, scaleAtk: 0.95 },
-      { hid: 'ifrit', star: 2, r: 1, c: 2, scaleHp: 1.1, scaleAtk: 1.0 },
-      { hid: 'taniw', star: 1, r: 0, c: 1, scaleHp: 1.05, scaleAtk: 0.9 },
+      { hid: 'jorm', star: 2, r: 1, c: 1, scaleHp: 1.3, scaleAtk: 0.95, boss: true },
+      { hid: 'hydra', star: 2, r: 0, c: 0, scaleHp: 1.15, scaleAtk: 0.95 },
+      { hid: 'levia', star: 2, r: 0, c: 5, scaleHp: 1.15, scaleAtk: 0.95 },
+      { hid: 'ifrit', star: 2, r: 5, c: 0, scaleHp: 1.1, scaleAtk: 1.0 },
+      { hid: 'taniw', star: 1, r: 5, c: 5, scaleHp: 1.05, scaleAtk: 0.9 },
     ],
     reward: { gold: 14, freeRerolls: 2, relic: true },
   },

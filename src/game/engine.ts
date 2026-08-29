@@ -4,6 +4,9 @@ import {
   BOARD_SIDE_ROWS,
   BOSS_FOOTPRINT,
   BOT_BOARD_CAPS,
+  BOT_DRAFT_SIZE,
+  GAUNTLET,
+  HERO_HP_MUL,
   MARATHON,
   MARATHON_BOARD_CAPS,
   MATCH_DEFAULTS,
@@ -11,6 +14,7 @@ import {
   PRACTICE_BOARD_CAP,
   SAF,
   STARMUL,
+  USER_DRAFT_MAX,
 } from '../data/constants';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP } from '../data/heroes';
@@ -22,9 +26,17 @@ import {
   lossDamage,
   makeBossUnits,
   roundIncome,
+  maxShopCost,
   shopWeight,
   unitPower,
 } from './hyperRoll';
+import {
+  boardPower,
+  getGauntletEncounter,
+  gauntletBoardCap,
+  gauntletRoundIncome,
+  makeGauntletBossUnits,
+} from './gauntlet';
 import type {
   ActiveTrait,
   Combatant,
@@ -51,20 +63,38 @@ export function isRankedMode(mode: GameMode): boolean {
   return mode === 'bot' || mode === 'marathon';
 }
 
+export function isGauntletMode(mode: GameMode): boolean {
+  return mode === 'gauntlet';
+}
+
+export function usesDifficulty(mode: GameMode): boolean {
+  return isRankedMode(mode) || isGauntletMode(mode);
+}
+
 export function matchRoundsFor(mode: GameMode): number {
+  if (mode === 'gauntlet') return GAUNTLET.matchRounds;
   return mode === 'marathon' ? MARATHON.matchRounds : MATCH_DEFAULTS.matchRounds;
 }
 
 export function heroHpMulFor(mode: GameMode): number {
-  return mode === 'marathon' ? MARATHON.heroHpMul : 1;
+  const marathonExtra = mode === 'marathon' ? MARATHON.heroHpMul : 1;
+  return HERO_HP_MUL * marathonExtra;
+}
+
+export function playerShopPool(draft: string[]): string[] {
+  const base = draft.length ? draft : HEROES.slice(0, USER_DRAFT_MAX).map((h) => h.id);
+  return base.slice(0, USER_DRAFT_MAX);
 }
 
 export function pickBotDraft(): string[] {
+  const perTier = Math.max(2, Math.floor(BOT_DRAFT_SIZE / 3));
   const low = HEROES.filter((h) => h.cost <= 2).sort(() => Math.random() - 0.5);
   const mid = HEROES.filter((h) => h.cost === 3).sort(() => Math.random() - 0.5);
   const high = HEROES.filter((h) => h.cost >= 4).sort(() => Math.random() - 0.5);
   const pick = (arr: typeof HEROES, n: number) => arr.slice(0, Math.min(n, arr.length));
-  return [...pick(low, 2), ...pick(mid, 2), ...pick(high, 2)].map((h) => h.id);
+  return [...pick(low, perTier), ...pick(mid, perTier), ...pick(high, perTier)]
+    .map((h) => h.id)
+    .slice(0, BOT_DRAFT_SIZE);
 }
 
 export function createGame(
@@ -78,7 +108,7 @@ export function createGame(
     matchRounds: matchRoundsFor(mode),
     heroHpMul: heroHpMulFor(mode),
     round: 1,
-    gold: mode === 'practice' ? 999 : 14,
+    gold: mode === 'practice' ? 999 : mode === 'gauntlet' ? GAUNTLET.startGold : 14,
     myHp: hp,
     foeHp: hp,
     maxHp: hp,
@@ -88,8 +118,8 @@ export function createGame(
     board: [],
     foe: [],
     foeBench: [],
-    foeGold: mode === 'practice' ? 0 : 14,
-    foeDraft: mode === 'practice' ? [] : pickBotDraft(),
+    foeGold: mode === 'practice' ? 0 : mode === 'gauntlet' ? 0 : 14,
+    foeDraft: mode === 'practice' || mode === 'gauntlet' ? [] : pickBotDraft(),
     foeShop: [],
     shop: [],
     freeRerolls: 0,
@@ -98,6 +128,9 @@ export function createGame(
     phase: 'plan',
     log: '',
     lastResult: null,
+    gauntletLives: mode === 'gauntlet' ? GAUNTLET.startLives : undefined,
+    gauntletGoldPenalty: mode === 'gauntlet' ? 0 : undefined,
+    gauntletRoundsCleared: mode === 'gauntlet' ? 0 : undefined,
   };
   if (isRankedMode(mode)) {
     runBotTurn(g);
@@ -111,7 +144,7 @@ export function createGame(
 }
 
 function seedDebugPlayer(g: GameState, draft: string[], round: number): void {
-  const pool = (draft.length ? draft : HEROES.slice(0, 6).map((h) => h.id)).slice(0, 6);
+  const pool = playerShopPool(draft);
   const n = Math.min(cap(round, g.matchRounds), Math.max(3, pool.length));
   const star: 1 | 2 = round >= 8 ? 2 : 1;
   for (let i = 0; i < n; i++) {
@@ -142,6 +175,7 @@ function fastForwardMatch(g: GameState, target: number): void {
 
 export function cap(round: number, maxR: number = MATCH_DEFAULTS.matchRounds, mode: GameMode = 'bot'): number {
   if (mode === 'practice') return PRACTICE_BOARD_CAP;
+  if (mode === 'gauntlet') return gauntletBoardCap(round);
   const table =
     mode === 'marathon' || maxR > MATCH_DEFAULTS.matchRounds ? MARATHON_BOARD_CAPS : BOT_BOARD_CAPS;
   return table[Math.min(round, maxR) - 1] ?? table[table.length - 1];
@@ -165,8 +199,18 @@ function cellBlocked(C: Combatant[], r: number, c: number, skip?: string): boole
   return C.some((o) => o.alive && o.u !== skip && occupiesCell(o, r, c));
 }
 
-export function rollShopOffers(draft: string[]): (string | null)[] {
-  const pool = draft.length ? draft : HEROES.slice(0, 6).map((h) => h.id);
+export function rollShopOffers(
+  draft: string[],
+  round = 1,
+  matchRounds: number = MATCH_DEFAULTS.matchRounds,
+): (string | null)[] {
+  const maxCost = maxShopCost(round, matchRounds);
+  const base = playerShopPool(draft);
+  let pool = base.filter((id) => HERO_MAP[id].cost <= maxCost);
+  if (!pool.length) {
+    const cheapest = Math.min(...base.map((id) => HERO_MAP[id].cost));
+    pool = base.filter((id) => HERO_MAP[id].cost === cheapest);
+  }
   const w = pool.map((id) => shopWeight(HERO_MAP[id].cost));
   const tot = w.reduce((a, b) => a + b, 0);
   return [0, 0, 0, 0, 0].map(() => {
@@ -180,7 +224,7 @@ export function rollShopOffers(draft: string[]): (string | null)[] {
 }
 
 export function rollShop(g: GameState, draft: string[], silent = false): void {
-  g.shop = rollShopOffers(draft);
+  g.shop = rollShopOffers(draft, g.round, g.matchRounds);
   void silent;
 }
 
@@ -409,6 +453,7 @@ export function sellValue(u: Unit): number {
 }
 
 export function combatOpponents(g: GameState): Unit[] {
+  if (g.mode === 'gauntlet') return makeGauntletBossUnits(g.round, boardPower(g.board));
   if (g.mode === 'bot' && isBossRound(g.round)) return makeBossUnits(g.round);
   return g.foe;
 }
@@ -501,7 +546,11 @@ function botSellWeakest(g: GameState): boolean {
 
 export function runBotTurn(g: GameState): void {
   if (!isRankedMode(g.mode)) return;
-  g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id));
+  g.foeShop = rollShopOffers(
+    g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id),
+    g.round,
+    g.matchRounds,
+  );
 
   const tryBuys = () => {
     let bought = false;
@@ -522,7 +571,7 @@ export function runBotTurn(g: GameState): void {
   const usefulLeft = g.foeShop.some((hid) => hid && botOwns(g, hid));
   if (!usefulLeft && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
     g.foeGold -= MATCH_DEFAULTS.rerollCost;
-    g.foeShop = rollShopOffers(g.foeDraft);
+    g.foeShop = rollShopOffers(g.foeDraft, g.round, g.matchRounds);
     tryBuys();
     tryBuys();
   }
@@ -549,10 +598,10 @@ const FOE_SCALE: Record<Difficulty, { hp: number; atk: number; extra: number }> 
   mythic: { hp: 1.4, atk: 1.28, extra: 1 },
 };
 
-const BOSS_ATK_SCALE: Record<Difficulty, number> = {
-  normal: 1,
-  hard: 1.12,
-  mythic: 1.28,
+const BOSS_SCALE: Record<Difficulty, { hp: number; atk: number; as: number }> = {
+  normal: { hp: 1, atk: 1, as: 1 },
+  hard: { hp: 1.25, atk: 1.15, as: 1.08 },
+  mythic: { hp: 1.5, atk: 1.3, as: 1.15 },
 };
 
 export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal'): void {
@@ -590,7 +639,12 @@ export function scaleFoeCombatants(list: Combatant[], difficulty: Difficulty): v
   if (s.hp === 1 && s.atk === 1) return;
   list.forEach((c) => {
     if (c.boss) {
-      c.atk = Math.round(c.atk * BOSS_ATK_SCALE[difficulty]);
+      const bs = BOSS_SCALE[difficulty];
+      c.maxHp = Math.round(c.maxHp * bs.hp);
+      c.hp = c.maxHp;
+      c.atk = Math.round(c.atk * bs.atk);
+      c.as = c.as * bs.as;
+      c.cd = 1 / c.as;
       return;
     }
     c.maxHp = Math.round(c.maxHp * s.hp);
@@ -1290,6 +1344,37 @@ export const gameActions = {
     if (g.mode === 'practice') {
       return { kind: 'spar' as const, win };
     }
+    if (g.mode === 'gauntlet') {
+      const enc = getGauntletEncounter(g.round, boardPower(g.board));
+      if (win) {
+        g.lossStreak = 0;
+        g.gold += enc.reward.gold;
+        g.freeRerolls += enc.reward.freeRerolls;
+        g.gauntletRoundsCleared = g.round;
+        g.lastResult = { win: true, dmg: 0, boss: true };
+        return {
+          kind: 'result' as const,
+          win: true,
+          dmg: 0,
+          offer: true,
+          boss: { name: enc.name, period: enc.period, reward: enc.reward },
+        };
+      }
+      g.lossStreak++;
+      g.gauntletLives = Math.max(0, (g.gauntletLives ?? GAUNTLET.startLives) - 1);
+      g.gauntletGoldPenalty = GAUNTLET.goldPenalty;
+      g.lastResult = { win: false, dmg: 0, boss: true };
+      if ((g.gauntletLives ?? 0) <= 0) {
+        return { kind: 'over' as const, win: false };
+      }
+      return {
+        kind: 'result' as const,
+        win: false,
+        dmg: 0,
+        offer: false,
+        boss: { name: enc.name, period: enc.period },
+      };
+    }
     const boss = g.mode === 'bot' ? getBossEncounter(g.round) : null;
     let dmg = 0;
     if (boss) {
@@ -1348,6 +1433,16 @@ export const gameActions = {
     g.sel = null;
     if (g.mode === 'practice') {
       g.foe = [];
+      rollShop(g, draft, true);
+      return;
+    }
+    if (g.mode === 'gauntlet') {
+      const penalty = g.gauntletGoldPenalty ?? 0;
+      if (penalty > 0) {
+        g.gold = Math.max(0, g.gold - penalty);
+        g.gauntletGoldPenalty = 0;
+      }
+      g.gold += gauntletRoundIncome(g.round);
       rollShop(g, draft, true);
       return;
     }

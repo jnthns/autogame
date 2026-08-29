@@ -1,4 +1,5 @@
-import { BONE, INK, JADE, SAF } from '../../data/constants';
+﻿import { BONE, INK, JADE, RUST, SAF } from '../../data/constants';
+import type { GauntletBestRun } from '../../game/gauntlet';
 import { HomeSpriteParade } from '../HomeSpriteParade';
 
 interface HomeScreenProps {
@@ -6,12 +7,24 @@ interface HomeScreenProps {
   unboundIds: string[];
   totalHeroes: number;
   wins: number;
+  gauntletBest?: GauntletBestRun;
   onPlay: () => void;
+  onGauntlet: () => void;
   onBuild: () => void;
   onSettings: () => void;
 }
 
-export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, onBuild, onSettings }: HomeScreenProps) {
+export function HomeScreen({
+  teamCount,
+  unboundIds,
+  totalHeroes,
+  wins,
+  gauntletBest,
+  onPlay,
+  onGauntlet,
+  onBuild,
+  onSettings,
+}: HomeScreenProps) {
   const unbound = unboundIds.length;
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
@@ -91,14 +104,14 @@ export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, o
           </div>
         </div>
         <div
-            className="om-muted"
-            style={{
-              marginTop: 12,
-              fontSize: 15,
-              lineHeight: 1.35,
-              maxWidth: 272,
-              textWrap: 'pretty',
-            }}
+          className="om-muted"
+          style={{
+            marginTop: 12,
+            fontSize: 15,
+            lineHeight: 1.35,
+            maxWidth: 272,
+            textWrap: 'pretty',
+          }}
         >
           Twelve creatures to start. Twelve more wait behind the veil. Draft six. Earn the rest.
         </div>
@@ -121,7 +134,7 @@ export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, o
             padding: 17,
           }}
         >
-          <span style={{ fontSize: 29, lineHeight: 1, color: SAF }}>☰</span>
+          <span style={{ fontSize: 29, lineHeight: 1, color: SAF }}>▶</span>
           <span style={{ flex: 1, textAlign: 'left' }}>
             <span className="slab" style={{ display: 'block', fontSize: 25, lineHeight: 1, color: BONE }}>
               PLAY
@@ -139,7 +152,42 @@ export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, o
               Practice · Bot match
             </span>
           </span>
-          <span style={{ fontSize: 22, color: SAF }}>›</span>
+          <span style={{ fontSize: 22, color: SAF }}>→</span>
+        </button>
+        <button
+          type="button"
+          className="btn-active om-card"
+          onClick={onGauntlet}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            border: '3px solid var(--om-line)',
+            boxShadow: '5px 5px 0 var(--om-line)',
+            padding: 17,
+          }}
+        >
+          <span style={{ fontSize: 29, lineHeight: 1, color: RUST }}>☠</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>
+            <span className="slab" style={{ display: 'block', fontSize: 25, lineHeight: 1 }}>
+              THE GAUNTLET
+            </span>
+            <span
+              className="om-muted"
+              style={{
+                display: 'block',
+                marginTop: 4,
+                fontSize: 12,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {gauntletBest
+                ? `Best · R${gauntletBest.round} · ${gauntletBest.lives} lives`
+                : 'Endless bosses · 3 lives'}
+            </span>
+          </span>
+          <span style={{ fontSize: 22, color: RUST }}>→</span>
         </button>
         <button
           type="button"
@@ -154,7 +202,7 @@ export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, o
             padding: 17,
           }}
         >
-          <span style={{ fontSize: 29, lineHeight: 1, color: JADE }}>☷</span>
+          <span style={{ fontSize: 29, lineHeight: 1, color: JADE }}>◆</span>
           <span style={{ flex: 1, textAlign: 'left' }}>
             <span className="slab" style={{ display: 'block', fontSize: 25, lineHeight: 1 }}>
               BUILD TEAM
@@ -172,7 +220,7 @@ export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, o
               {teamCount} of 6 drafted
             </span>
           </span>
-          <span style={{ fontSize: 22, color: JADE }}>›</span>
+          <span style={{ fontSize: 22, color: JADE }}>→</span>
         </button>
         <button
           type="button"
@@ -205,7 +253,7 @@ export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, o
               Battlegrounds · theme · trial
             </span>
           </span>
-          <span style={{ fontSize: 22, color: JADE }}>›</span>
+          <span style={{ fontSize: 22, color: JADE }}>→</span>
         </button>
         <div
           className="mono om-muted"
@@ -217,6 +265,9 @@ export function HomeScreen({ teamCount, unboundIds, totalHeroes, wins, onPlay, o
           }}
         >
           {unbound}/{totalHeroes} UNBOUND · {wins} WIN{wins === 1 ? '' : 'S'}
+          {gauntletBest && gauntletBest.round > 0
+            ? ` · GAUNTLET R${gauntletBest.round} · ${gauntletBest.lives} LIVE${gauntletBest.lives === 1 ? '' : 'S'}`
+            : ''}
         </div>
       </div>
     </div>

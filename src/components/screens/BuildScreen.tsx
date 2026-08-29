@@ -1,4 +1,4 @@
-import { BONE, INK, JADE, SAF, costTone } from '../../data/constants';
+import { BONE, INK, JADE, SAF, USER_DRAFT_MAX, costTone } from '../../data/constants';
 import { HEROES } from '../../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../../data/progress';
 import { spriteCss } from '../../data/sprites';
@@ -23,7 +23,7 @@ export function BuildScreen({
   onToBattle,
   onInspect,
 }: BuildScreenProps) {
-  const full = draft.length >= 6;
+  const full = draft.length >= USER_DRAFT_MAX;
   const synergies = activeSynergies(draft).filter((t) => t.lvl > 0);
   const unbound = HEROES.filter((h) => heroUnlocked(h.id, progress));
   const sealed = HEROES.filter((h) => !heroUnlocked(h.id, progress));
@@ -67,7 +67,7 @@ export function BuildScreen({
               marginTop: 3,
             }}
           >
-            {draft.length} / 6 chosen · {unbound.length} / {HEROES.length} unbound
+            {draft.length} / {USER_DRAFT_MAX} chosen · {unbound.length} / {HEROES.length} unbound
           </div>
         </div>
         <button
@@ -452,7 +452,7 @@ export function BuildScreen({
             fontSize: 19,
           }}
         >
-          {full ? 'TO BATTLE' : `PICK ${6 - draft.length} MORE`}
+          {full ? 'TO BATTLE' : `PICK ${USER_DRAFT_MAX - draft.length} MORE`}
         </button>
       </div>
     </div>
