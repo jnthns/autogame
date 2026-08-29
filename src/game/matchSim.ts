@@ -207,7 +207,7 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   resetUidCounter();
   const gauntlet = createGame('gauntlet');
   assert(gauntlet.mode === 'gauntlet', 'gauntlet mode flag');
-  assert(gauntlet.gold === GAUNTLET.startGold, 'gauntlet starts with 8 gold');
+  assert(gauntlet.gold === GAUNTLET.startGold, 'gauntlet starts with 30 gold');
   assert(gauntlet.gauntletLives === GAUNTLET.startLives, 'gauntlet starts with 3 lives');
   assert(gauntlet.foe.length === 0, 'gauntlet has no bot board');
   const gBoss = combatOpponents(gauntlet);

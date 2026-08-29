@@ -68,7 +68,7 @@ export const GAUNTLET = {
   /** Effectively endless — UI shows round count only. */
   matchRounds: 9999,
   startLives: 3,
-  startGold: 8,
+  startGold: 30,
   goldPenalty: 2,
   baseGoldReward: 8,
   goldPerRound: 2,
