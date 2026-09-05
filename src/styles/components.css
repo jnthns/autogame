@@ -1,0 +1,1204 @@
+/*
+ * Component classes. The names here are a contract: D3–D5 attach animations to
+ * them, so rename with care. Everything reads tokens from tokens.css; a
+ * component may only use inline `style` for runtime geometry (percent
+ * positions, bar widths, FX transforms).
+ */
+
+/* ── Text ──────────────────────────────────────────────────────────────── */
+.om-label {
+  font-weight: 700;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--om-muted-2);
+}
+
+.om-body {
+  font-size: var(--text-md);
+  line-height: 1.4;
+  color: var(--om-muted);
+  text-wrap: pretty;
+}
+
+.om-section-label {
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: var(--track-wider);
+  text-transform: uppercase;
+  color: var(--om-muted);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.om-btn {
+  border: var(--bw-2) solid var(--om-line);
+  background: var(--om-card);
+  color: var(--om-fg);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  padding: var(--sp-4) var(--sp-5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+}
+
+.om-btn:active {
+  transform: translate(2px, 2px);
+}
+
+.om-btn--primary {
+  background: var(--om-good);
+  color: var(--om-on-good);
+  border-color: var(--om-ink);
+}
+
+.om-btn--danger {
+  background: var(--om-bad);
+  color: var(--om-on-bad);
+  border-color: var(--om-ink);
+}
+
+.om-btn--accent {
+  background: var(--om-accent);
+  color: var(--om-on-accent);
+  border-color: var(--om-ink);
+}
+
+.om-btn--ghost {
+  background: transparent;
+}
+
+.om-btn--sm {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--text-2xs);
+}
+
+.om-btn--lg {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: normal;
+  border-width: var(--bw-3);
+  box-shadow: var(--shadow-hard-md);
+  padding: var(--sp-4) var(--sp-3);
+}
+
+.om-btn--lg:active {
+  transform: translate(3px, 3px);
+}
+
+.om-btn--icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: var(--text-md);
+}
+
+.om-btn--disabled,
+.om-btn:disabled {
+  background: var(--om-disabled);
+  color: var(--om-muted-2);
+}
+
+/* ── Chips ─────────────────────────────────────────────────────────────── */
+.om-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  border: var(--bw-2) solid var(--om-line);
+  background: var(--om-card);
+  color: var(--om-muted-2);
+  padding: var(--sp-1) var(--sp-3);
+  font-weight: 700;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.om-chip__glyph {
+  font-size: var(--text-sm);
+}
+
+.om-chip--active {
+  background: var(--om-hud-bg);
+  border-color: var(--om-ink);
+  color: var(--om-hud-fg);
+}
+
+.om-chip--tier2 {
+  background: var(--om-accent);
+  border-color: var(--om-ink);
+  color: var(--om-on-accent);
+}
+
+/* Ink on sky clears 4.5:1; bone on sky does not. */
+.om-chip--class-tier2 {
+  background: var(--om-info);
+  border-color: var(--om-ink);
+  color: var(--om-ink);
+}
+
+.om-chip--warn {
+  background: transparent;
+  border-color: var(--om-bad);
+  color: var(--om-bad);
+}
+
+.om-chip--muted {
+  border-color: var(--om-muted-2);
+  color: var(--om-muted-2);
+}
+
+/* ── Surfaces ──────────────────────────────────────────────────────────── */
+.om-panel {
+  background: var(--om-card);
+  border: var(--bw-3) solid var(--om-line);
+}
+
+.om-card {
+  background: var(--om-card);
+  color: var(--om-fg);
+}
+
+.om-card--raised {
+  border: var(--bw-3) solid var(--om-line);
+  box-shadow: var(--shadow-hard-lg);
+}
+
+.om-card__banner {
+  border-bottom: var(--bw-3) solid var(--om-ink);
+  padding: var(--sp-6) var(--sp-6) var(--sp-5);
+}
+
+.om-card__banner-title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+
+.om-card__banner-sub {
+  margin-top: var(--sp-2);
+  font-size: var(--text-sm);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.om-tile {
+  border: var(--bw-2) solid var(--om-line);
+  background: var(--om-surface-2);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.om-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 13, 10, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-8);
+  z-index: var(--z-overlay);
+}
+
+.om-modal {
+  width: 100%;
+  background: var(--om-card);
+  border: var(--bw-3) solid var(--om-line);
+  box-shadow: var(--shadow-hard-accent);
+  overflow: hidden;
+  animation: omStamp var(--dur-slow) both;
+}
+
+.om-sheet__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 13, 10, 0.66);
+  display: flex;
+  align-items: flex-end;
+  z-index: var(--z-sheet);
+}
+
+.om-sheet {
+  width: 100%;
+  max-height: 86%;
+  overflow-y: auto;
+  background: var(--om-card);
+  border-top: var(--bw-3) solid var(--om-line);
+  animation: omRise var(--dur-base) ease both;
+}
+
+.om-sheet__header {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: flex-start;
+  padding: var(--sp-6) var(--sp-6) var(--sp-5);
+  background: var(--om-hud-bg);
+  color: var(--om-hud-fg);
+}
+
+.om-sheet__avatar {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 auto;
+  border: var(--bw-2) solid var(--om-accent);
+  background: var(--om-hud-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-2xl);
+  color: var(--om-accent);
+}
+
+.om-sheet__body {
+  padding: var(--sp-5) var(--sp-6) var(--sp-7);
+}
+
+/* ── HUD ───────────────────────────────────────────────────────────────── */
+.om-hud {
+  background: var(--om-hud-bg);
+  color: var(--om-hud-fg);
+  border-bottom: var(--bw-3) solid var(--om-ink);
+}
+
+.om-hud__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.om-hud__row + .om-hud__row {
+  margin-top: var(--sp-2);
+}
+
+.om-hud__title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  color: var(--om-accent);
+  white-space: nowrap;
+}
+
+.om-hud__back {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--om-hud-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.om-hud__back > span {
+  width: 24px;
+  height: 24px;
+  border: var(--bw-2) solid var(--om-hud-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-md);
+}
+
+.om-hud__gold {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  border: var(--bw-2) solid var(--om-accent);
+  color: var(--om-accent);
+  padding: 1px var(--sp-3);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+
+.om-hud__income {
+  border: var(--bw-2) solid var(--om-good);
+  color: var(--om-good);
+  background: transparent;
+  padding: 1px var(--sp-3);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+}
+
+.om-hud__stat {
+  border: var(--bw-2) solid var(--om-hud-line);
+  padding: 1px var(--sp-3);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+}
+
+.om-hud__lives {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.om-hud__life {
+  width: 14px;
+  height: 14px;
+  border: var(--bw-2) solid var(--om-accent);
+  background: var(--om-hud-line);
+}
+
+.om-hud__life--full {
+  background: var(--om-good);
+}
+
+.om-hud__hp {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.om-hud__hp-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  width: 22px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Bars ──────────────────────────────────────────────────────────────── */
+.om-bar {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  min-width: 0;
+  border: var(--bw-1) solid var(--om-bone);
+  background: var(--om-hud-line);
+}
+
+.om-bar__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  transition: width var(--dur-slow) var(--ease-in-out);
+}
+
+.om-bar__fill--hp-me {
+  background: var(--om-good);
+}
+
+.om-bar__fill--hp-foe {
+  background: var(--om-bad);
+}
+
+.om-bar--unit {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: -7px;
+  height: 5px;
+  flex: none;
+  border: var(--bw-1) solid var(--om-ink);
+  background: var(--om-ink);
+}
+
+.om-bar--unit-mana {
+  bottom: -13px;
+  height: 4px;
+  border: none;
+}
+
+.om-bar--unit .om-bar__fill,
+.om-bar--unit-mana .om-bar__fill {
+  position: static;
+  display: block;
+  height: 100%;
+  transition: none;
+}
+
+.om-bar__fill--unit-me {
+  background: var(--om-good);
+}
+
+.om-bar__fill--unit-foe {
+  background: var(--om-ember);
+}
+
+.om-bar__fill--mana {
+  background: var(--om-info);
+}
+
+/* ── Board ─────────────────────────────────────────────────────────────── */
+.om-board__grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  z-index: var(--z-cells);
+}
+
+.om-cell {
+  border-right: var(--bw-1) solid rgba(20, 18, 14, 0.22);
+  border-bottom: var(--bw-1) solid rgba(20, 18, 14, 0.22);
+  background: rgba(180, 68, 43, 0.12);
+}
+
+.om-cell--mine {
+  background: rgba(27, 107, 82, 0.12);
+}
+
+.om-cell--drop {
+  background: rgba(232, 163, 23, 0.24);
+}
+
+.om-board__divider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--bw-3);
+  background: var(--om-ink);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.om-unit {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: var(--z-unit);
+  transition:
+    left var(--dur-base) var(--ease-out),
+    top var(--dur-base) var(--ease-out);
+}
+
+.om-unit--boss {
+  z-index: var(--z-boss);
+}
+
+.om-unit--sel {
+  z-index: var(--z-unit-sel);
+}
+
+.om-unit__body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: transparent;
+  border: none;
+  transition: transform var(--dur-instant) var(--ease-out);
+}
+
+.om-unit__body--boss {
+  width: 100%;
+  height: 100%;
+}
+
+.om-unit__body--stunned {
+  box-shadow: 0 0 0 2px var(--om-info);
+}
+
+.om-badge-star {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1px;
+  align-items: center;
+  background: var(--om-ink);
+  border: var(--bw-1) solid var(--om-ink);
+  padding: 1px 2px;
+  line-height: 0;
+  /* The glyph is kept for screen readers; the pixels are what you see. */
+  font-size: 0;
+  color: transparent;
+}
+
+/* One 5×5 pixel star per level, legible on a 30 px unit where text is not. */
+.om-badge-star > i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  background: var(--om-star, var(--om-dust));
+  clip-path: polygon(50% 0, 65% 35%, 100% 35%, 72% 58%, 85% 100%, 50% 74%, 15% 100%, 28% 58%, 0 35%, 35% 35%);
+}
+
+.om-badge-star--1 {
+  --om-star: var(--om-dust);
+}
+
+.om-badge-star--2 {
+  --om-star: var(--om-bone);
+}
+
+.om-badge-star--3 {
+  --om-star: var(--om-accent);
+}
+
+.om-badge-boss {
+  position: absolute;
+  bottom: var(--sp-3);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  background: var(--om-accent);
+  color: var(--om-on-accent);
+  border: var(--bw-1) solid var(--om-ink);
+  padding: 0 3px;
+  line-height: 11px;
+}
+
+.om-badge-info {
+  position: absolute;
+  top: -10px;
+  right: -12px;
+  font-family: var(--font-display);
+  background: var(--om-accent);
+  color: var(--om-on-accent);
+  border: var(--bw-2) solid var(--om-ink);
+  width: 19px;
+  height: 19px;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  line-height: 15px;
+  text-align: center;
+}
+
+.om-board__banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--sp-4);
+  text-align: center;
+  pointer-events: none;
+  z-index: var(--z-banner);
+}
+
+.om-stamp {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  background: var(--om-hud-bg);
+  color: var(--om-accent);
+  border: var(--bw-2) solid var(--om-accent);
+  padding: var(--sp-1) var(--sp-5);
+  animation: omStamp var(--dur-slow) both;
+}
+
+.om-stamp--boss {
+  background: var(--om-bad);
+  color: var(--om-bone);
+  border-color: var(--om-ink);
+  animation: none;
+}
+
+.om-stamp--final {
+  animation: none;
+}
+
+/* ── Bench and shop ────────────────────────────────────────────────────── */
+.om-bench {
+  display: flex;
+  gap: var(--sp-2);
+  padding: 5px var(--sp-5);
+  border-bottom: var(--bw-2) solid var(--om-line);
+  overflow-x: auto;
+  min-height: 44px;
+  align-items: center;
+  flex-shrink: 0;
+  background: var(--om-synergy);
+}
+
+.om-slot {
+  flex: 0 0 auto;
+  width: var(--bench-size);
+  min-width: 40px;
+  height: var(--bench-size);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+}
+
+.om-slot--empty {
+  border: var(--bw-2) solid var(--om-line);
+  background: var(--om-card);
+  color: var(--om-muted-2);
+  font-size: var(--text-lg);
+}
+
+.om-slot--sel {
+  box-shadow: 0 0 0 2px var(--om-accent);
+}
+
+.om-shop {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--om-card);
+}
+
+.om-shop__row {
+  display: flex;
+  gap: 5px;
+  padding: var(--sp-4) var(--sp-5) var(--sp-3);
+  align-items: stretch;
+}
+
+.om-shop-card {
+  flex: 1;
+  min-height: 56px;
+  min-width: 0;
+  border: var(--bw-2) solid var(--om-line);
+  background: var(--om-card);
+  padding: 5px 3px var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.om-shop-card--sold {
+  background: var(--om-disabled);
+  color: var(--om-muted-2);
+  opacity: 0.5;
+}
+
+.om-shop-card--locked {
+  opacity: 0.55;
+}
+
+.om-shop-card__name {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--om-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.om-shop-card__price {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--om-ink);
+  background: var(--om-accent);
+  padding: 0 var(--sp-2);
+}
+
+.om-shop-card--locked .om-shop-card__price {
+  background: var(--om-disabled);
+}
+
+.om-shop-actions {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-5) calc(var(--safe-bottom) + var(--sp-4));
+}
+
+.om-shop-actions .om-btn--lg {
+  flex: 1;
+}
+
+.om-shop-actions .om-btn--fight {
+  flex: 1.2;
+}
+
+/* ── Combat bar ────────────────────────────────────────────────────────── */
+.om-combat-bar {
+  padding: var(--sp-5);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+}
+
+.om-combat-bar__pulse {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--om-bad);
+  animation: omPulse 1s infinite;
+}
+
+.om-combat-bar__hint {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--om-muted);
+  line-height: 1.3;
+}
+
+/* ── Synergy bar ───────────────────────────────────────────────────────── */
+.om-synergy {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-5);
+  border-bottom: var(--bw-2) solid var(--om-line);
+  overflow-x: auto;
+  min-height: 28px;
+  align-items: center;
+  flex-shrink: 0;
+  background: var(--om-synergy);
+}
+
+/* ── Trait cards and stat boxes ────────────────────────────────────────── */
+.om-trait-card {
+  border: var(--bw-2) solid var(--om-line);
+}
+
+.om-trait-card__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px var(--sp-4);
+}
+
+.om-trait-card__body {
+  padding: 7px var(--sp-4) var(--sp-4);
+}
+
+.om-trait-card__tier {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+}
+
+.om-statbox {
+  border: var(--bw-2) solid var(--om-line);
+  background: var(--om-surface-2);
+  padding: var(--sp-3) var(--sp-2);
+  text-align: center;
+}
+
+.om-statbox__value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-md);
+}
+
+.om-statbox__label {
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--om-muted);
+  margin-top: 1px;
+}
+
+.om-ability-card {
+  margin-top: var(--sp-5);
+  border: var(--bw-3) solid var(--om-line);
+  background: var(--om-hud-bg);
+  color: var(--om-hud-fg);
+  padding: var(--sp-5);
+}
+
+.om-relic-card {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: center;
+  text-align: left;
+  border: var(--bw-2) solid var(--om-line);
+  background: var(--om-surface-2);
+  padding: var(--sp-4) var(--sp-5);
+  width: 100%;
+}
+
+.om-relic-card__glyph {
+  font-size: var(--text-xl);
+  color: var(--om-good);
+}
+
+.om-relic-strip {
+  position: absolute;
+  right: -1px;
+  top: 1px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* ── Floaters ──────────────────────────────────────────────────────────── */
+.damage-floater {
+  position: absolute;
+  text-align: center;
+  pointer-events: none;
+  font-weight: 700;
+  text-shadow: 0 1px 0 var(--om-ink);
+  z-index: var(--z-floater);
+}
+
+.damage-floater--damage,
+.damage-floater--heal,
+.damage-floater--death,
+.damage-floater--info {
+  animation: omFloatUp var(--dur-linger) var(--ease-out) forwards;
+}
+
+.damage-floater--crit {
+  animation: omCritFloat var(--dur-linger) var(--ease-out) forwards;
+}
+
+/* ── Sheet detail ──────────────────────────────────────────────────────── */
+.om-sheet__title {
+  font-size: var(--text-xl);
+  line-height: 1.05;
+  color: var(--om-bone);
+}
+
+.om-sheet__subtitle {
+  margin-top: var(--sp-2);
+  font-size: var(--text-sm);
+  letter-spacing: var(--track-wider);
+  text-transform: uppercase;
+  color: var(--om-muted-2);
+}
+
+.om-sheet__close {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--om-hud-fg);
+  font-size: var(--text-md);
+}
+
+.om-ability-card__name {
+  font-size: var(--text-lg);
+  color: var(--om-accent);
+}
+
+.om-ability-card__mana {
+  font-size: var(--text-xs);
+  color: var(--om-info);
+  border: var(--bw-1) solid var(--om-info);
+  padding: 1px 5px;
+}
+
+.om-ability-card__text {
+  margin-top: 7px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--om-disabled);
+  text-wrap: pretty;
+}
+
+.om-ability-card__note {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: var(--bw-1) solid var(--om-hud-line);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--om-accent);
+}
+
+/* ── Overlay modal ─────────────────────────────────────────────────────── */
+.om-card__banner--good {
+  background: var(--om-good);
+  color: var(--om-on-good);
+}
+
+.om-card__banner--bad {
+  background: var(--om-bad);
+  color: var(--om-on-bad);
+}
+
+.om-card__banner--accent {
+  background: var(--om-accent);
+  color: var(--om-on-accent);
+}
+
+.om-card__banner--ink {
+  background: var(--om-hud-bg);
+  color: var(--om-accent);
+}
+
+.om-card__banner--muted {
+  background: var(--om-muted);
+  color: var(--om-bone);
+}
+
+.om-reward-row {
+  margin-top: var(--sp-5);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  padding: 9px 10px;
+}
+
+.om-reward-chip {
+  font-size: var(--text-sm);
+  background: var(--om-accent);
+  color: var(--om-on-accent);
+  border: var(--bw-2) solid var(--om-ink);
+  padding: var(--sp-1) var(--sp-4);
+}
+
+.om-unlock-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: 7px 9px;
+}
+
+.om-unlock-row__thumb {
+  width: 28px;
+  height: 28px;
+  border: var(--bw-2) solid var(--om-line);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.om-unlock-row__name {
+  display: block;
+  font-size: var(--text-md);
+  line-height: 1.1;
+}
+
+.om-unlock-row__meta {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--om-muted);
+}
+
+.om-unlock-row__desc {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  color: var(--om-muted);
+}
+
+.om-unlock-row__mark {
+  color: var(--om-good);
+  font-weight: 700;
+  font-size: var(--text-lg);
+}
+
+/* ── Home parade motion (durations live here, not in the TSX) ──────────── */
+.om-marquee {
+  display: flex;
+  width: max-content;
+  gap: 10px;
+  padding: 10px 0;
+  animation-duration: var(--parade-marquee-dur, 30s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.om-marquee--left {
+  animation-name: omMarqueeLeft;
+}
+
+.om-marquee--right {
+  animation-name: omMarqueeRight;
+}
+
+.om-parade-bob {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  animation: omHomeBob 2.8s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.om-parade-sparkle {
+  position: absolute;
+  font-size: 14px;
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 2;
+  animation: omHomeSparkle 3.2s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.om-glyph-drift {
+  display: flex;
+  width: max-content;
+  gap: 18px;
+  animation: omGlyphDrift 28s linear infinite;
+}
+
+/* ── Rise / stamp helpers ──────────────────────────────────────────────── */
+.om-rise {
+  animation: omRise var(--dur-base) ease both;
+}
+
+.om-title-stamp {
+  animation: omStamp var(--dur-deliberate) var(--ease-snap) both;
+}
+
+.om-hud__income-detail {
+  color: var(--om-muted-2);
+  font-size: var(--text-xs);
+}
+
+/* ── Board geometry ────────────────────────────────────────────────────── */
+.game-board {
+  /* One cell as a fraction of the board — units size and translate off these. */
+  --cell-w: calc(100% / 6);
+  --cell-h: calc(100% / 12);
+}
+
+.om-unit {
+  left: 0;
+  top: 0;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* ── Combat reactions ──────────────────────────────────────────────────── */
+.om-unit__body--hit {
+  transform: translate(var(--flinch-c), var(--flinch-r));
+  filter: brightness(1.6);
+  transition-duration: var(--dur-instant);
+}
+
+.om-unit__body--hit-crit {
+  transform: translate(var(--flinch-c), var(--flinch-r));
+  filter: brightness(2) drop-shadow(0 0 2px var(--om-accent));
+  transition-duration: var(--dur-fast);
+}
+
+.om-unit__body--casting::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: var(--bw-2) solid var(--om-accent);
+  border-radius: 0;
+  pointer-events: none;
+  animation: omMergeRing var(--dur-slow) var(--ease-out) forwards;
+}
+
+.om-unit__body--healed {
+  box-shadow: 0 0 0 2px var(--om-good);
+  transition: box-shadow var(--dur-base) var(--ease-out);
+}
+
+.om-unit__body--shielded {
+  outline: var(--bw-1) solid var(--om-info);
+  outline-offset: 1px;
+}
+
+.om-bar__fill--critical {
+  animation: omCriticalPulse 600ms ease-in-out infinite;
+}
+
+.om-unit--dying {
+  z-index: var(--z-unit);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: omDeathDrop var(--dur-slow) var(--ease-in) forwards;
+}
+
+.om-badge-dead {
+  transform: translateY(-6px);
+  transition: transform var(--dur-slow) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  font-weight: 700;
+  font-size: var(--text-lg);
+  color: var(--om-bad);
+  text-shadow: 0 1px 0 var(--om-ink);
+  opacity: 0;
+}
+
+.om-unit--dead-mark .om-badge-dead {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Screen frame ──────────────────────────────────────────────────────── */
+.om-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.om-screen--enter {
+  animation: omScreenEnter var(--dur-base) var(--ease-out) both;
+}
+
+/* ── Fight and boss intro ──────────────────────────────────────────────── */
+.om-intro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  background: rgba(14, 13, 10, 0.35);
+  z-index: var(--z-banner);
+  cursor: pointer;
+}
+
+.om-boss-intro {
+  text-align: center;
+  padding: var(--sp-4) var(--sp-6);
+  animation: omBossRise var(--dur-deliberate) var(--ease-out) both;
+}
+
+.om-boss-intro__name {
+  font-size: var(--text-2xl);
+  line-height: 1;
+  color: var(--om-bone);
+  text-shadow: 2px 2px 0 var(--om-ink);
+}
+
+.om-boss-intro__kit {
+  margin-top: var(--sp-3);
+  font-size: var(--text-sm);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--om-accent);
+}
+
+.om-stamp--fight {
+  font-size: var(--text-xl);
+  animation: omStamp var(--dur-deliberate) var(--ease-snap) both;
+}
+
+/* ── Round flow ────────────────────────────────────────────────────────── */
+.om-shop--collapse {
+  overflow: hidden;
+  transition: max-height var(--dur-base) var(--ease-in-out);
+}
+
+.om-combat-bar--enter {
+  animation: omRise var(--dur-base) var(--ease-out) both;
+}
+
+.om-hud__hit {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  color: var(--om-bad);
+  animation: omFloatUp var(--dur-linger) var(--ease-out) both;
+}
+
+.om-relic-card--deal,
+.om-unlock-row--deal {
+  animation: omDeal var(--dur-base) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}

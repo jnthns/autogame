@@ -1,5 +1,5 @@
 import { BONE, INK, JADE, SAF, USER_DRAFT_MAX, costTone } from '../../data/constants';
-import { HEROES } from '../../data/heroes';
+import { HEROES, HERO_MAP } from '../../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../../data/progress';
 import { spriteCss } from '../../data/sprites';
 import { CLASSES } from '../../data/classes';
@@ -24,6 +24,8 @@ export function BuildScreen({
   onInspect,
 }: BuildScreenProps) {
   const full = draft.length >= USER_DRAFT_MAX;
+  /** Without a cheap creature the early shop rolls are almost all unaffordable. */
+  const slowStart = draft.length > 0 && !draft.some((id) => (HERO_MAP[id]?.cost ?? 9) <= 3);
   const synergies = activeSynergies(draft).filter((t) => t.lvl > 0);
   const unbound = HEROES.filter((h) => heroUnlocked(h.id, progress));
   const sealed = HEROES.filter((h) => !heroUnlocked(h.id, progress));
@@ -45,7 +47,7 @@ export function BuildScreen({
           style={{
             width: 34,
             height: 34,
-            border: '2px solid #14120E',
+            border: '2px solid var(--om-ink)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -63,18 +65,23 @@ export function BuildScreen({
               fontSize: 12,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#6b6455',
+              color: 'var(--om-muted)',
               marginTop: 3,
             }}
           >
             {draft.length} / {USER_DRAFT_MAX} chosen · {unbound.length} / {HEROES.length} unbound
           </div>
+          {slowStart && (
+            <div style={{ marginTop: 5 }}>
+              <span className="om-chip om-chip--warn">SLOW START · no 2- or 3-cost creature</span>
+            </div>
+          )}
         </div>
         <button
           type="button"
           onClick={onAutoDraft}
           style={{
-            border: '2px solid #14120E',
+            border: '2px solid var(--om-ink)',
             padding: '6px 10px',
             fontWeight: 700,
             fontSize: 12,
@@ -91,8 +98,8 @@ export function BuildScreen({
           display: 'flex',
           gap: 5,
           padding: '10px 14px',
-          borderBottom: '2px solid #14120E',
-          background: '#e7dcc2',
+          borderBottom: '2px solid var(--om-ink)',
+          background: 'var(--om-surface-2)',
           overflowX: 'auto',
         }}
       >
@@ -108,7 +115,7 @@ export function BuildScreen({
                 flex: 1,
                 minWidth: 52,
                 height: 56,
-                border: '2px solid #14120E',
+                border: '2px solid var(--om-ink)',
                 background: h ? INK : BONE,
                 display: 'flex',
                 flexDirection: 'column',
@@ -120,7 +127,7 @@ export function BuildScreen({
               {h ? (
                 <PixelSprite src={spriteCss(h.id)} size={24} />
               ) : (
-                <span style={{ fontSize: 20, lineHeight: '24px', color: '#a99f86' }}>+</span>
+                <span style={{ fontSize: 20, lineHeight: '24px', color: 'var(--om-muted-2)' }}>+</span>
               )}
               <span
                 style={{
@@ -128,7 +135,7 @@ export function BuildScreen({
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                   fontWeight: 700,
-                  color: h ? SAF : '#a99f86',
+                  color: h ? SAF : 'var(--om-muted-2)',
                 }}
               >
                 {h ? h.name.slice(0, 7) : 'empty'}
@@ -144,9 +151,9 @@ export function BuildScreen({
             display: 'flex',
             gap: 6,
             padding: '9px 14px',
-            borderBottom: '2px solid #14120E',
+            borderBottom: '2px solid var(--om-ink)',
             overflowX: 'auto',
-            background: BONE,
+            background: 'var(--om-card)',
           }}
         >
           {synergies.map((t) => (
@@ -157,9 +164,9 @@ export function BuildScreen({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 5,
-                border: '2px solid #14120E',
+                border: '2px solid var(--om-ink)',
                 padding: '3px 7px',
-                background: t.lvl > 1 ? (t.kind === 'class' ? '#4C7BD1' : SAF) : INK,
+                background: t.lvl > 1 ? (t.kind === 'class' ? 'var(--om-sky)' : SAF) : INK,
               }}
             >
               <span style={{ fontSize: 13, color: t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE }}>{t.glyph}</span>
@@ -202,7 +209,7 @@ export function BuildScreen({
               onClick={() => onInspect(h.id)}
               style={{
                 textAlign: 'left',
-                border: '3px solid #14120E',
+                border: '3px solid var(--om-ink)',
                 background: on ? INK : BONE,
                 boxShadow: on ? `4px 4px 0 ${SAF}` : '3px 3px 0 rgba(20,18,14,.25)',
                 overflow: 'hidden',
@@ -217,7 +224,7 @@ export function BuildScreen({
                   justifyContent: 'space-between',
                   padding: '7px 9px',
                   background: on ? SAF : tone,
-                  borderBottom: '2px solid #14120E',
+                  borderBottom: '2px solid var(--om-ink)',
                 }}
               >
                 <span className="mono" style={{ fontWeight: 700, fontSize: 11, color: on ? INK : BONE }}>
@@ -257,7 +264,7 @@ export function BuildScreen({
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     fontWeight: 600,
-                    color: on ? '#a99f86' : '#6b6455',
+                    color: on ? 'var(--om-muted-2)' : 'var(--om-muted)',
                   }}
                 >
                   {CLASSES[h.heroClass].glyph} {h.heroClass} · {h.traits.join(' · ')}
@@ -300,7 +307,7 @@ export function BuildScreen({
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 fontWeight: 700,
-                color: '#6b6455',
+                color: 'var(--om-muted)',
               }}
             >
               Win bot matches to unseal
@@ -319,8 +326,8 @@ export function BuildScreen({
               onClick={() => onInspect(h.id)}
               style={{
                 textAlign: 'left',
-                border: '3px solid #14120E',
-                background: '#e7dcc2',
+                border: '3px solid var(--om-ink)',
+                background: 'var(--om-surface-2)',
                 boxShadow: '3px 3px 0 rgba(20,18,14,.18)',
                 overflow: 'hidden',
                 display: 'flex',
@@ -334,8 +341,8 @@ export function BuildScreen({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '7px 9px',
-                  background: '#6b6455',
-                  borderBottom: '2px solid #14120E',
+                  background: 'var(--om-muted)',
+                  borderBottom: '2px solid var(--om-ink)',
                 }}
               >
                 <span className="mono" style={{ fontWeight: 700, fontSize: 11, color: BONE }}>
@@ -366,7 +373,7 @@ export function BuildScreen({
                 <PixelSprite src={spriteCss(h.id)} size={48} dimmed />
               </div>
               <div style={{ padding: '0 9px 9px' }}>
-                <div className="slab" style={{ fontSize: 15, lineHeight: 1.05, color: '#4a4436' }}>
+                <div className="slab" style={{ fontSize: 15, lineHeight: 1.05, color: 'var(--om-muted)' }}>
                   {h.name}
                 </div>
                 <div
@@ -376,7 +383,7 @@ export function BuildScreen({
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     fontWeight: 600,
-                    color: '#6b6455',
+                    color: 'var(--om-muted)',
                   }}
                 >
                   {CLASSES[h.heroClass].glyph} {h.heroClass} · {h.traits.join(' · ')}
@@ -386,7 +393,7 @@ export function BuildScreen({
                     marginTop: 6,
                     fontSize: 11,
                     lineHeight: 1.3,
-                    color: '#6b6455',
+                    color: 'var(--om-muted)',
                     fontWeight: 600,
                   }}
                 >
@@ -414,8 +421,8 @@ export function BuildScreen({
           right: 0,
           bottom: 0,
           padding: '12px 14px 18px',
-          background: BONE,
-          borderTop: '3px solid #14120E',
+          background: 'var(--om-card)',
+          borderTop: '3px solid var(--om-ink)',
           display: 'flex',
           gap: 10,
           alignItems: 'center',
@@ -426,7 +433,7 @@ export function BuildScreen({
           onClick={onBack}
           style={{
             flex: '0 0 auto',
-            border: '2px solid #14120E',
+            border: '2px solid var(--om-ink)',
             padding: '12px 14px',
             fontWeight: 700,
             letterSpacing: '0.1em',
@@ -443,10 +450,10 @@ export function BuildScreen({
           onClick={onToBattle}
           style={{
             flex: 1,
-            background: full ? JADE : '#cfc3a6',
-            color: full ? BONE : '#8a8271',
-            border: '3px solid #14120E',
-            boxShadow: '4px 4px 0 #14120E',
+            background: full ? JADE : 'var(--om-disabled)',
+            color: full ? BONE : 'var(--om-muted-2)',
+            border: '3px solid var(--om-ink)',
+            boxShadow: '4px 4px 0 var(--om-ink)',
             padding: 12,
             fontFamily: "'Alfa Slab One', serif",
             fontSize: 19,

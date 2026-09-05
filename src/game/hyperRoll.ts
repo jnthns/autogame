@@ -1,13 +1,14 @@
 import { BOSS_KITS, type BossKitId } from '../data/bosses';
+import { BOSS_ANCHOR, MERGE_COPIES } from '../data/constants';
 import {
-  BOSS_ANCHOR,
   BOSS_ROUNDS,
   HYPER_ROLL_ROUNDS,
   MARATHON_BOSS_ROUNDS,
-  MATCH_DEFAULTS,
-  MERGE_COPIES,
-} from '../data/constants';
+  SHOP_TIERS,
+  shopOdds,
+} from '../data/economy';
 import { HERO_MAP } from '../data/heroes';
+import { random } from './rng';
 import type { BossRewardGrant, ShopOffer, Unit } from './types';
 
 export { BOSS_ROUNDS, HYPER_ROLL_ROUNDS };
@@ -44,19 +45,6 @@ export interface PeriodInfo {
   encounter: 'bot' | 'boss' | 'final';
 }
 
-/** Same cost-weight table the player shop uses: cheaper heroes appear more often. */
-export function shopWeight(cost: number): number {
-  return Math.max(1, 7 - cost);
-}
-
-/** Max hero cost tier available in the shop for a given round. */
-export function maxShopCost(round: number, matchRounds: number = HYPER_ROLL_ROUNDS): number {
-  if (round >= matchRounds || round >= 12) return 5;
-  if (round >= 9) return 4;
-  if (round >= 5) return 3;
-  return 2;
-}
-
 export function bossRoundsFor(matchRounds: number = HYPER_ROLL_ROUNDS): readonly number[] {
   return matchRounds > HYPER_ROLL_ROUNDS ? MARATHON_BOSS_ROUNDS : BOSS_ROUNDS;
 }
@@ -86,15 +74,6 @@ export function periodInfo(round: number, matchRounds = HYPER_ROLL_ROUNDS): Peri
     roundsUntilBoss: isFinal || nextBoss == null ? null : nextBoss - round,
     encounter,
   };
-}
-
-export function roundIncome(roundAfter: number, pvpWin: boolean | null): number {
-  const winBonus = pvpWin === true ? 1 : 0;
-  return 4 + winBonus + Math.min(2, Math.floor(roundAfter / 5));
-}
-
-export function lossDamage(round: number, streak: number): number {
-  return 8 + 4 * (streak - 1) + Math.floor(round / 3) * 2;
 }
 
 export const BOSS_ENCOUNTERS: BossEncounter[] = [
@@ -198,15 +177,21 @@ export function shopPrice(offer: ShopOffer): number {
   return offer.star === 1 ? cost : cost * MERGE_COPIES;
 }
 
-/** Collapse duplicate 1★ shop rolls into a single 2★ offer (pay for both copies). */
-export function collapseShopOffers(hids: (string | null)[]): (ShopOffer | null)[] {
+/**
+ * Collapse duplicate 1★ shop rolls into a single 2★ offer (pay for both copies).
+ * `canPair` lets the caller refuse when the shared pool cannot cover two copies.
+ */
+export function collapseShopOffers(
+  hids: (string | null)[],
+  canPair: (hid: string) => boolean = () => true,
+): (ShopOffer | null)[] {
   const slots: (ShopOffer | null)[] = hids.map((hid) => (hid ? { hid, star: 1 as const } : null));
   const pending = new Map<string, number>();
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i];
     if (!s || s.star !== 1) continue;
     const prev = pending.get(s.hid);
-    if (prev != null && slots[prev]) {
+    if (prev != null && slots[prev] && canPair(s.hid)) {
       slots[prev] = { hid: s.hid, star: 2 };
       slots[i] = null;
       pending.delete(s.hid);
@@ -226,15 +211,28 @@ export function rewardLines(reward: BossRewardGrant): string[] {
   return lines;
 }
 
-export function debugRoundFromUrl(): number | undefined {
-  if (typeof window === 'undefined') return undefined;
-  try {
-    const n = Number(new URLSearchParams(window.location.search).get('round'));
-    if (!Number.isFinite(n) || n < 1 || n > MATCH_DEFAULTS.matchRounds) return undefined;
-    return Math.floor(n);
-  } catch {
-    return undefined;
+/**
+ * Roll one cost tier from the round's odds row, then fall back to the nearest
+ * tier the draft actually contains: −1, +1, −2, +2, −3 (bounded to 2..5).
+ */
+export function rollShopTier(round: number, has: (tier: number) => boolean): number {
+  const odds = shopOdds(round);
+  let roll = random() * 100;
+  let tier: number = SHOP_TIERS[0];
+  for (let i = 0; i < SHOP_TIERS.length; i++) {
+    roll -= odds[i];
+    if (roll <= 0) {
+      tier = SHOP_TIERS[i];
+      break;
+    }
+    tier = SHOP_TIERS[i];
   }
+  if (has(tier)) return tier;
+  for (const step of [-1, 1, -2, 2, -3]) {
+    const t = tier + step;
+    if (t >= 2 && t <= 5 && has(t)) return t;
+  }
+  return tier;
 }
 
 export function unitPower(u: Unit): number {

@@ -402,10 +402,6 @@ export function getFxProfile(hid: string, kind: CombatFxKind): FxProfile {
 }
 
 /** @deprecated use getFxProfile */
-export function fxColors(kind: CombatFxKind) {
-  const p = getFxProfile('', kind);
-  return { bolt: p.bolt, flash: p.flash, slash: p.slash };
-}
 
 export function lungePush(hid: string): number {
   switch (hid) {

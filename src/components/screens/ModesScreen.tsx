@@ -66,7 +66,7 @@ export function ModesScreen({
           <div
             style={{
               background: SAF,
-              borderBottom: '3px solid #14120E',
+              borderBottom: '3px solid var(--om-ink)',
               padding: '12px 16px',
               display: 'flex',
               alignItems: 'center',
@@ -91,7 +91,7 @@ export function ModesScreen({
           <div
             style={{
               background: JADE,
-              borderBottom: '3px solid #14120E',
+              borderBottom: '3px solid var(--om-ink)',
               padding: '12px 16px',
               display: 'flex',
               alignItems: 'center',
@@ -133,7 +133,7 @@ export function ModesScreen({
           <div
             style={{
               background: RUST,
-              borderBottom: '3px solid #14120E',
+              borderBottom: '3px solid var(--om-ink)',
               padding: '12px 16px',
               display: 'flex',
               alignItems: 'center',
@@ -175,7 +175,7 @@ export function ModesScreen({
           <div
             style={{
               background: INK,
-              borderBottom: '3px solid #14120E',
+              borderBottom: '3px solid var(--om-ink)',
               padding: '12px 16px',
               display: 'flex',
               alignItems: 'center',

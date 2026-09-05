@@ -88,12 +88,12 @@ export function HomeScreen({
           An auto-battler of world myth
         </div>
         <div
+          className="om-title-stamp"
           style={{
             marginTop: 14,
             display: 'inline-block',
             background: INK,
             padding: '12px 16px 14px',
-            animation: 'omStamp 0.5s cubic-bezier(.2,.9,.3,1.2) both',
             boxShadow: '4px 4px 0 rgba(27,107,82,.35)',
           }}
         >
@@ -129,8 +129,8 @@ export function HomeScreen({
             alignItems: 'center',
             gap: 14,
             background: JADE,
-            border: '3px solid #14120E',
-            boxShadow: '5px 5px 0 #14120E',
+            border: '3px solid var(--om-ink)',
+            boxShadow: '5px 5px 0 var(--om-ink)',
             padding: 17,
           }}
         >

@@ -35,12 +35,12 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
       onClick={onClose}
     >
       <div
+        className="om-rise"
         style={{
           width: '100%',
-          background: BONE,
-          borderTop: '3px solid #14120E',
+          background: 'var(--om-card)',
+          borderTop: '3px solid var(--om-ink)',
           padding: '18px 18px 26px',
-          animation: 'omRise 0.22s ease both',
           maxHeight: '80%',
           overflowY: 'auto',
         }}
@@ -52,7 +52,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
               width: 64,
               height: 64,
               flex: '0 0 auto',
-              border: '3px solid #14120E',
+              border: '3px solid var(--om-ink)',
               background: costTone(h.cost),
               display: 'flex',
               alignItems: 'center',
@@ -70,7 +70,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
                 fontSize: 12,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: '#6b6455',
+                color: 'var(--om-muted)',
                 marginTop: 3,
               }}
             >
@@ -79,13 +79,13 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
             <div style={{ marginTop: 7, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <span
                 style={{
-                  border: '2px solid #14120E',
+                  border: '2px solid var(--om-ink)',
                   padding: '2px 6px',
                   fontWeight: 700,
                   fontSize: 11,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  background: '#4C7BD1',
+                  background: 'var(--om-sky)',
                   color: BONE,
                 }}
               >
@@ -93,7 +93,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
               </span>
               <span
                 style={{
-                  border: '2px solid #14120E',
+                  border: '2px solid var(--om-ink)',
                   padding: '2px 6px',
                   fontWeight: 700,
                   fontSize: 11,
@@ -109,7 +109,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
                 <span
                   key={t}
                   style={{
-                    border: '2px solid #14120E',
+                    border: '2px solid var(--om-ink)',
                     padding: '2px 6px',
                     fontWeight: 700,
                     fontSize: 11,
@@ -132,7 +132,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
           ].map((st) => (
             <div
               key={st.k}
-              style={{ border: '2px solid #14120E', padding: '6px 4px', textAlign: 'center', background: '#e7dcc2' }}
+              style={{ border: '2px solid var(--om-ink)', padding: '6px 4px', textAlign: 'center', background: 'var(--om-surface-2)' }}
             >
               <div className="mono" style={{ fontWeight: 700, fontSize: 15 }}>
                 {st.v}
@@ -142,7 +142,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
                   fontSize: 9,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: '#6b6455',
+                  color: 'var(--om-muted)',
                   marginTop: 1,
                 }}
               >
@@ -151,14 +151,14 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 12, border: '3px solid #14120E', background: INK, color: BONE, padding: 12 }}>
+        <div style={{ marginTop: 12, border: '3px solid var(--om-ink)', background: INK, color: BONE, padding: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 17, color: '#E8A317' }}>✦</span>
-            <span className="slab" style={{ fontSize: 16, color: '#E8A317' }}>
+            <span style={{ fontSize: 17, color: 'var(--om-saffron)' }}>✦</span>
+            <span className="slab" style={{ fontSize: 16, color: 'var(--om-saffron)' }}>
               {h.ability}
             </span>
           </div>
-          <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.4, color: '#d8cfb8', textWrap: 'pretty' }}>
+          <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.4, color: 'var(--om-disabled)', textWrap: 'pretty' }}>
             {h.abilityText}
           </div>
         </div>
@@ -169,12 +169,12 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
               fontSize: 11,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#6b6455',
+              color: 'var(--om-muted)',
             }}
           >
             Lore
           </div>
-          <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.45, color: '#4a4436', textWrap: 'pretty' }}>
+          <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.45, color: 'var(--om-muted)', textWrap: 'pretty' }}>
             {h.lore}
           </div>
         </div>
@@ -185,25 +185,25 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
               fontSize: 11,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#6b6455',
+              color: 'var(--om-muted)',
             }}
           >
             {CLASSES[h.heroClass].glyph} {h.heroClass}
           </div>
-          <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.45, color: '#6b6455', textWrap: 'pretty' }}>
+          <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.45, color: 'var(--om-muted)', textWrap: 'pretty' }}>
             {CLASSES[h.heroClass].desc}
           </div>
         </div>
-        <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.4, color: '#6b6455', textWrap: 'pretty' }}>{h.quirk}</div>
+        <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.4, color: 'var(--om-muted)', textWrap: 'pretty' }}>{h.quirk}</div>
         {!unlocked && req && (
-          <div style={{ marginTop: 12, border: '3px solid #14120E', padding: 12, background: '#e7dcc2' }}>
+          <div style={{ marginTop: 12, border: '3px solid var(--om-ink)', padding: 12, background: 'var(--om-surface-2)' }}>
             <div
               style={{
                 fontWeight: 700,
                 fontSize: 11,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: '#6b6455',
+                color: 'var(--om-muted)',
               }}
             >
               Sealed omen
@@ -211,7 +211,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
             <div className="slab" style={{ fontSize: 16, lineHeight: 1.15, marginTop: 4 }}>
               {unlockLabel(req)}
             </div>
-            <div style={{ marginTop: 8, height: 8, background: 'rgba(20,18,14,.15)', border: '2px solid #14120E' }}>
+            <div style={{ marginTop: 8, height: 8, background: 'rgba(20,18,14,.15)', border: '2px solid var(--om-ink)' }}>
               <div style={{ height: '100%', width: `${Math.min(100, (have / need) * 100)}%`, background: SAF }} />
             </div>
             <div className="mono" style={{ marginTop: 6, fontSize: 12, fontWeight: 700 }}>
@@ -226,10 +226,10 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
           style={{
             marginTop: 16,
             width: '100%',
-            background: !unlocked ? '#6b6455' : on ? RUST : full ? '#cfc3a6' : JADE,
-            color: !unlocked || on || !full ? BONE : '#8a8271',
-            border: '3px solid #14120E',
-            boxShadow: '4px 4px 0 #14120E',
+            background: !unlocked ? 'var(--om-muted)' : on ? RUST : full ? 'var(--om-disabled)' : JADE,
+            color: !unlocked || on || !full ? BONE : 'var(--om-muted-2)',
+            border: '3px solid var(--om-ink)',
+            boxShadow: '4px 4px 0 var(--om-ink)',
             padding: 13,
             fontFamily: "'Alfa Slab One', serif",
             fontSize: 19,

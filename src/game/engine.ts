@@ -1,4 +1,5 @@
 import {
+  BONE,
   BOARD_COLS,
   BOARD_ROWS,
   BOARD_SIDE_ROWS,
@@ -6,12 +7,14 @@ import {
   BOSS_AS,
   BOSS_BOARD_SURVIVAL,
   BOSS_COMBAT_LIMIT,
-  BOSS_DAMAGE_TAKEN,
-  BOSS_DPS_BURN_SECONDS,
+  BOSS_INCOMING_MULT,
+  BOSS_AUTO_SHARE,
+  BOSS_BURN_SECONDS,
+  BOSS_CAST_PERIOD_SECONDS,
+  BOSS_MIN_ATK,
   BOSS_FOOTPRINT,
   BOSS_HP_TEAM_MULT,
   BOSS_RANGE,
-  BOSS_TAKEN_BY_DIFFICULTY,
   BOT_BOARD_CAPS,
   BOT_DRAFT_SIZE,
   COMBAT_LIMIT,
@@ -19,33 +22,47 @@ import {
   HERO_HP_MUL,
   MARATHON,
   MARATHON_BOARD_CAPS,
-  MATCH_DEFAULTS,
   MERGE_COPIES,
   PLAYER_ROW_START,
   PRACTICE_BOARD_CAP,
+  RUST,
   SAF,
+  SKY,
+  JADE,
   STARMUL,
   USER_DRAFT_MAX,
 } from '../data/constants';
-import { BOSS_KITS, type BossKitId } from '../data/bosses';
+import { ABILITIES } from '../data/abilities';
+import { BOSS_KIT_SCALE, BOSS_KITS, type BossKitId } from '../data/bosses';
+import { bossRoundMul, refEffectiveDps, refTeam } from '../data/bossCurve';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP, isMeleeHero } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
+import { random, shuffle } from './rng';
+import {
+  BOSS_SURVIVOR_COUNT,
+  createPool,
+  MAX_COPIES_PER_ROLL,
+  type CopyPool,
+  BOT_INCOME_BONUS,
+  incomeBreakdown,
+  INTEREST_MAX,
+  INTEREST_PER,
+  lossDamage,
+  MATCH_DEFAULTS,
+  RELIC_ROUNDS,
+} from '../data/economy';
 import {
   collapseShopOffers,
   getBossEncounter,
   isBossRound,
-  lossDamage,
   makeBossUnits,
-  roundIncome,
-  maxShopCost,
+  rollShopTier,
   shopPrice,
-  shopWeight,
   unitPower,
 } from './hyperRoll';
 import {
-  boardPower,
   getGauntletEncounter,
   gauntletBoardCap,
   gauntletRoundIncome,
@@ -103,9 +120,9 @@ export function playerShopPool(draft: string[]): string[] {
 
 export function pickBotDraft(): string[] {
   const perTier = Math.max(2, Math.floor(BOT_DRAFT_SIZE / 3));
-  const low = HEROES.filter((h) => h.cost <= 2).sort(() => Math.random() - 0.5);
-  const mid = HEROES.filter((h) => h.cost === 3).sort(() => Math.random() - 0.5);
-  const high = HEROES.filter((h) => h.cost >= 4).sort(() => Math.random() - 0.5);
+  const low = shuffle(HEROES.filter((h) => h.cost <= 2));
+  const mid = shuffle(HEROES.filter((h) => h.cost === 3));
+  const high = shuffle(HEROES.filter((h) => h.cost >= 4));
   const pick = (arr: typeof HEROES, n: number) => arr.slice(0, Math.min(n, arr.length));
   return [...pick(low, perTier), ...pick(mid, perTier), ...pick(high, perTier)]
     .map((h) => h.id)
@@ -127,8 +144,9 @@ export function createGame(
     myHp: hp,
     foeHp: hp,
     maxHp: hp,
-    lossStreak: 0,
-    foeLossStreak: 0,
+    streak: 0,
+    foeStreak: 0,
+    lastSurvivors: { me: 0, foe: 0 },
     bench: [],
     board: [],
     foe: [],
@@ -138,10 +156,10 @@ export function createGame(
     foeShop: [],
     shop: [],
     freeRerolls: 0,
+    pool: mode === 'practice' ? null : createPool(HEROES.map((h) => h.id), (id) => HERO_MAP[id].cost),
     sel: null,
     speed,
     phase: 'plan',
-    log: '',
     lastResult: null,
     gauntletLives: mode === 'gauntlet' ? GAUNTLET.startLives : undefined,
     gauntletGoldPenalty: mode === 'gauntlet' ? 0 : undefined,
@@ -179,8 +197,8 @@ function fastForwardMatch(g: GameState, target: number): void {
   const capR = Math.min(target, g.matchRounds);
   for (let r = 1; r < capR; r++) {
     g.round++;
-    g.gold += roundIncome(g.round, false);
-    g.foeGold += roundIncome(g.round, null);
+    g.gold += incomeBreakdown(g.round, g.gold, g.streak, false).total;
+    g.foeGold += incomeBreakdown(g.round, g.foeGold, g.foeStreak, null).total;
     runBotTurn(g);
   }
   g.phase = 'plan';
@@ -214,34 +232,64 @@ function cellBlocked(C: Combatant[], r: number, c: number, skip?: string): boole
   return C.some((o) => o.alive && o.u !== skip && occupiesCell(o, r, c));
 }
 
+/**
+ * Five slots, each an independent tier roll from the round's odds row followed
+ * by a uniform pick inside that tier. Both the player and the bot use this;
+ * only the draft differs.
+ *
+ * A hero is offerable while the shared pool still holds a copy and this roll
+ * has not already shown MAX_COPIES_PER_ROLL of it. Rolling does not reserve
+ * anything — the pool only moves on a buy or a sell.
+ */
 export function rollShopOffers(
   draft: string[],
   round = 1,
-  matchRounds: number = MATCH_DEFAULTS.matchRounds,
+  pool: CopyPool | null = null,
 ): (ShopOffer | null)[] {
-  const maxCost = maxShopCost(round, matchRounds);
   const base = playerShopPool(draft);
-  let pool = base.filter((id) => HERO_MAP[id].cost <= maxCost);
-  if (!pool.length) {
-    const cheapest = Math.min(...base.map((id) => HERO_MAP[id].cost));
-    pool = base.filter((id) => HERO_MAP[id].cost === cheapest);
-  }
-  const w = pool.map((id) => shopWeight(HERO_MAP[id].cost));
-  const tot = w.reduce((a, b) => a + b, 0);
-  const raw = [0, 0, 0, 0, 0].map(() => {
-    let r = Math.random() * tot;
-    for (let i = 0; i < pool.length; i++) {
-      r -= w[i];
-      if (r <= 0) return pool[i];
-    }
-    return pool[0];
+  const byTier = new Map<number, string[]>();
+  base.forEach((id) => {
+    const cost = HERO_MAP[id].cost;
+    const list = byTier.get(cost) ?? [];
+    list.push(id);
+    byTier.set(cost, list);
   });
-  return collapseShopOffers(raw);
+
+  const shown: Record<string, number> = {};
+  const left = (id: string) => (pool ? (pool[id] ?? 0) : Infinity) - (shown[id] ?? 0);
+  const offerable = (id: string) => left(id) > 0 && (shown[id] ?? 0) < MAX_COPIES_PER_ROLL;
+  const has = (tier: number) => (byTier.get(tier) ?? []).some(offerable);
+
+  const raw: (string | null)[] = [0, 0, 0, 0, 0].map(() => {
+    const tier = rollShopTier(round, has);
+    const candidates = (byTier.get(tier) ?? base).filter(offerable);
+    const from = candidates.length ? candidates : base.filter(offerable);
+    if (!from.length) return null;
+    const id = from[Math.floor(random() * from.length)];
+    shown[id] = (shown[id] ?? 0) + 1;
+    return id;
+  });
+  // A pair only collapses into a 2★ offer if the pool can actually pay for both.
+  return collapseShopOffers(raw, (id) => (pool ? (pool[id] ?? 0) : Infinity) >= MERGE_COPIES);
 }
 
-export function rollShop(g: GameState, draft: string[], silent = false): void {
-  g.shop = rollShopOffers(draft, g.round, g.matchRounds);
-  void silent;
+/** Copies of a hero this unit is holding: 1 at 1★, 2 at 2★, 4 at 3★. */
+export function unitCopies(u: { star: 1 | 2 | 3 }): number {
+  return u.star === 1 ? 1 : u.star === 2 ? MERGE_COPIES : MERGE_COPIES * MERGE_COPIES;
+}
+
+function takeFromPool(g: GameState, hid: string, copies: number): void {
+  if (!g.pool) return;
+  g.pool[hid] = Math.max(0, (g.pool[hid] ?? 0) - copies);
+}
+
+function returnToPool(g: GameState, hid: string, copies: number): void {
+  if (!g.pool) return;
+  g.pool[hid] = (g.pool[hid] ?? 0) + copies;
+}
+
+export function rollShop(g: GameState, draft: string[]): void {
+  g.shop = rollShopOffers(draft, g.round, g.pool);
 }
 
 export function traitCounts(ids: string[]): Record<string, number> {
@@ -460,16 +508,20 @@ export function applyMerges(
   }
 }
 
-/** 1★ refunds full cost; combined units pay a combine tax so 2-copy merges do not print gold. */
+/**
+ * 1★ pays a one-gold scout tax so rolling through the shop and dumping the
+ * misses costs something; combined units pay a combine tax so 2-copy merges do
+ * not print gold.
+ */
 export function sellValue(u: Unit): number {
   const cost = HERO_MAP[u.hid].cost;
-  if (u.star === 1) return cost;
+  if (u.star === 1) return Math.max(1, cost - 1);
   if (u.star === 2) return Math.max(1, cost * MERGE_COPIES - 1);
   return Math.max(1, cost * 3);
 }
 
 export function combatOpponents(g: GameState): Unit[] {
-  if (g.mode === 'gauntlet') return makeGauntletBossUnits(g.round, boardPower(g.board));
+  if (g.mode === 'gauntlet') return makeGauntletBossUnits(g.round);
   if ((g.mode === 'bot' || g.mode === 'marathon') && isBossRound(g.round, g.matchRounds)) {
     return makeBossUnits(g.round, g.matchRounds);
   }
@@ -486,8 +538,10 @@ function placeBotBoard(units: Unit[], capN: number): { board: Unit[]; bench: Uni
   for (const r of [5, 4, 3, 2, 1, 0]) {
     for (const c of [2, 3, 1, 4, 0, 5]) cells.push({ r, c });
   }
+  // Rows 0–2 only: a ranged bot unit that starts on row 3 is already inside a
+  // player kiter's dead zone on the first tick.
   const backCells: { r: number; c: number }[] = [];
-  for (const r of [0, 1, 2, 3, 4, 5]) {
+  for (const r of [0, 1, 2]) {
     for (const c of [2, 3, 1, 4, 0, 5]) backCells.push({ r, c });
   }
   const used = new Set<string>();
@@ -527,6 +581,7 @@ function botBuy(g: GameState, i: number): boolean {
   if (g.foeGold < cost || g.foeBench.length >= 8) return false;
   g.foeGold -= cost;
   g.foeShop = g.foeShop.map((s, j) => (j === i ? null : s));
+  takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
   g.foeBench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   return true;
 }
@@ -558,17 +613,28 @@ function botSellWeakest(g: GameState): boolean {
   const idx = list.findIndex((x) => x.u === worst.u);
   if (idx < 0) return false;
   g.foeGold += sellValue(worst);
+  returnToPool(g, worst.hid, unitCopies(worst));
   list.splice(idx, 1);
   return true;
 }
 
+/**
+ * The bot carries relics too, on the same schedule the player is offered them.
+ * Without this the player's board silently gains three stacking modifiers over
+ * a match and the bot's does not.
+ */
+export function grantBotRelic(g: GameState): void {
+  if (!isRankedMode(g.mode)) return;
+  const eligible = g.foe.filter((u) => u.relics.length < 3);
+  if (!eligible.length) return;
+  const holder = eligible.slice().sort((a, b) => unitPower(b) - unitPower(a))[0];
+  const [rid] = pickRelics(1);
+  if (rid) holder.relics.push(rid);
+}
+
 export function runBotTurn(g: GameState): void {
   if (!isRankedMode(g.mode)) return;
-  g.foeShop = rollShopOffers(
-    g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id),
-    g.round,
-    g.matchRounds,
-  );
+  g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id), g.round, g.pool);
 
   const tryBuys = () => {
     let bought = false;
@@ -587,9 +653,13 @@ export function runBotTurn(g: GameState): void {
   }
 
   const usefulLeft = g.foeShop.some((offer) => offer && botOwns(g, offer.hid));
-  if (!usefulLeft && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
+  const keepsInterest =
+    g.round >= 9 ||
+    g.foeGold - MATCH_DEFAULTS.rerollCost >=
+      Math.min(INTEREST_MAX, Math.floor(g.foeGold / INTEREST_PER)) * INTEREST_PER;
+  if (!usefulLeft && keepsInterest && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
     g.foeGold -= MATCH_DEFAULTS.rerollCost;
-    g.foeShop = rollShopOffers(g.foeDraft, g.round, g.matchRounds);
+    g.foeShop = rollShopOffers(g.foeDraft, g.round, g.pool);
     tryBuys();
     tryBuys();
   }
@@ -610,44 +680,29 @@ export function runBotTurn(g: GameState): void {
   }
 }
 
-const FOE_SCALE: Record<Difficulty, { hp: number; atk: number; extra: number }> = {
-  normal: { hp: 1, atk: 1, extra: 0 },
-  hard: { hp: 1.2, atk: 1.12, extra: 0 },
-  mythic: { hp: 1.4, atk: 1.28, extra: 1 },
+const FOE_SCALE: Record<Difficulty, { hp: number; atk: number }> = {
+  normal: { hp: 1, atk: 1 },
+  hard: { hp: 1.1, atk: 1.06 },
+  mythic: { hp: 1.18, atk: 1.1 },
 };
 
 const BOSS_SCALE: Record<Difficulty, { hp: number; atk: number; as: number }> = {
   normal: { hp: 1, atk: 1, as: 1 },
-  hard: { hp: 1.25, atk: 1.15, as: 1.08 },
-  mythic: { hp: 1.5, atk: 1.3, as: 1.15 },
+  hard: { hp: 1.2, atk: 1.1, as: 1.05 },
+  mythic: { hp: 1.45, atk: 1.2, as: 1.1 },
 };
 
-export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal'): void {
-  const extra = g.mode === 'bot' ? FOE_SCALE[difficulty].extra : 0;
-  const n = Math.min(3 + Math.floor(g.round * 0.7) + extra, 12);
-  const ids = HEROES.map((h) => h.id)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, n);
+/** Practice sandbox only — ranked modes fight the persistent bot board. */
+export function makeFoeBoard(g: GameState): void {
+  const n = Math.min(3 + Math.floor(g.round * 0.7), 12);
+  const ids = shuffle(HEROES.map((h) => h.id)).slice(0, n);
   const cells: { r: number; c: number }[] = [];
   for (let r = 0; r < BOARD_SIDE_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) cells.push({ r, c });
-  cells.sort(() => Math.random() - 0.5);
+  const shuffledCells = shuffle(cells);
   g.foe = ids.map((hid, i) => {
-    let star: 1 | 2 | 3 =
-      g.round >= 9
-        ? Math.random() < 0.4
-          ? 3
-          : 2
-        : g.round >= 5
-          ? Math.random() < 0.5
-            ? 2
-            : 1
-          : 1;
-    if (g.mode === 'bot' && difficulty === 'mythic' && star < 3 && Math.random() < 0.22) {
-      star = (star + 1) as 2 | 3;
-    } else if (g.mode === 'bot' && difficulty === 'hard' && star === 1 && Math.random() < 0.18) {
-      star = 2;
-    }
-    const pos = cells[i];
+    const star: 1 | 2 | 3 =
+      g.round >= 9 ? (random() < 0.4 ? 3 : 2) : g.round >= 5 ? (random() < 0.5 ? 2 : 1) : 1;
+    const pos = shuffledCells[i];
     return { u: uid(), hid, star, relics: [], r: pos.r, c: pos.c };
   });
 }
@@ -713,7 +768,7 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
     cast2: false,
     boss: isBoss,
     bossKit: u.bossKit,
-    bossTaken: isBoss ? BOSS_DAMAGE_TAKEN : undefined,
+    bossTaken: isBoss ? BOSS_INCOMING_MULT : undefined,
     footprint: isBoss ? BOSS_FOOTPRINT : 1,
     rooted: isBoss,
   };
@@ -725,39 +780,53 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
   return o;
 }
 
-function teamDps(list: Combatant[]): number {
-  return list.reduce((s, u) => s + u.atk * u.as * (1 + (u.crit || 0) * (u.critDmg || 0)), 0);
+/**
+ * The damage one boss slam does at this round.
+ *
+ * The boss's whole output — board-wide autos plus its kit — is budgeted to wipe
+ * an idle reference board in BOSS_BOARD_SURVIVAL seconds. BOSS_AUTO_SHARE of
+ * that goes to the autos and the rest to the kit, spread over the measured cast
+ * period; the kit's own `slam` weight only decides how the three kits differ.
+ */
+export function bossCastDamage(round: number, kit: BossKitId): { slam: number; burnPerSec: number } {
+  const ref = refTeam(round);
+  const k = BOSS_KIT_SCALE[kit];
+  const perCast =
+    (ref.avgHp * (1 - BOSS_AUTO_SHARE) * BOSS_CAST_PERIOD_SECONDS) / BOSS_BOARD_SURVIVAL;
+  const total = perCast * k.slam;
+  const burnShare = k.burnShare ?? 0;
+  const burnSeconds = k.burnSeconds ?? 1;
+  return {
+    slam: total * (1 - burnShare),
+    burnPerSec: burnShare > 0 ? (total * burnShare) / burnSeconds : 0,
+  };
+}
+
+/** The attack that spends the autos' share of the same budget. */
+export function bossAttack(round: number): number {
+  const ref = refTeam(round);
+  return Math.max(BOSS_MIN_ATK, (ref.avgHp * BOSS_AUTO_SHARE) / (BOSS_AS * BOSS_BOARD_SURVIVAL));
 }
 
 /**
- * Pin every boss to the 4×4 anchor and set HP to at least 10× the living team's total HP.
- * Extra HP is added when player DPS (crit included) would burn that floor too fast,
- * because damage compounds harder than raw health.
+ * Fit every boss to the *reference* team for the round, not to the live board.
+ * Growing your board therefore makes the fight easier, which is the whole point
+ * of growing it; the round number alone decides how big the boss is.
+ *
+ * HP is whatever the reference team burns down in BOSS_BURN_SECONDS. That is
+ * deliberately well under BOSS_BOARD_SURVIVAL, and the gap between the two is
+ * the boss win rate: `roundMul` closes it as the match goes on, which is why
+ * round 12 is meant to be harder than round 4.
  */
-export function fitBossToTeam(
-  foes: Combatant[],
-  allies: Combatant[],
-  round: number,
-  opts?: { difficulty?: Difficulty; gauntlet?: boolean },
-): void {
+export function fitBossToTeam(foes: Combatant[], round: number, opts?: { gauntlet?: boolean }): void {
   const bosses = foes.filter((u) => u.boss);
   if (!bosses.length) return;
-  const teamHp = Math.max(
-    1,
-    allies.reduce((s, u) => s + Math.max(0, u.maxHp), 0),
-  );
-  const dps = Math.max(1, teamDps(allies));
-  const n = Math.max(1, allies.length);
-  const difficulty = opts?.difficulty ?? 'normal';
-  const taken = BOSS_TAKEN_BY_DIFFICULTY[difficulty];
-  const roundMul = 1 + Math.max(0, round - 1) * (opts?.gauntlet ? 0.09 : 0.04);
-  const floor = BOSS_HP_TEAM_MULT * teamHp * roundMul;
-  const effectiveDps = dps * taken;
-  const burn = floor / effectiveDps;
-  const pad = burn < BOSS_DPS_BURN_SECONDS ? BOSS_DPS_BURN_SECONDS / burn : 1;
-  const target = Math.max(1, Math.round(floor * pad));
-  const avgHp = teamHp / n;
-  const atk = Math.max(16, avgHp / (BOSS_AS * BOSS_BOARD_SURVIVAL));
+  const ref = refTeam(round);
+  const roundMul = bossRoundMul(round, !!opts?.gauntlet);
+  const byBurn = refEffectiveDps(round) * BOSS_INCOMING_MULT * BOSS_BURN_SECONDS * roundMul;
+  const floor = BOSS_HP_TEAM_MULT * ref.hp * roundMul;
+  const target = Math.max(1, Math.round(Math.max(byBurn, floor)));
+  const atk = bossAttack(round);
 
   bosses.forEach((b) => {
     b.maxHp = target;
@@ -771,7 +840,9 @@ export function fitBossToTeam(
     b.c = BOSS_ANCHOR.c;
     b.footprint = BOSS_FOOTPRINT;
     b.rooted = true;
-    b.bossTaken = taken;
+    b.bossTaken = BOSS_INCOMING_MULT;
+    b.bossRound = round;
+    b.bossGauntlet = !!opts?.gauntlet;
   });
 }
 
@@ -908,9 +979,20 @@ export class CombatEngine {
     ) => void,
     private onBanner: (text: string) => void,
     private onFx?: (fx: CombatFxPayload) => void,
+    /** Simulator hook for damage attribution — never affects combat. */
+    private onDamage?: (
+      src: Combatant | null,
+      target: Combatant,
+      amount: number,
+      kind: string,
+      fromCast: boolean,
+    ) => void,
   ) {}
 
-  private emitFx(src: Combatant, t: Combatant, kind: CombatFxKind) {
+  /** >0 while a cast is resolving, so the sim can split ability damage from autos. */
+  private castDepth = 0;
+
+  private emitFx(src: Combatant, t: Combatant, kind: CombatFxKind, amount = 0) {
     const from = unitCenter(src);
     const to = unitCenter(t);
     this.onFx?.({
@@ -921,13 +1003,30 @@ export class CombatEngine {
       toR: to.r,
       toC: to.c,
       melee: src.melee || this.dist(src, t) <= 1,
+      side: src.side,
+      amount,
+      share: t.maxHp > 0 ? amount / t.maxHp : 0,
     });
   }
 
-  dist(a: { r: number; c: number; footprint?: number; boss?: boolean }, b: { r: number; c: number; footprint?: number; boss?: boolean }) {
-    const ac = unitCenter(a);
-    const bc = unitCenter(b);
-    return Math.max(Math.abs(ac.r - bc.r), Math.abs(ac.c - bc.c));
+  /**
+   * Chebyshev distance between the two units' *footprints*.
+   *
+   * For 1×1 units this is exactly the old centre-to-centre distance. For a 4×4
+   * boss it is the distance to its nearest occupied cell, which is what makes
+   * the boss reachable at all: a melee hero attacks at distance ≤ 1, and the
+   * centre of a 4×4 block is 1.5 cells inside its own body, so measuring from
+   * the centre put every boss permanently out of melee range.
+   */
+  dist(
+    a: { r: number; c: number; footprint?: number; boss?: boolean },
+    b: { r: number; c: number; footprint?: number; boss?: boolean },
+  ) {
+    const af = unitFootprint(a);
+    const bf = unitFootprint(b);
+    const gap = (a0: number, aSize: number, b0: number, bSize: number) =>
+      Math.max(a0 - (b0 + bSize - 1), b0 - (a0 + aSize - 1), 0);
+    return Math.max(gap(a.r, af, b.r, bf), gap(a.c, af, b.c, bf));
   }
 
   target(u: Combatant): Combatant | null {
@@ -946,7 +1045,7 @@ export class CombatEngine {
   }
 
   private bossBasicAttack(u: Combatant) {
-    const crit = Math.random() < u.crit;
+    const crit = random() < Math.min(1, u.crit);
     const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
     const kind = crit ? 'crit' : 'phys';
     this.enemiesOf(u).forEach((o) => {
@@ -956,9 +1055,10 @@ export class CombatEngine {
 
   hurt(src: Combatant | null, t: Combatant, amount: number, kind: string): number {
     if (!t.alive) return 0;
-    let dmg = amount * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
-    if (kind === 'true') dmg = amount;
-    if (t.boss) dmg *= t.bossTaken ?? BOSS_DAMAGE_TAKEN;
+    const out = amount * (1 + (src?.dmgBuff || 0));
+    let dmg = out * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
+    if (kind === 'true') dmg = out;
+    if (t.boss) dmg *= t.bossTaken ?? BOSS_INCOMING_MULT;
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
       t.shield -= a;
@@ -966,6 +1066,7 @@ export class CombatEngine {
     }
     t.hp -= dmg;
     t.mana = Math.min(100, t.mana + 5);
+    if (dmg > 0) this.onDamage?.(src, t, dmg, kind, this.castDepth > 0);
     if (dmg > 0) {
       const popPos = unitCenter(t);
       const isCrit = kind === 'crit';
@@ -974,14 +1075,14 @@ export class CombatEngine {
         popPos.r,
         popPos.c,
         `-${Math.round(dmg)}`,
-        isMagic ? '#4C7BD1' : isCrit ? SAF : '#F2E9D4',
+        isMagic ? SKY : isCrit ? SAF : BONE,
         isCrit ? 'var(--crit-font)' : 'var(--damage-font)',
         isCrit ? 'crit' : 'damage',
       );
       if (src) {
         const fxKind: CombatFxKind =
           kind === 'magic' ? 'magic' : kind === 'crit' ? 'crit' : kind === 'true' ? 'true' : 'phys';
-        this.emitFx(src, t, fxKind);
+        this.emitFx(src, t, fxKind, dmg);
       }
     }
     if (src && src.lifesteal > 0 && dmg > 0)
@@ -990,7 +1091,7 @@ export class CombatEngine {
       t.alive = false;
       t.hp = 0;
       const popPos = unitCenter(t);
-      this.onPop(popPos.r, popPos.c, '✕', '#B4442B', 'var(--crit-font)', 'death');
+      this.onPop(popPos.r, popPos.c, '✕', RUST, 'var(--crit-font)', 'death');
     }
     return dmg;
   }
@@ -1001,7 +1102,7 @@ export class CombatEngine {
     if (t.hp <= 0) {
       t.hp = 0;
       t.alive = false;
-      this.onPop(t.r, t.c, '✕', '#B4442B', 'var(--crit-font)', 'death');
+      this.onPop(t.r, t.c, '✕', RUST, 'var(--crit-font)', 'death');
     }
   }
 
@@ -1011,7 +1112,7 @@ export class CombatEngine {
     if (got <= 0) return;
     u.hp += got;
     const popPos = unitCenter(u);
-    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, '#1B6B52', 'var(--heal-font)', 'heal');
+    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, JADE, 'var(--heal-font)', 'heal');
   }
 
   enemiesOf(u: Combatant) {
@@ -1077,24 +1178,28 @@ export class CombatEngine {
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
     const kit = (u.bossKit as BossKitId) || 'clay';
+    const k = BOSS_KIT_SCALE[kit];
+    const round = u.bossRound ?? 4;
+    // Kit magnitudes track the reference board's average unit, so a cast is
+    // always worth about the same fraction of a hero at every round.
+    const unit = refTeam(round).avgHp;
+    const cast = bossCastDamage(round, kit);
+    const slam = (cast.slam + sp) * m;
+    const shield = (unit * k.shield + sp) * m;
     const fxTarget = E[0] || u;
     this.emitFx(u, fxTarget, 'cast');
 
     if (kit === 'storm') {
-      E.forEach((o) => this.hurt(u, o, (190 + sp) * m, 'magic'));
-      A.forEach((a) => {
-        a.shield += (160 + sp) * m;
-        if (!a.buffAs) {
-          a.buffAs = 1.22;
-          a.as *= 1.22;
-          a.buffT = 4;
-        }
+      E.forEach((o) => this.hurt(u, o, slam, 'magic'));
+      A.forEach((ally) => {
+        ally.shield += shield;
+        this.applyAsBuff(ally, 1.22, 4);
       });
-      if (!u.buffAs) {
-        u.buffAs = 1.12;
-        u.as *= 1.12;
-        u.buffT = 4;
-      }
+      // "The court steels itself" — with the solo 4×4 boss there is no court to
+      // steel, so the ward lands on the boss instead of evaporating. Without
+      // this the round-8 boss was the only one with no defensive layer at all.
+      if (!A.length) u.shield += shield;
+      this.applyAsBuff(u, 1.12, 4);
       E.slice()
         .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)
         .slice(0, 2)
@@ -1106,29 +1211,38 @@ export class CombatEngine {
 
     if (kit === 'coil') {
       E.forEach((o) => {
-        this.hurt(u, o, (210 + sp) * m, 'magic');
-        o.burn = 32 * m;
-        o.burnT = 4;
+        this.hurt(u, o, slam, 'magic');
+        o.burn = cast.burnPerSec * m;
+        o.burnT = k.burnSeconds ?? 4;
         o.amp = Math.max(o.amp || 0, 0.16);
         o.silence = Math.max(o.silence, 1.4);
       });
       this.heal(u, Math.round(u.maxHp * 0.035));
       u.lifesteal = Math.min(0.35, (u.lifesteal || 0) + 0.08);
-      u.shield += (180 + sp) * m;
+      u.shield += shield;
       return;
     }
 
     // clay — default
     E.forEach((o) => {
-      this.hurt(u, o, (170 + sp) * m, 'magic');
+      this.hurt(u, o, slam, 'magic');
       o.snare = Math.max(o.snare, 2.2);
       o.amp = Math.max(o.amp || 0, 0.14);
     });
-    u.shield += (300 + sp) * m;
+    u.shield += shield;
     u.dr = Math.min(0.5, (u.dr || 0) + 0.1);
   }
 
   cast(u: Combatant, t: Combatant) {
+    this.castDepth++;
+    try {
+      this.castInner(u, t);
+    } finally {
+      this.castDepth--;
+    }
+  }
+
+  private castInner(u: Combatant, t: Combatant) {
     u.mana = 0;
     if (u.boss) {
       this.bossCast(u);
@@ -1136,208 +1250,202 @@ export class CombatEngine {
     }
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
+    const a = ABILITIES[u.hid];
     this.emitFx(u, t, 'cast');
     const E = this.enemiesOf(u);
     const A = this.alliesOf(u);
     const near = (n: number) =>
       E.slice()
-        .sort((a, b) => this.dist(u, a) - this.dist(u, b))
+        .sort((x, y) => this.dist(u, x) - this.dist(u, y))
         .slice(0, n);
+    /** A magnitude at this star, with spell power folded in. */
+    const mag = (base: number) => (base + sp) * m;
+
+    if (!a) {
+      this.hurt(u, t, mag(200), 'magic');
+      return;
+    }
 
     switch (u.hid) {
-      case 'boss': {
-        const slam = 220 + sp + u.star * 40;
-        E.forEach((o) => this.hurt(u, o, slam, 'magic'));
-        break;
-      }
       case 'jorm': {
         let tot = 0;
         E.forEach((o) => {
-          if (this.dist(u, o) <= 1) tot += this.hurt(u, o, (220 + sp) * m, 'magic');
+          if (this.dist(u, o) <= 1) tot += this.hurt(u, o, mag(a.base), 'magic');
         });
         u.hp = Math.min(u.maxHp, u.hp + tot / 2);
         break;
       }
       case 'quetz': {
         const hit = E.filter((o) => o.c === t.c || this.dist(u, o) <= 2);
-        const per = ((300 + sp) * m) / Math.max(1, hit.length);
+        const per = mag(a.base) / Math.max(1, hit.length);
         hit.forEach((o) => this.hurt(u, o, per, 'magic'));
-        A.forEach((a) => {
-          if (!a.buffAs) {
-            a.buffAs = 1.25;
-            a.as *= 1.25;
-            a.buffT = 4;
-          }
-        });
+        A.forEach((ally) => this.applyAsBuff(ally, 1.25, a.duration ?? 4));
         break;
       }
       case 'thund':
         near(3).forEach((o, i) =>
-          this.hurt(u, o, (180 + sp) * m * (i ? 1 + u.critDmg : 1), i ? 'crit' : 'magic'),
+          this.hurt(u, o, mag(a.base) * (i ? 1 + u.critDmg : 1), i ? 'crit' : 'magic'),
         );
         break;
       case 'anans':
         near(2).forEach((o) => {
-          o.snare = 2;
+          o.snare = a.duration ?? 2;
           o.amp = 0.2;
         });
         break;
       case 'bunyi': {
-        const b = E.slice().sort((a, c) => c.atk - a.atk)[0];
+        const b = E.slice().sort((x, y) => y.atk - x.atk)[0];
         if (b) {
-          this.hurt(u, b, (160 + sp) * m, 'magic');
-          b.silence = 3;
+          this.hurt(u, b, mag(a.base), 'magic');
+          b.silence = a.duration ?? 3;
         }
         break;
       }
       case 'garud':
-        this.hurt(u, t, (260 + sp) * m, 'phys');
-        u.shield += 300 * m;
+        this.hurt(u, t, mag(a.base), 'phys');
+        u.shield += (a.secondary ?? 0) * m;
         break;
       case 'kitsu':
-        for (let i = 0; i < 9; i++) {
-          const o = E[Math.floor(Math.random() * E.length)];
+        for (let i = 0; i < (a.secondary ?? 9); i++) {
+          const o = E[Math.floor(random() * E.length)];
           if (!o) break;
-          const crit = Math.random() < u.crit;
-          this.hurt(u, o, (70 + sp / 3) * m * (crit ? 1 + u.critDmg : 1), crit ? 'crit' : 'magic');
+          const crit = random() < Math.min(1, u.crit);
+          this.hurt(u, o, (a.base + sp / 3) * m * (crit ? 1 + u.critDmg : 1), crit ? 'crit' : 'magic');
         }
         break;
       case 'ifrit':
         E.forEach((o) => {
           if (this.dist(o, t) <= 1) {
-            this.hurt(u, o, (280 + sp) * m, 'magic');
-            o.burn = 40 * m;
-            o.burnT = 4;
+            this.hurt(u, o, mag(a.base), 'magic');
+            o.burn = (a.secondary ?? 0) * m;
+            o.burnT = a.duration ?? 4;
           }
         });
         break;
       case 'zirni':
-        near(3).forEach((o) => this.hurt(u, o, (200 + sp) * m, 'magic'));
+        near(3).forEach((o) => this.hurt(u, o, mag(a.base), 'magic'));
         if (!u.cast2 && u.hp < u.maxHp * 0.35) {
           u.cast2 = true;
           u.mana = 100;
         }
         break;
       case 'taniw':
-        A.forEach((a) => {
-          a.shield += (220 + sp) * m;
-          a.dmgBuff = 0.15;
+        A.forEach((ally) => {
+          ally.shield += mag(a.base);
+          ally.dmgBuff = 0.15;
+          ally.dmgBuffT = 4;
         });
         break;
       case 'anzuu': {
-        const b = E.slice().sort((a, c) => c.mana - a.mana)[0];
+        const b = E.slice().sort((x, y) => y.mana - x.mana)[0];
         if (b) {
-          b.sp = (b.sp || 0) - 25;
-          u.sp = (u.sp || 0) + 25;
+          b.sp = (b.sp || 0) - a.base;
+          u.sp = (u.sp || 0) + a.base;
           u.atk *= 1.08;
         }
         break;
       }
       case 'sphin':
         E.slice()
-          .sort((a, b2) => a.hp - b2.hp)
+          .sort((x, y) => x.hp - y.hp)
           .slice(0, 2)
           .forEach((o) => {
-            o.stun = 2.5;
-            this.hurt(u, o, (240 + sp) * m, 'true');
+            o.stun = a.duration ?? 2.5;
+            this.hurt(u, o, mag(a.base), 'true');
           });
         break;
       case 'kelpi': {
         const b = near(1)[0];
         if (b) {
-          const dealt = this.hurt(u, b, (150 + sp) * m, 'magic');
-          b.snare = 2.5;
+          const dealt = this.hurt(u, b, mag(a.base), 'magic');
+          b.snare = a.duration ?? 2.5;
           this.heal(u, dealt / 2);
         }
         break;
       }
       case 'barng':
-        A.forEach((a) => {
-          a.stun = 0;
-          a.snare = 0;
-          a.shield += (160 + sp) * m;
+        A.forEach((ally) => {
+          ally.stun = 0;
+          ally.snare = 0;
+          ally.shield += mag(a.base);
         });
         break;
       case 'coyot': {
-        const o = E[Math.floor(Math.random() * E.length)];
+        const o = E[Math.floor(random() * E.length)];
         if (o) {
-          this.hurt(u, o, (140 + sp) * m, 'magic');
-          o.stun = 1.5;
+          this.hurt(u, o, mag(a.base), 'magic');
+          o.stun = a.duration ?? 1.5;
         }
-        A.forEach((a) => {
-          a.crit += 0.15;
+        A.forEach((ally) => {
+          ally.crit = Math.min(1, ally.crit + 0.15);
         });
         break;
       }
       case 'griff': {
-        const ally = A.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || u;
-        ally.shield += (250 + sp) * m;
+        const ally = A.slice().sort((x, y) => x.hp / x.maxHp - y.hp / y.maxHp)[0] || u;
+        ally.shield += mag(a.secondary ?? 0);
         E.forEach((o) => {
-          if (this.dist(ally, o) <= 1) this.hurt(u, o, (180 + sp) * m, 'phys');
+          if (this.dist(ally, o) <= 1) this.hurt(u, o, mag(a.base), 'phys');
         });
         break;
       }
       case 'golem':
-        u.shield += (320 + sp) * m;
+        u.shield += mag(a.secondary ?? 0);
         E.forEach((o) => {
-          if (this.dist(u, o) <= 1) this.hurt(u, o, (90 + sp) * m, 'magic');
+          if (this.dist(u, o) <= 1) this.hurt(u, o, mag(a.base), 'magic');
         });
         break;
       case 'bansh': {
-        const o = E.slice().sort((a, b) => a.hp - b.hp)[0];
+        const o = E.slice().sort((x, y) => x.hp - y.hp)[0];
         if (o) {
-          o.stun = 2;
+          o.stun = a.duration ?? 2;
           const exec = o.hp < o.maxHp * 0.4;
-          this.hurt(u, o, (200 + sp) * m, exec ? 'true' : 'magic');
+          this.hurt(u, o, mag(a.base), exec ? 'true' : 'magic');
         }
         break;
       }
       case 'hydra': {
         let hits = 0;
         near(3).forEach((o) => {
-          this.hurt(u, o, (160 + sp) * m, 'magic');
+          this.hurt(u, o, mag(a.base), 'magic');
           hits++;
         });
-        this.heal(u, 40 * m * hits);
+        this.heal(u, (a.secondary ?? 0) * m * hits);
         break;
       }
       case 'nuwa':
         A.slice()
-          .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)
+          .sort((x, y) => x.hp / x.maxHp - y.hp / y.maxHp)
           .slice(0, 2)
-          .forEach((a) => {
-            this.heal(a, (200 + sp) * m);
-            a.dr = Math.min(0.6, (a.dr || 0) + 0.15);
+          .forEach((ally) => {
+            this.heal(ally, mag(a.base));
+            ally.dr = Math.min(0.6, (ally.dr || 0) + 0.15);
           });
         break;
       case 'camaz': {
         const nearTarget = near(1)[0] || t;
-        const dealt = this.hurt(u, nearTarget, (240 + sp) * m, 'phys');
+        const dealt = this.hurt(u, nearTarget, mag(a.base), 'phys');
         this.heal(u, dealt);
         break;
       }
       case 'simur':
-        A.forEach((a) => {
-          this.heal(a, (160 + sp) * m);
-          if (!a.buffAs) {
-            a.buffAs = 1.2;
-            a.as *= 1.2;
-            a.buffT = 4;
-          }
+        A.forEach((ally) => {
+          this.heal(ally, mag(a.base));
+          this.applyAsBuff(ally, 1.2, a.duration ?? 4);
         });
-        near(2).forEach((o) => this.hurt(u, o, (200 + sp) * m, 'magic'));
+        near(2).forEach((o) => this.hurt(u, o, mag(a.secondary ?? 0), 'magic'));
         break;
       case 'levia':
         E.forEach((o) => {
           if (this.dist(u, o) <= 2) {
-            this.hurt(u, o, (220 + sp) * m, 'magic');
-            o.snare = 1.5;
+            this.hurt(u, o, mag(a.base), 'magic');
+            o.snare = a.duration ?? 1.5;
           }
         });
         break;
       case 'wendi': {
-        const steal = Math.round(t.hp * 0.1);
-        this.hurt(u, t, (280 + sp) * m, 'phys');
+        const steal = Math.round(t.hp * (a.secondary ?? 0.1));
+        this.hurt(u, t, mag(a.base), 'phys');
         if (steal > 0) {
           u.maxHp += steal;
           this.heal(u, steal);
@@ -1346,8 +1454,16 @@ export class CombatEngine {
         break;
       }
       default:
-        this.hurt(u, t, (200 + sp) * m, 'magic');
+        this.hurt(u, t, mag(a.base), 'magic');
     }
+  }
+
+  /** One attack-speed buff at a time, restored when `buffT` runs out. */
+  private applyAsBuff(u: Combatant, mul: number, seconds: number) {
+    if (u.buffAs) return;
+    u.buffAs = mul;
+    u.as *= mul;
+    u.buffT = seconds;
   }
 
   simTick(dt: number) {
@@ -1366,6 +1482,10 @@ export class CombatEngine {
           u.as /= u.buffAs;
           u.buffAs = 0;
         }
+      }
+      if (u.dmgBuffT && u.dmgBuffT > 0) {
+        u.dmgBuffT -= dt;
+        if (u.dmgBuffT <= 0) u.dmgBuff = 0;
       }
       if (u.stun > 0) return;
       const t = this.target(u);
@@ -1386,7 +1506,7 @@ export class CombatEngine {
           if (u.boss) {
             this.bossBasicAttack(u);
           } else {
-            const crit = Math.random() < u.crit;
+            const crit = random() < Math.min(1, u.crit);
             const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
             this.hurt(u, t, dmg, crit ? 'crit' : 'phys');
           }
@@ -1453,6 +1573,7 @@ export const gameActions = {
     if (g.gold < cost || g.bench.length >= 8) return;
     g.gold -= cost;
     g.shop = g.shop.map((s, j) => (j === i ? null : s));
+    takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
     g.bench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   },
 
@@ -1463,6 +1584,7 @@ export const gameActions = {
     if (idx < 0) return;
     const un = list[idx];
     g.gold += sellValue(un);
+    returnToPool(g, un.hid, unitCopies(un));
     list.splice(idx, 1);
     g.sel = null;
   },
@@ -1519,15 +1641,21 @@ export const gameActions = {
     g.sel = null;
   },
 
-  resolveRound(g: GameState, win: boolean, maxR: number): OverlayKind {
+  resolveRound(
+    g: GameState,
+    win: boolean,
+    maxR: number,
+    survivors?: { me: number; foe: number },
+  ): OverlayKind {
     g.phase = 'result';
+    if (survivors) g.lastSurvivors = survivors;
     if (g.mode === 'practice') {
       return { kind: 'spar' as const, win };
     }
     if (g.mode === 'gauntlet') {
-      const enc = getGauntletEncounter(g.round, boardPower(g.board));
+      const enc = getGauntletEncounter(g.round);
       if (win) {
-        g.lossStreak = 0;
+        g.streak = Math.max(0, g.streak) + 1;
         g.gold += enc.reward.gold;
         g.freeRerolls += enc.reward.freeRerolls;
         g.gauntletRoundsCleared = g.round;
@@ -1540,7 +1668,7 @@ export const gameActions = {
           boss: { name: enc.name, period: enc.period, reward: enc.reward },
         };
       }
-      g.lossStreak++;
+      g.streak = Math.min(0, g.streak) - 1;
       g.gauntletLives = Math.max(0, (g.gauntletLives ?? GAUNTLET.startLives) - 1);
       g.gauntletGoldPenalty = GAUNTLET.goldPenalty;
       g.lastResult = { win: false, dmg: 0, boss: true };
@@ -1560,7 +1688,7 @@ export const gameActions = {
     let dmg = 0;
     if (boss) {
       if (win) {
-        g.lossStreak = 0;
+        g.streak = Math.max(0, g.streak) + 1;
         g.gold += boss.reward.gold;
         g.freeRerolls += boss.reward.freeRerolls;
         g.lastResult = { win: true, dmg: 0, boss: true };
@@ -1574,8 +1702,8 @@ export const gameActions = {
           boss: { name: boss.name, period: boss.period, reward: boss.reward },
         };
       }
-      g.lossStreak++;
-      dmg = lossDamage(g.round, g.lossStreak);
+      g.streak = Math.min(0, g.streak) - 1;
+      dmg = lossDamage(g.round, BOSS_SURVIVOR_COUNT, true);
       g.myHp = Math.max(0, g.myHp - dmg);
       g.lastResult = { win: false, dmg, boss: true };
       const over = g.myHp <= 0 || g.foeHp <= 0 || g.round >= maxR;
@@ -1589,24 +1717,24 @@ export const gameActions = {
       };
     }
     if (win) {
-      g.foeLossStreak++;
-      g.lossStreak = 0;
-      dmg = lossDamage(g.round, g.foeLossStreak);
+      g.streak = Math.max(0, g.streak) + 1;
+      g.foeStreak = Math.min(0, g.foeStreak) - 1;
+      dmg = lossDamage(g.round, g.lastSurvivors.me);
       g.foeHp = Math.max(0, g.foeHp - dmg);
     } else {
-      g.lossStreak++;
-      g.foeLossStreak = 0;
-      dmg = lossDamage(g.round, g.lossStreak);
+      g.streak = Math.min(0, g.streak) - 1;
+      g.foeStreak = Math.max(0, g.foeStreak) + 1;
+      dmg = lossDamage(g.round, g.lastSurvivors.foe);
       g.myHp = Math.max(0, g.myHp - dmg);
     }
     g.lastResult = { win, dmg, boss: false };
     const over = g.myHp <= 0 || g.foeHp <= 0 || g.round >= maxR;
     if (over) return { kind: 'over' as const, win: g.foeHp <= 0 || (g.myHp > 0 && g.foeHp < g.myHp) };
-    const offer = win && (g.round % 2 === 1 || g.round >= 7);
+    const offer = RELIC_ROUNDS.includes(g.round as (typeof RELIC_ROUNDS)[number]);
     return { kind: 'result' as const, win, dmg, offer };
   },
 
-  nextRound(g: GameState, draft: string[]) {
+  nextRound(g: GameState, draft: string[], difficulty: Difficulty = 'normal') {
     const pvpWin = g.lastResult && !g.lastResult.boss ? g.lastResult.win : null;
     const botPvpWin = g.lastResult && !g.lastResult.boss ? !g.lastResult.win : null;
     g.round++;
@@ -1614,7 +1742,7 @@ export const gameActions = {
     g.sel = null;
     if (g.mode === 'practice') {
       g.foe = [];
-      rollShop(g, draft, true);
+      rollShop(g, draft);
       return;
     }
     if (g.mode === 'gauntlet') {
@@ -1623,14 +1751,19 @@ export const gameActions = {
         g.gold = Math.max(0, g.gold - penalty);
         g.gauntletGoldPenalty = 0;
       }
-      g.gold += gauntletRoundIncome(g.round);
-      rollShop(g, draft, true);
+      g.gold += gauntletRoundIncome(g.round, g.gold);
+      rollShop(g, draft);
       return;
     }
-    g.gold += roundIncome(g.round, pvpWin);
-    g.foeGold += roundIncome(g.round, botPvpWin);
-    rollShop(g, draft, true);
+    g.gold += incomeBreakdown(g.round, g.gold, g.streak, pvpWin).total;
+    g.foeGold +=
+      incomeBreakdown(g.round, g.foeGold, g.foeStreak, botPvpWin).total +
+      BOT_INCOME_BONUS[difficulty];
+    rollShop(g, draft);
     runBotTurn(g);
+    if (RELIC_ROUNDS.includes(g.round as (typeof RELIC_ROUNDS)[number]) || isBossRound(g.round, g.matchRounds)) {
+      grantBotRelic(g);
+    }
   },
 
   bindRelic(_g: GameState, rid: string, u: Unit) {
@@ -1651,13 +1784,21 @@ export function traitCard(name: string, counts: Record<string, number>) {
     glyph: def.glyph,
     desc: def.desc,
     countLabel: `${n} on board`,
-    cardBg: best ? '#F2E9D4' : '#ece2ca',
-    headBg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#E8A317' : '#14120E') : '#d8cdb2',
-    headFg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#14120E' : '#F2E9D4') : '#6b6455',
+    cardBg: best ? 'var(--om-card)' : 'var(--om-surface-2)',
+    headBg: best
+      ? best >= def.tiers[def.tiers.length - 1][0]
+        ? 'var(--om-accent)'
+        : 'var(--om-hud-bg)'
+      : 'var(--om-surface-3)',
+    headFg: best
+      ? best >= def.tiers[def.tiers.length - 1][0]
+        ? 'var(--om-on-accent)'
+        : 'var(--om-hud-fg)'
+      : 'var(--om-muted)',
     tiers: def.tiers.map(([need, text]) => ({
       n: need,
       text,
-      fg: n >= need ? '#14120E' : '#a99f86',
+      fg: n >= need ? 'var(--om-fg)' : 'var(--om-muted-2)',
       mark: n >= need ? '●' : '○',
     })),
   };
@@ -1675,20 +1816,22 @@ export function classCard(name: string, counts: Record<string, number>) {
     glyph: def.glyph,
     desc: def.desc,
     countLabel: `${n} drafted`,
-    cardBg: best ? '#e7dcc2' : '#ece2ca',
-    headBg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#4C7BD1' : '#14120E') : '#d8cdb2',
-    headFg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#F2E9D4' : '#F2E9D4') : '#6b6455',
+    cardBg: best ? 'var(--om-surface-2)' : 'var(--om-surface-3)',
+    headBg: best
+      ? best >= def.tiers[def.tiers.length - 1][0]
+        ? 'var(--om-info)'
+        : 'var(--om-hud-bg)'
+      : 'var(--om-surface-3)',
+    headFg: best ? 'var(--om-hud-fg)' : 'var(--om-muted)',
     tiers: def.tiers.map(([need, text]) => ({
       n: need,
       text,
-      fg: n >= need ? '#14120E' : '#a99f86',
+      fg: n >= need ? 'var(--om-fg)' : 'var(--om-muted-2)',
       mark: n >= need ? '●' : '○',
     })),
   };
 }
 
 export function pickRelics(count = 3): string[] {
-  return RELICS.map((r) => r.id)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, count);
+  return shuffle(RELICS.map((r) => r.id)).slice(0, count);
 }

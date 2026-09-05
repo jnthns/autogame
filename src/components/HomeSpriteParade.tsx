@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { BONE, INK, JADE, RUST, SAF, costTone } from '../data/constants';
+import { useMemo, type CSSProperties } from 'react';
+import { INK, JADE, RUST, SAF, costTone } from '../data/constants';
 import { HEROES } from '../data/heroes';
 import { spriteCss } from '../data/sprites';
 import { PixelSprite } from './PixelSprite';
@@ -11,10 +11,10 @@ const SPARKLES = [
   { left: '22%', top: '68%', delay: 1.2, glyph: '✷', color: RUST },
   { left: '78%', top: '18%', delay: 0.6, glyph: '☖', color: JADE },
   { left: '88%', top: '55%', delay: 1.8, glyph: '⌃', color: SAF },
-  { left: '52%', top: '8%', delay: 2.4, glyph: '≋', color: '#7A3E9D' },
+  { left: '52%', top: '8%', delay: 2.4, glyph: '≋', color: 'var(--om-violet)' },
   { left: '65%', top: '78%', delay: 0.9, glyph: '⌇', color: JADE },
   { left: '12%', top: '42%', delay: 2.1, glyph: '⁂', color: RUST },
-  { left: '92%', top: '32%', delay: 1.5, glyph: '⏄', color: '#4C7BD1' },
+  { left: '92%', top: '32%', delay: 1.5, glyph: '⏄', color: 'var(--om-sky)' },
 ];
 
 const GLYPHS = ['☰', '☱', '☲', '☳', '☴', '☵', '☶', '☷', '✧', '✷', '⌃', '≋'];
@@ -43,13 +43,8 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
       }}
     >
       <div
-        style={{
-          display: 'flex',
-          width: 'max-content',
-          gap: 10,
-          padding: '10px 0',
-          animation: `${direction === 'left' ? 'omMarqueeLeft' : 'omMarqueeRight'} ${duration}s linear infinite`,
-        }}
+        className={`om-marquee om-marquee--${direction === 'left' ? 'left' : 'right'}`}
+        style={{ '--parade-marquee-dur': `${duration}s` } as CSSProperties}
       >
         {track.map((id, i) => {
           const hero = HEROES.find((h) => h.id === id)!;
@@ -58,18 +53,12 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
           return (
             <div
               key={`${id}-${i}`}
-              style={{
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 4,
-                animation: `omHomeBob 2.8s ease-in-out ${delay}s infinite`,
-              }}
+              className="om-parade-bob"
+              style={{ '--delay': `${delay}s` } as CSSProperties}
             >
               <div
                 style={{
-                  background: BONE,
+                  background: 'var(--om-card)',
                   border: `3px solid ${INK}`,
                   boxShadow: `3px 3px 0 ${costTone(hero.cost)}`,
                   padding: 6,
@@ -91,7 +80,7 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
                   fontSize: 8,
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
-                  color: '#6b6455',
+                  color: 'var(--om-muted)',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -120,17 +109,13 @@ export function HomeSpriteParade({ unboundIds = HERO_IDS }: HomeSpriteParadeProp
         <span
           key={i}
           aria-hidden
+          className="om-parade-sparkle"
           style={{
-            position: 'absolute',
             left: s.left,
             top: s.top,
-            fontSize: 14,
             color: s.color,
-            opacity: 0.75,
-            pointerEvents: 'none',
-            animation: `omHomeSparkle 3.2s ease-in-out ${s.delay}s infinite`,
-            zIndex: 2,
-          }}
+            '--delay': `${s.delay}s`,
+          } as CSSProperties}
         >
           {s.glyph}
         </span>
@@ -146,14 +131,7 @@ export function HomeSpriteParade({ unboundIds = HERO_IDS }: HomeSpriteParadeProp
           opacity: 0.35,
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            width: 'max-content',
-            gap: 18,
-            animation: 'omGlyphDrift 28s linear infinite',
-          }}
-        >
+        <div className="om-glyph-drift">
           {[...GLYPHS, ...GLYPHS, ...GLYPHS].map((g, i) => (
             <span
               key={i}

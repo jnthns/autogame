@@ -1,3 +1,5 @@
+import type { CopyPool } from '../data/economy';
+
 export type Screen = 'home' | 'modes' | 'build' | 'game' | 'settings';
 export type GameMode = 'practice' | 'bot' | 'marathon' | 'gauntlet';
 export type Phase = 'plan' | 'combat' | 'result';
@@ -43,8 +45,11 @@ export interface GameState {
   myHp: number;
   foeHp: number;
   maxHp: number;
-  lossStreak: number;
-  foeLossStreak: number;
+  /** Signed: +n wins in a row, −n losses in a row. */
+  streak: number;
+  foeStreak: number;
+  /** Units left standing on each side after the last fight. */
+  lastSurvivors: { me: number; foe: number };
   bench: Unit[];
   board: Unit[];
   foe: Unit[];
@@ -54,10 +59,15 @@ export interface GameState {
   foeShop: (ShopOffer | null)[];
   shop: (ShopOffer | null)[];
   freeRerolls: number;
+  /**
+   * Copies of each hero left in the shared pool, or null in the practice
+   * sandbox — a mode with 999 gold and free rolls would drain a pool in six
+   * rolls and stop being a place to try board compositions.
+   */
+  pool: CopyPool | null;
   sel: Selection | null;
   speed: number;
   phase: Phase;
-  log: string;
   lastResult: { win: boolean; dmg: number; boss?: boolean } | null;
   /** Gauntlet-only: remaining lives (starts at 3). */
   gauntletLives?: number;
@@ -93,6 +103,11 @@ export interface CombatFx {
   toR: number;
   toC: number;
   melee: boolean;
+  /** Which side threw it, and how much it landed for — the shake gate reads both. */
+  side: 'me' | 'foe';
+  amount: number;
+  /** The hit as a fraction of the target's max HP. */
+  share: number;
   t: number;
 }
 
@@ -162,13 +177,18 @@ export interface Combatant {
   cast2: boolean;
   buffT?: number;
   buffAs?: number;
+  /** Outgoing damage bonus (Taniwha), and the seconds left on it. */
   dmgBuff?: number;
+  dmgBuffT?: number;
   /** Grid footprint in cells (1 = normal, 4 = multi-tile boss). */
   footprint?: number;
   boss?: boolean;
   bossKit?: string;
-  /** Incoming damage multiplier vs this boss (set from trial difficulty). */
+  /** Incoming damage multiplier vs this boss. */
   bossTaken?: number;
+  /** The round this boss was fitted for — its kit scales off the same curve. */
+  bossRound?: number;
+  bossGauntlet?: boolean;
   rooted?: boolean;
 }
 

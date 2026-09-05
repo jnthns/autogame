@@ -1,9 +1,11 @@
 import { BOSS_ANCHOR, GAUNTLET, GAUNTLET_BOARD_CAPS } from '../data/constants';
+import { INTEREST_MAX, INTEREST_PER } from '../data/economy';
 import { HERO_MAP } from '../data/heroes';
 import { CLASSES, type ClassName } from '../data/classes';
 import { GAUNTLET_RELIC_IDS, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
 import { BOSS_ENCOUNTERS, type BossEncounter, type BossUnitSpec, rewardLines } from './hyperRoll';
+import { shuffle } from './rng';
 import type { Unit } from './types';
 
 export { rewardLines };
@@ -52,14 +54,6 @@ export function boardPower(board: Unit[]): number {
   return units + synergyBonus;
 }
 
-function roundScale(round: number): number {
-  return 1 + (round - 1) * GAUNTLET.roundScalePerRound;
-}
-
-function powerScale(power: number): number {
-  return 1 + power / GAUNTLET.boardPowerDivisor;
-}
-
 function scaledStar(base: 1 | 2 | 3, round: number): 1 | 2 | 3 {
   if (round >= 30) return 3;
   if (round >= 15) return base >= 2 ? 3 : 2;
@@ -67,23 +61,23 @@ function scaledStar(base: 1 | 2 | 3, round: number): 1 | 2 | 3 {
   return base;
 }
 
-function buildScaledUnits(template: BossUnitSpec[], round: number, power: number): BossUnitSpec[] {
-  const rs = roundScale(round);
-  const ps = powerScale(power);
-  const combined = rs * ps;
+/**
+ * Gauntlet encounters are a solo 4×4 boss whose HP and attack are fitted to the
+ * live player board in combat, so the only thing scaling here is the star.
+ */
+function buildScaledUnits(template: BossUnitSpec[], round: number): BossUnitSpec[] {
   return template.map((spec) => ({
     ...spec,
     star: scaledStar(spec.star, round),
-    // The 4×4 boss HP/ATK is fitted to the live player board in combat; minions still scale.
-    scaleHp: spec.boss ? 1 : spec.scaleHp * combined,
-    scaleAtk: spec.boss ? 1 : spec.scaleAtk * Math.sqrt(combined),
+    scaleHp: 1,
+    scaleAtk: 1,
     boss: spec.boss ?? false,
     bossKit: spec.bossKit,
   }));
 }
 
-/** Rotate boss templates and scale by round number + player board power. */
-export function getGauntletEncounter(round: number, power: number): BossEncounter {
+/** Rotate boss templates by round; the boss itself is fitted to the board in combat. */
+export function getGauntletEncounter(round: number): BossEncounter {
   const template = BOSS_ENCOUNTERS[(round - 1) % BOSS_ENCOUNTERS.length];
   const period = Math.min(4, Math.ceil(round / 4));
   const suffix = round > BOSS_ENCOUNTERS.length ? ` · Wave ${round}` : '';
@@ -93,7 +87,7 @@ export function getGauntletEncounter(round: number, power: number): BossEncounte
     id: `${template.id}-w${round}`,
     name: `${template.name}${suffix}`,
     blurb: template.blurb,
-    units: buildScaledUnits(template.units, round, power),
+    units: buildScaledUnits(template.units, round),
     reward: {
       gold: gauntletGoldReward(round),
       freeRerolls: round >= 12 ? 2 : round >= 6 ? 1 : 0,
@@ -106,8 +100,10 @@ export function gauntletGoldReward(round: number): number {
   return GAUNTLET.baseGoldReward + round * GAUNTLET.goldPerRound;
 }
 
-export function gauntletRoundIncome(round: number): number {
-  return GAUNTLET.baseRoundIncome + Math.min(4, Math.floor(round / 5));
+/** Same interest term as the ranked modes, on top of the gauntlet's own base. */
+export function gauntletRoundIncome(round: number, goldHeld = 0): number {
+  const interest = Math.min(INTEREST_MAX, Math.floor(Math.max(0, goldHeld) / INTEREST_PER));
+  return GAUNTLET.baseRoundIncome + Math.min(4, Math.floor(round / 5)) + interest;
 }
 
 export function gauntletBoardCap(round: number): number {
@@ -115,8 +111,8 @@ export function gauntletBoardCap(round: number): number {
   return Math.min(12, 10 + Math.floor((round - GAUNTLET_BOARD_CAPS.length) / 4));
 }
 
-export function makeGauntletBossUnits(round: number, power: number): Unit[] {
-  const enc = getGauntletEncounter(round, power);
+export function makeGauntletBossUnits(round: number): Unit[] {
+  const enc = getGauntletEncounter(round);
   return enc.units.map((spec, i) => {
     const isBoss = spec.boss ?? i === 0;
     return {
@@ -145,10 +141,7 @@ export function pickGauntletRelics(round: number, count = 3): string[] {
     round >= GAUNTLET.exclusiveRelicRound && exclusive.length
       ? [...standard, ...exclusive, ...exclusive]
       : standard;
-  return pool
-    .slice()
-    .sort(() => Math.random() - 0.5)
-    .slice(0, count);
+  return shuffle(pool).slice(0, count);
 }
 
 export function gauntletMilestoneRound(round: number): 'cost4' | 'cost5' | null {
