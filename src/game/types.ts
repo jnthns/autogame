@@ -95,6 +95,11 @@ export interface CombatFx {
   toR: number;
   toC: number;
   melee: boolean;
+  /** Which side threw it, and how much it landed for — the shake gate reads both. */
+  side: 'me' | 'foe';
+  amount: number;
+  /** The hit as a fraction of the target's max HP. */
+  share: number;
   t: number;
 }
 

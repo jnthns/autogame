@@ -17,7 +17,8 @@
     "audit:budget": "tsx scripts/balance-audit.ts",
     "check:styles": "node scripts/check-styles.mjs",
     "prebuild": "node scripts/check-styles.mjs",
-    "screens": "node scripts/screens.mjs"
+    "screens": "node scripts/screens.mjs",
+    "perf:combat": "node scripts/perf-combat.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",

@@ -17,9 +17,14 @@ const INK = '#14120E';
 /** Scale a VFX dimension relative to --unit-size (34px baseline). */
 const u = (factor: number) => `calc(var(--unit-size) * ${factor})`;
 
-const BOLT_DUR = '0.5s';
-const SLASH_DUR = '0.45s';
-const ZIGZAG_DUR = '0.5s';
+/**
+ * FX timings come off the motion scale, so reduced motion zeroes them with
+ * everything else. `--dur-slow` is the long streak, `--dur-base` the short pop.
+ */
+const BOLT_DUR = 'var(--dur-slow)';
+const SLASH_DUR = 'var(--dur-slow)';
+const ZIGZAG_DUR = 'var(--dur-slow)';
+const POP_DUR = 'var(--dur-base)';
 
 function Pos({
   left,
@@ -181,7 +186,7 @@ function WispBolt({ from, target, profile }: { from: { left: number; top: number
             background: profile.bolt,
             border: `2px solid ${INK}`,
             boxShadow: `0 0 6px ${profile.glow}`,
-            animation: 'omWisp 0.32s ease-out forwards',
+            animation: `omWisp ${POP_DUR} ease-out forwards`,
             zIndex: 28,
             pointerEvents: 'none',
           }}
@@ -218,7 +223,7 @@ function WebHit({ target, profile, melee, large }: { target: { left: number; top
   const ring = `calc(${size} * 0.55)`;
   return (
     <Pos left={target.left} top={target.top} zIndex={29}>
-      <div style={{ position: 'relative', width: size, height: size, animation: 'omWeb 0.28s ease-out forwards' }}>
+      <div style={{ position: 'relative', width: size, height: size, animation: `omWeb ${POP_DUR} ease-out forwards` }}>
         {Array.from({ length: 8 }, (_, i) => (
           <span
             key={i}
@@ -260,7 +265,7 @@ function SplashHit({ target, profile }: { target: { left: number; top: number };
   const sz = u(0.824);
   return (
     <Pos left={target.left} top={target.top} zIndex={29}>
-      <div style={{ position: 'relative', width: sz, height: sz, animation: 'omSplash 0.26s ease-out forwards' }}>
+      <div style={{ position: 'relative', width: sz, height: sz, animation: `omSplash ${POP_DUR} ease-out forwards` }}>
         {[0, 60, 120, 180, 240, 300].map((deg) => (
           <span
             key={deg}
@@ -289,7 +294,7 @@ function EmberHit({ target, profile, crit }: { target: { left: number; top: numb
     <>
       <HitFlash target={target} profile={profile} size={crit ? u(0.882) : u(0.706)} anim="omEmberFlash" />
       <Pos left={target.left} top={target.top} zIndex={29}>
-        <div style={{ position: 'relative', width: u(0.647), height: u(0.647), animation: 'omEmber 0.3s ease-out forwards' }}>
+        <div style={{ position: 'relative', width: u(0.647), height: u(0.647), animation: `omEmber ${BOLT_DUR} ease-out forwards` }}>
           {[0, 1, 2, 3].map((i) => (
             <span
               key={i}
@@ -320,7 +325,7 @@ function RuneHit({ target, profile, melee }: { target: { left: number; top: numb
           position: 'relative',
           width: sz,
           height: sz,
-          animation: 'omRune 0.28s ease-out forwards',
+          animation: `omRune ${POP_DUR} ease-out forwards`,
           color: profile.slash,
           fontSize: `calc(${sz} * 0.7)`,
           lineHeight: 1,
@@ -430,7 +435,7 @@ function AttackFx({
                 borderRadius: u(0.118),
                 background: profile.bolt,
                 border: `${u(0.059)} solid ${INK}`,
-                animation: 'omTide 0.24s ease-out forwards',
+                animation: `omTide ${POP_DUR} ease-out forwards`,
               }}
             />
           </Pos>
@@ -440,7 +445,7 @@ function AttackFx({
         <>
           <HitFlash target={target} profile={profile} size={u(0.588)} />
           <Pos left={target.left} top={target.top - 3} zIndex={29}>
-            <div style={{ fontSize: u(0.412), animation: 'omStorm 0.26s ease-out forwards' }}>⌃</div>
+            <div style={{ fontSize: u(0.412), animation: `omStorm ${POP_DUR} ease-out forwards` }}>⌃</div>
           </Pos>
         </>
       )}
@@ -486,7 +491,10 @@ function CastFx({
           transform: 'translate(-50%, -50%)',
           border: `3px solid ${profile.ring}`,
           boxShadow: `0 0 0 2px ${INK}${cast === 'foxfire' ? `, 0 0 10px ${profile.glow}` : ''}`,
-          animation: cast === 'breath' ? 'omBreathRing 0.5s ease-out forwards' : 'omCastRing 0.45s ease-out forwards',
+          animation:
+            cast === 'breath'
+              ? `omBreathRing ${BOLT_DUR} ease-out forwards`
+              : `omCastRing ${BOLT_DUR} ease-out forwards`,
           zIndex: 28,
           pointerEvents: 'none',
           borderRadius: cast === 'pillar' || cast === 'ward' ? '50%' : undefined,
@@ -501,7 +509,7 @@ function CastFx({
               height: 48,
               borderRadius: '50%',
               border: `3px dashed ${profile.bolt}`,
-              animation: 'omCoilRing 0.5s ease-out forwards',
+              animation: `omCoilRing ${BOLT_DUR} ease-out forwards`,
             }}
           />
         </Pos>
@@ -591,7 +599,7 @@ function CastFx({
               height: 36,
               background: `linear-gradient(to top, ${profile.bolt}, ${profile.glow})`,
               border: `2px solid ${INK}`,
-              animation: 'omPillar 0.42s ease-out forwards',
+              animation: `omPillar ${BOLT_DUR} ease-out forwards`,
             }}
           />
         </Pos>
@@ -620,7 +628,7 @@ function CastFx({
               borderRadius: '50%',
               border: `3px solid ${profile.ring}`,
               background: profile.burst,
-              animation: 'omWard 0.5s ease-out forwards',
+              animation: `omWard ${BOLT_DUR} ease-out forwards`,
             }}
           />
         </Pos>
@@ -637,7 +645,7 @@ function CastFx({
                 height: 32,
                 border: `3px solid ${profile.ring}`,
                 background: profile.burst,
-                animation: 'omRiddle 0.45s ease-out forwards',
+                animation: `omRiddle ${BOLT_DUR} ease-out forwards`,
               }}
             />
           </Pos>
@@ -656,7 +664,7 @@ function CastFx({
             background: profile.burst,
             border: `3px solid ${profile.ring}`,
             boxShadow: `inset 0 0 0 2px ${profile.glow}`,
-            animation: 'omCastBurst 0.4s ease-out forwards',
+            animation: `omCastBurst ${BOLT_DUR} ease-out forwards`,
             zIndex: 29,
             pointerEvents: 'none',
           }}
@@ -665,7 +673,7 @@ function CastFx({
 
       {cast === 'steal' && (
         <Pos left={from.left} top={from.top - 4} zIndex={30}>
-          <div style={{ fontSize: 12, color: profile.glow, animation: 'omSteal 0.4s ease-out forwards' }}>+SP</div>
+          <div style={{ fontSize: 12, color: profile.glow, animation: `omSteal ${BOLT_DUR} ease-out forwards` }}>+SP</div>
         </Pos>
       )}
     </>

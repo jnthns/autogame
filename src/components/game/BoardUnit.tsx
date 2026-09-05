@@ -1,8 +1,5 @@
-import {
-  BOARD_CELL_HEIGHT_PCT,
-  BOARD_CELL_WIDTH_PCT,
-  BOSS_FOOTPRINT,
-} from '../../data/constants';
+import { BOSS_FOOTPRINT } from '../../data/constants';
+import type { CSSProperties } from 'react';
 import { RELIC_MAP } from '../../data/relics';
 import { spriteCss } from '../../data/sprites';
 import type { Combatant, Unit } from '../../game/types';
@@ -17,6 +14,12 @@ interface BoardUnitProps {
   /** Just combined into this star, or just dropped onto the board. */
   merged?: boolean;
   placed?: boolean;
+  /** Combat reactions derived from the FX stream by `Board`. */
+  reaction?: 'hit' | 'hit-crit' | null;
+  /** Direction to flinch away from, as unit fractions. */
+  flinch?: { dr: number; dc: number };
+  casting?: boolean;
+  healed?: boolean;
   /** Lunge transform from the FX layer, when this unit is swinging. */
   lunge?: string;
   onTap: () => void;
@@ -29,6 +32,10 @@ export function BoardUnit({
   combat,
   merged,
   placed,
+  reaction,
+  flinch,
+  casting,
+  healed,
   lunge,
   onTap,
 }: BoardUnitProps) {
@@ -36,6 +43,7 @@ export function BoardUnit({
   const isBoss = fp > 1;
   const hpPct = Math.max(0, Math.min(1, u.hp / u.maxHp));
   const stunned = u.stun > 0 && !selected;
+  const critical = u.hp / u.maxHp < 0.25;
 
   const wrapClass = [
     'om-unit',
@@ -52,6 +60,11 @@ export function BoardUnit({
     isBoss ? 'om-unit__body--boss' : '',
     stunned ? 'om-unit__body--stunned' : '',
     selected ? 'board-unit--sel' : '',
+    reaction === 'hit' ? 'om-unit__body--hit' : '',
+    reaction === 'hit-crit' ? 'om-unit__body--hit-crit' : '',
+    casting ? 'om-unit__body--casting' : '',
+    healed ? 'om-unit__body--healed' : '',
+    u.shield > 0 ? 'om-unit__body--shielded' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -59,12 +72,17 @@ export function BoardUnit({
   return (
     <div
       className={wrapClass}
-      style={{
-        width: `${fp * BOARD_CELL_WIDTH_PCT}%`,
-        height: `${fp * BOARD_CELL_HEIGHT_PCT}%`,
-        left: `${u.c * BOARD_CELL_WIDTH_PCT}%`,
-        top: `${u.r * BOARD_CELL_HEIGHT_PCT}%`,
-      }}
+      style={
+        {
+          // Position is a transform, never left/top: the board is the only thing
+          // that ever needs layout, and a moving unit stays on the compositor.
+          width: `calc(${fp} * var(--cell-w))`,
+          height: `calc(${fp} * var(--cell-h))`,
+          transform: `translate(${(u.c / fp) * 100}%, ${(u.r / fp) * 100}%)`,
+          '--flinch-r': `${flinch?.dr ?? 0}px`,
+          '--flinch-c': `${flinch?.dc ?? 0}px`,
+        } as CSSProperties
+      }
     >
       <button type="button" className={bodyClass} onClick={onTap} style={{ transform: lunge }}>
         <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 132 : undefined} />
@@ -87,7 +105,7 @@ export function BoardUnit({
         </span>
         <span className="om-bar om-bar--unit">
           <span
-            className={`om-bar__fill om-bar__fill--unit-${u.side === 'me' ? 'me' : 'foe'}`}
+            className={`om-bar__fill om-bar__fill--unit-${u.side === 'me' ? 'me' : 'foe'}${critical ? ' om-bar__fill--critical' : ''}`}
             style={{ width: `${hpPct * 100}%` }}
           />
         </span>

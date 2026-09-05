@@ -918,7 +918,7 @@ export class CombatEngine {
   /** >0 while a cast is resolving, so the sim can split ability damage from autos. */
   private castDepth = 0;
 
-  private emitFx(src: Combatant, t: Combatant, kind: CombatFxKind) {
+  private emitFx(src: Combatant, t: Combatant, kind: CombatFxKind, amount = 0) {
     const from = unitCenter(src);
     const to = unitCenter(t);
     this.onFx?.({
@@ -929,6 +929,9 @@ export class CombatEngine {
       toR: to.r,
       toC: to.c,
       melee: src.melee || this.dist(src, t) <= 1,
+      side: src.side,
+      amount,
+      share: t.maxHp > 0 ? amount / t.maxHp : 0,
     });
   }
 
@@ -1005,7 +1008,7 @@ export class CombatEngine {
       if (src) {
         const fxKind: CombatFxKind =
           kind === 'magic' ? 'magic' : kind === 'crit' ? 'crit' : kind === 'true' ? 'true' : 'phys';
-        this.emitFx(src, t, fxKind);
+        this.emitFx(src, t, fxKind, dmg);
       }
     }
     if (src && src.lifesteal > 0 && dmg > 0)

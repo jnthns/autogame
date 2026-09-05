@@ -224,11 +224,7 @@ button:disabled {
 }
 
 .game-board--shake {
-  animation: omBoardShake 0.4s ease-out;
-}
-
-.damage-floater {
-  z-index: 30;
+  animation: omBoardShake var(--dur-slow) var(--ease-out);
 }
 
 .combat-fx {

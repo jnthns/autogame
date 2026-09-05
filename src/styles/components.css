@@ -1035,3 +1035,77 @@
   color: var(--om-muted-2);
   font-size: var(--text-xs);
 }
+
+/* ── Board geometry ────────────────────────────────────────────────────── */
+.game-board {
+  /* One cell as a fraction of the board — units size and translate off these. */
+  --cell-w: calc(100% / 6);
+  --cell-h: calc(100% / 12);
+}
+
+.om-unit {
+  left: 0;
+  top: 0;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* ── Combat reactions ──────────────────────────────────────────────────── */
+.om-unit__body--hit {
+  transform: translate(var(--flinch-c), var(--flinch-r));
+  filter: brightness(1.6);
+  transition-duration: var(--dur-instant);
+}
+
+.om-unit__body--hit-crit {
+  transform: translate(var(--flinch-c), var(--flinch-r));
+  filter: brightness(2) drop-shadow(0 0 2px var(--om-accent));
+  transition-duration: var(--dur-fast);
+}
+
+.om-unit__body--casting::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: var(--bw-2) solid var(--om-accent);
+  border-radius: 0;
+  pointer-events: none;
+  animation: omMergeRing var(--dur-slow) var(--ease-out) forwards;
+}
+
+.om-unit__body--healed {
+  box-shadow: 0 0 0 2px var(--om-good);
+  transition: box-shadow var(--dur-base) var(--ease-out);
+}
+
+.om-unit__body--shielded {
+  outline: var(--bw-1) solid var(--om-info);
+  outline-offset: 1px;
+}
+
+.om-bar__fill--critical {
+  animation: omCriticalPulse 600ms ease-in-out infinite;
+}
+
+.om-unit--dying {
+  z-index: var(--z-unit);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: omDeathDrop var(--dur-slow) var(--ease-in) forwards;
+}
+
+.om-badge-dead {
+  transform: translateY(-6px);
+  transition: transform var(--dur-slow) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  font-weight: 700;
+  font-size: var(--text-lg);
+  color: var(--om-bad);
+  text-shadow: 0 1px 0 var(--om-ink);
+  opacity: 0;
+}
+
+.om-unit--dead-mark .om-badge-dead {
+  opacity: 1;
+  transform: none;
+}

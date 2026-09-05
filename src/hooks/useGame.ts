@@ -53,6 +53,11 @@ import type {
   SheetState,
 } from '../game/types';
 
+/** How long a floater, an FX streak and the prune interval live. */
+const FLOATER_TTL_MS = 1300;
+const FX_TTL_MS = 700;
+const PRUNE_INTERVAL_MS = 250;
+
 function loadDraft(unlocked: string[]): string[] {
   const allow = new Set(unlocked);
   try {
@@ -180,7 +185,6 @@ export function useGame() {
         t: Date.now(),
       };
       setFloaters((prev) => [...prev, f].slice(-14));
-      setTimeout(() => setFloaters((prev) => prev.filter((x) => x.k !== f.k)), 1300);
     },
     [],
   );
@@ -189,7 +193,6 @@ export function useGame() {
     if (settingsRef.current.reduceVfx) return;
     const item: CombatFx = { ...payload, k: `fx${Date.now()}${Math.random()}`, t: Date.now() };
     setCombatFx((prev) => [...prev, item].slice(-28));
-    setTimeout(() => setCombatFx((prev) => prev.filter((x) => x.k !== item.k)), 700);
   }, []);
 
   const saveDraft = useCallback((d: string[]) => {
@@ -213,6 +216,29 @@ export function useGame() {
     },
     [draft, saveDraft],
   );
+
+  /**
+   * One prune for every transient list, instead of a timer per floater and per
+   * FX. Runs on the combat tick, and on a slow interval outside combat only
+   * while something is still on screen.
+   */
+  const pruneTransients = useCallback((now = Date.now()) => {
+    setFloaters((prev) => {
+      const kept = prev.filter((f) => now - f.t < FLOATER_TTL_MS);
+      return kept.length === prev.length ? prev : kept;
+    });
+    setCombatFx((prev) => {
+      const kept = prev.filter((f) => now - f.t < FX_TTL_MS);
+      return kept.length === prev.length ? prev : kept;
+    });
+    setUiEvents((prev) => pruneUiEvents(prev, now));
+  }, []);
+
+  useEffect(() => {
+    if (!floaters.length && !combatFx.length && !uiEvents.length) return;
+    const id = setInterval(() => pruneTransients(), PRUNE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [combatFx.length, floaters.length, pruneTransients, uiEvents.length]);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -344,6 +370,7 @@ export function useGame() {
       if (!eng || !current) return;
       eng.tick(current.speed);
       setCombatants([...eng.C]);
+      pruneTransients();
       setTick((t) => t + 1);
       if (eng.isDone()) {
         clearTimer();
@@ -355,7 +382,7 @@ export function useGame() {
         setTimeout(() => resolveCombat(win, survivors), 500);
       }
     }, 100);
-  }, [clearTimer, emit, pop, resolveCombat, spawnFx, syncGame]);
+  }, [clearTimer, emit, pop, pruneTransients, resolveCombat, spawnFx, syncGame]);
 
   const buy = useCallback(
     (i: number) => {
