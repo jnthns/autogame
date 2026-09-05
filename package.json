@@ -9,7 +9,13 @@
     "sim": "npx --yes tsx scripts/run-match-sim.ts",
     "preview": "vite preview",
     "generate-icons": "node scripts/generate-icons.mjs",
-    "postinstall": "node scripts/generate-icons.mjs"
+    "postinstall": "node scripts/generate-icons.mjs",
+    "check:rng": "! grep -rn 'Math.random' src/game --include=*.ts | grep -v 'src/game/rng.ts'",
+    "pretest": "npm run check:rng",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sim:balance": "tsx scripts/balance-sim.ts",
+    "audit:budget": "tsx scripts/balance-audit.ts"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -20,8 +26,10 @@
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
     "sharp": "^0.35.4",
+    "tsx": "^4.23.13",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "vite-plugin-pwa": "^1.0.0"
+    "vite-plugin-pwa": "^1.0.0",
+    "vitest": "^3.2.7"
   }
 }

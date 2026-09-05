@@ -18,6 +18,8 @@ export interface HeroDef {
   /** melee = adjacent only; ranged = cannot close — attacks at `range` tiles. */
   attack: AttackStyle;
   range: number;
+  /** Supports deal no direct damage with their cast; used by the stat budget. */
+  abilityKind?: 'damage' | 'support';
   crit: number;
   ability: string;
   abilityText: string;
@@ -112,6 +114,7 @@ export const HEROES: HeroDef[] = [
     attack: 'melee',
     range: 1,
     crit: 0.35,
+    abilityKind: 'support',
     ability: 'Web of Tales',
     abilityText:
       'Snares the two nearest enemies for 2s and marks them: marked foes take +20% damage from everyone.',
@@ -238,6 +241,7 @@ export const HEROES: HeroDef[] = [
     attack: 'melee',
     range: 1,
     crit: 0.05,
+    abilityKind: 'support',
     ability: 'Tide Ward',
     abilityText:
       'Grants every ally a 220-point shield and cleanses slows. Allies under shield deal +15% damage.',
@@ -322,6 +326,7 @@ export const HEROES: HeroDef[] = [
     attack: 'melee',
     range: 1,
     crit: 0.08,
+    abilityKind: 'support',
     ability: 'Calonarang Ward',
     abilityText:
       'Shakes the mask: cleanses stun and snare from every ally and grants each a 160-point shield.',
@@ -448,6 +453,7 @@ export const HEROES: HeroDef[] = [
     attack: 'melee',
     range: 1,
     crit: 0.12,
+    abilityKind: 'support',
     ability: 'Mend the Sky',
     abilityText:
       'Repairs the two most wounded allies: each heals 200 and gains 15% damage reduction for the rest of the round.',

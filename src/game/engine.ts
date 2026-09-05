@@ -32,6 +32,7 @@ import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP, isMeleeHero } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
+import { random, shuffle } from './rng';
 import {
   collapseShopOffers,
   getBossEncounter,
@@ -103,9 +104,9 @@ export function playerShopPool(draft: string[]): string[] {
 
 export function pickBotDraft(): string[] {
   const perTier = Math.max(2, Math.floor(BOT_DRAFT_SIZE / 3));
-  const low = HEROES.filter((h) => h.cost <= 2).sort(() => Math.random() - 0.5);
-  const mid = HEROES.filter((h) => h.cost === 3).sort(() => Math.random() - 0.5);
-  const high = HEROES.filter((h) => h.cost >= 4).sort(() => Math.random() - 0.5);
+  const low = shuffle(HEROES.filter((h) => h.cost <= 2));
+  const mid = shuffle(HEROES.filter((h) => h.cost === 3));
+  const high = shuffle(HEROES.filter((h) => h.cost >= 4));
   const pick = (arr: typeof HEROES, n: number) => arr.slice(0, Math.min(n, arr.length));
   return [...pick(low, perTier), ...pick(mid, perTier), ...pick(high, perTier)]
     .map((h) => h.id)
@@ -229,7 +230,7 @@ export function rollShopOffers(
   const w = pool.map((id) => shopWeight(HERO_MAP[id].cost));
   const tot = w.reduce((a, b) => a + b, 0);
   const raw = [0, 0, 0, 0, 0].map(() => {
-    let r = Math.random() * tot;
+    let r = random() * tot;
     for (let i = 0; i < pool.length; i++) {
       r -= w[i];
       if (r <= 0) return pool[i];
@@ -625,29 +626,27 @@ const BOSS_SCALE: Record<Difficulty, { hp: number; atk: number; as: number }> = 
 export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal'): void {
   const extra = g.mode === 'bot' ? FOE_SCALE[difficulty].extra : 0;
   const n = Math.min(3 + Math.floor(g.round * 0.7) + extra, 12);
-  const ids = HEROES.map((h) => h.id)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, n);
+  const ids = shuffle(HEROES.map((h) => h.id)).slice(0, n);
   const cells: { r: number; c: number }[] = [];
   for (let r = 0; r < BOARD_SIDE_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) cells.push({ r, c });
-  cells.sort(() => Math.random() - 0.5);
+  const shuffledCells = shuffle(cells);
   g.foe = ids.map((hid, i) => {
     let star: 1 | 2 | 3 =
       g.round >= 9
-        ? Math.random() < 0.4
+        ? random() < 0.4
           ? 3
           : 2
         : g.round >= 5
-          ? Math.random() < 0.5
+          ? random() < 0.5
             ? 2
             : 1
           : 1;
-    if (g.mode === 'bot' && difficulty === 'mythic' && star < 3 && Math.random() < 0.22) {
+    if (g.mode === 'bot' && difficulty === 'mythic' && star < 3 && random() < 0.22) {
       star = (star + 1) as 2 | 3;
-    } else if (g.mode === 'bot' && difficulty === 'hard' && star === 1 && Math.random() < 0.18) {
+    } else if (g.mode === 'bot' && difficulty === 'hard' && star === 1 && random() < 0.18) {
       star = 2;
     }
-    const pos = cells[i];
+    const pos = shuffledCells[i];
     return { u: uid(), hid, star, relics: [], r: pos.r, c: pos.c };
   });
 }
@@ -908,7 +907,18 @@ export class CombatEngine {
     ) => void,
     private onBanner: (text: string) => void,
     private onFx?: (fx: CombatFxPayload) => void,
+    /** Simulator hook for damage attribution — never affects combat. */
+    private onDamage?: (
+      src: Combatant | null,
+      target: Combatant,
+      amount: number,
+      kind: string,
+      fromCast: boolean,
+    ) => void,
   ) {}
+
+  /** >0 while a cast is resolving, so the sim can split ability damage from autos. */
+  private castDepth = 0;
 
   private emitFx(src: Combatant, t: Combatant, kind: CombatFxKind) {
     const from = unitCenter(src);
@@ -946,7 +956,7 @@ export class CombatEngine {
   }
 
   private bossBasicAttack(u: Combatant) {
-    const crit = Math.random() < u.crit;
+    const crit = random() < u.crit;
     const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
     const kind = crit ? 'crit' : 'phys';
     this.enemiesOf(u).forEach((o) => {
@@ -966,6 +976,7 @@ export class CombatEngine {
     }
     t.hp -= dmg;
     t.mana = Math.min(100, t.mana + 5);
+    if (dmg > 0) this.onDamage?.(src, t, dmg, kind, this.castDepth > 0);
     if (dmg > 0) {
       const popPos = unitCenter(t);
       const isCrit = kind === 'crit';
@@ -1129,6 +1140,15 @@ export class CombatEngine {
   }
 
   cast(u: Combatant, t: Combatant) {
+    this.castDepth++;
+    try {
+      this.castInner(u, t);
+    } finally {
+      this.castDepth--;
+    }
+  }
+
+  private castInner(u: Combatant, t: Combatant) {
     u.mana = 0;
     if (u.boss) {
       this.bossCast(u);
@@ -1196,9 +1216,9 @@ export class CombatEngine {
         break;
       case 'kitsu':
         for (let i = 0; i < 9; i++) {
-          const o = E[Math.floor(Math.random() * E.length)];
+          const o = E[Math.floor(random() * E.length)];
           if (!o) break;
-          const crit = Math.random() < u.crit;
+          const crit = random() < u.crit;
           this.hurt(u, o, (70 + sp / 3) * m * (crit ? 1 + u.critDmg : 1), crit ? 'crit' : 'magic');
         }
         break;
@@ -1259,7 +1279,7 @@ export class CombatEngine {
         });
         break;
       case 'coyot': {
-        const o = E[Math.floor(Math.random() * E.length)];
+        const o = E[Math.floor(random() * E.length)];
         if (o) {
           this.hurt(u, o, (140 + sp) * m, 'magic');
           o.stun = 1.5;
@@ -1386,7 +1406,7 @@ export class CombatEngine {
           if (u.boss) {
             this.bossBasicAttack(u);
           } else {
-            const crit = Math.random() < u.crit;
+            const crit = random() < u.crit;
             const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
             this.hurt(u, t, dmg, crit ? 'crit' : 'phys');
           }
@@ -1688,7 +1708,5 @@ export function classCard(name: string, counts: Record<string, number>) {
 }
 
 export function pickRelics(count = 3): string[] {
-  return RELICS.map((r) => r.id)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, count);
+  return shuffle(RELICS.map((r) => r.id)).slice(0, count);
 }

@@ -4,6 +4,7 @@ import { CLASSES, type ClassName } from '../data/classes';
 import { GAUNTLET_RELIC_IDS, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
 import { BOSS_ENCOUNTERS, type BossEncounter, type BossUnitSpec, rewardLines } from './hyperRoll';
+import { shuffle } from './rng';
 import type { Unit } from './types';
 
 export { rewardLines };
@@ -145,10 +146,7 @@ export function pickGauntletRelics(round: number, count = 3): string[] {
     round >= GAUNTLET.exclusiveRelicRound && exclusive.length
       ? [...standard, ...exclusive, ...exclusive]
       : standard;
-  return pool
-    .slice()
-    .sort(() => Math.random() - 0.5)
-    .slice(0, count);
+  return shuffle(pool).slice(0, count);
 }
 
 export function gauntletMilestoneRound(round: number): 'cost4' | 'cost5' | null {
