@@ -16,7 +16,13 @@ import {
   updateGauntletBest,
   type ProgressState,
 } from '../data/progress';
-import { DEFAULT_BATTLEGROUND_ID, loadSettings, saveSettings, type SettingsState } from '../data/settings';
+import {
+  DEFAULT_BATTLEGROUND_ID,
+  loadSettings,
+  saveSettings,
+  vibrate,
+  type SettingsState,
+} from '../data/settings';
 import {
   applyMerges,
   applyTraits,
@@ -58,6 +64,9 @@ import type {
 const FLOATER_TTL_MS = 1300;
 const FX_TTL_MS = 700;
 const PRUNE_INTERVAL_MS = 250;
+/** Haptics: a tap for a buy or a merge, a thump for felling a boss. */
+const HAPTIC_TAP_MS = 10;
+const HAPTIC_BOSS_MS = 25;
 
 function loadDraft(unlocked: string[]): string[] {
   const allow = new Set(unlocked);
@@ -155,6 +164,7 @@ export function useGame() {
       });
       knownUnits.current = seen;
       if (!events.length && landedBenchIndex != null) return;
+      if (events.length) vibrate(HAPTIC_TAP_MS, settingsRef.current.haptics);
       emit(...events);
     },
     [emit],
@@ -298,7 +308,11 @@ export function useGame() {
     (win: boolean, survivors: { me: number; foe: number }) => {
       const g = gameRef.current;
       if (!g) return;
-      let result = gameActions.resolveRound(g, win, g.matchRounds, survivors);
+      const result0 = gameActions.resolveRound(g, win, g.matchRounds, survivors);
+      let result = result0;
+      if (win && result0.kind === 'result' && result0.boss) {
+        vibrate(HAPTIC_BOSS_MS, settingsRef.current.haptics);
+      }
       if (result.kind === 'over' && isGauntletMode(g.mode)) {
         const before = progressRef.current;
         const peakRound = g.gauntletRoundsCleared ?? Math.max(0, g.round - 1);
@@ -437,6 +451,7 @@ export function useGame() {
         return;
       }
       emit({ kind: 'buy', hid: hid!, benchIndex: benchBefore });
+      vibrate(HAPTIC_TAP_MS, settingsRef.current.haptics);
       if (hid) {
         applyMerges(g, { boughtHid: hid, twoStarBeforeBuy: twoStarBefore }, (r, c, text) =>
           pop(r, c, text),

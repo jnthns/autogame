@@ -85,8 +85,10 @@
   /* Semantic, light */
   --om-bg: var(--om-bone);
   --om-fg: var(--om-ink);
-  --om-muted: #6b6455;
-  --om-muted-2: var(--om-stone);
+  /* Both muted tones clear 4.5:1 on bone, parchment and sand — the three light
+     surfaces they are ever drawn on. --om-stone stays the brand swatch. */
+  --om-muted: #5c5648;
+  --om-muted-2: #6b6455;
   --om-card: var(--om-bone);
   --om-surface-2: var(--om-parchment);
   --om-surface-3: var(--om-sand);

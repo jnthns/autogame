@@ -25,6 +25,20 @@ interface BoardUnitProps {
   onTap: () => void;
 }
 
+/** Pixel stars: a text ★ is unreadable at 30 px, five pixels of saffron is not. */
+export function StarBadge({ star, popped }: { star: number; popped?: boolean }) {
+  return (
+    <span
+      className={`om-badge-star om-badge-star--${star}${popped ? ' om-badge-star--pop' : ''}`}
+      aria-label={`${star} star`}
+    >
+      {Array.from({ length: star }, (_, i) => (
+        <i key={i} aria-hidden />
+      ))}
+    </span>
+  );
+}
+
 export function BoardUnit({
   unit: u,
   boardUnit,
@@ -98,11 +112,7 @@ export function BoardUnit({
             })}
           </span>
         )}
-        <span
-          className={`om-badge-star om-badge-star--${u.star}${merged ? ' om-badge-star--pop' : ''}`}
-        >
-          {'★'.repeat(u.star)}
-        </span>
+        <StarBadge star={u.star} popped={merged} />
         <span className="om-bar om-bar--unit">
           <span
             className={`om-bar__fill om-bar__fill--unit-${u.side === 'me' ? 'me' : 'foe'}${critical ? ' om-bar__fill--critical' : ''}`}

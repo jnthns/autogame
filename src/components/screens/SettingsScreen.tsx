@@ -207,6 +207,13 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
               onClick={() => onChange({ reduceMotion: !settings.reduceMotion })}
             />
           </SettingRow>
+          <SettingRow title="Haptics" hint="A tap on buy and merge, a thump on a boss kill">
+            <Toggle
+              label="Haptics"
+              on={settings.haptics}
+              onClick={() => onChange({ haptics: !settings.haptics })}
+            />
+          </SettingRow>
         </section>
 
         <section style={{ marginBottom: 22 }}>

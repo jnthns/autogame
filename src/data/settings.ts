@@ -9,6 +9,8 @@ export interface SettingsState {
   defaultSpeed: CombatSpeed;
   reduceVfx: boolean;
   reduceMotion: boolean;
+  /** Short vibrations on buy, merge and boss kill, where the device supports it. */
+  haptics: boolean;
 }
 
 export const SETTINGS_STORAGE_KEY = 'om_settings';
@@ -21,6 +23,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   defaultSpeed: 1,
   reduceVfx: false,
   reduceMotion: false,
+  haptics: true,
 };
 
 function prefersReducedMotion(): boolean {
@@ -54,9 +57,20 @@ export function loadSettings(): SettingsState {
       defaultSpeed: parseSpeed(d.defaultSpeed),
       reduceVfx: d.reduceVfx === true,
       reduceMotion: typeof d.reduceMotion === 'boolean' ? d.reduceMotion : prefersReducedMotion(),
+      haptics: d.haptics !== false,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
+  }
+}
+
+/** Feature-detected, and silent when the platform refuses. */
+export function vibrate(ms: number, enabled: boolean): void {
+  if (!enabled) return;
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    /* not supported */
   }
 }
 

@@ -2,6 +2,7 @@ import { spriteCss } from '../../data/sprites';
 import type { GameState, Unit } from '../../game/types';
 import { recent, type StampedUiEvent } from '../../game/uiEvents';
 import { PixelSprite } from '../PixelSprite';
+import { StarBadge } from './BoardUnit';
 
 interface BenchProps {
   game: GameState;
@@ -63,11 +64,7 @@ export function Bench({
               .join(' ')}
           >
             <PixelSprite src={spriteCss(u.hid)} />
-            <span
-              className={`om-badge-star om-badge-star--${u.star}${merged?.u === u.u ? ' om-badge-star--pop' : ''}`}
-            >
-              {'★'.repeat(u.star)}
-            </span>
+            <StarBadge star={u.star} popped={merged?.u === u.u} />
           </button>
         );
       })}

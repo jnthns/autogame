@@ -135,10 +135,11 @@
   color: var(--om-on-accent);
 }
 
+/* Ink on sky clears 4.5:1; bone on sky does not. */
 .om-chip--class-tier2 {
   background: var(--om-info);
   border-color: var(--om-ink);
-  color: var(--om-bone);
+  color: var(--om-ink);
 }
 
 .om-chip--warn {
@@ -508,22 +509,37 @@
   top: -8px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  color: var(--om-ink);
-  background: var(--om-disabled);
+  display: flex;
+  gap: 1px;
+  align-items: center;
+  background: var(--om-ink);
   border: var(--bw-1) solid var(--om-ink);
-  padding: 0 3px;
-  line-height: 11px;
+  padding: 1px 2px;
+  line-height: 0;
+  /* The glyph is kept for screen readers; the pixels are what you see. */
+  font-size: 0;
+  color: transparent;
+}
+
+/* One 5×5 pixel star per level, legible on a 30 px unit where text is not. */
+.om-badge-star > i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  background: var(--om-star, var(--om-dust));
+  clip-path: polygon(50% 0, 65% 35%, 100% 35%, 72% 58%, 85% 100%, 50% 74%, 15% 100%, 28% 58%, 0 35%, 35% 35%);
+}
+
+.om-badge-star--1 {
+  --om-star: var(--om-dust);
 }
 
 .om-badge-star--2 {
-  background: var(--om-bone);
+  --om-star: var(--om-bone);
 }
 
 .om-badge-star--3 {
-  background: var(--om-accent);
+  --om-star: var(--om-accent);
 }
 
 .om-badge-boss {
@@ -532,7 +548,7 @@
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--font-display);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   background: var(--om-accent);
   color: var(--om-on-accent);
@@ -642,6 +658,7 @@
 
 .om-shop-card {
   flex: 1;
+  min-height: 56px;
   min-width: 0;
   border: var(--bw-2) solid var(--om-line);
   background: var(--om-card);
