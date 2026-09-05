@@ -11,7 +11,7 @@
     "generate-icons": "node scripts/generate-icons.mjs",
     "postinstall": "node scripts/generate-icons.mjs",
     "check:rng": "! grep -rn 'Math.random' src/game --include=*.ts | grep -v 'src/game/rng.ts'",
-    "pretest": "npm run check:rng",
+    "pretest": "npm run check:rng && npm run audit:budget -- --strict",
     "test": "vitest run",
     "test:watch": "vitest",
     "sim:balance": "tsx scripts/balance-sim.ts",

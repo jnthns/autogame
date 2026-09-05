@@ -162,7 +162,9 @@ export interface Combatant {
   cast2: boolean;
   buffT?: number;
   buffAs?: number;
+  /** Outgoing damage bonus (Taniwha), and the seconds left on it. */
   dmgBuff?: number;
+  dmgBuffT?: number;
   /** Grid footprint in cells (1 = normal, 4 = multi-tile boss). */
   footprint?: number;
   boss?: boolean;

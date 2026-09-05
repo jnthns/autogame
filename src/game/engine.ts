@@ -31,6 +31,7 @@ import {
   STARMUL,
   USER_DRAFT_MAX,
 } from '../data/constants';
+import { ABILITIES } from '../data/abilities';
 import { BOSS_KITS, type BossKitId } from '../data/bosses';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP, isMeleeHero } from '../data/heroes';
@@ -957,7 +958,7 @@ export class CombatEngine {
   }
 
   private bossBasicAttack(u: Combatant) {
-    const crit = random() < u.crit;
+    const crit = random() < Math.min(1, u.crit);
     const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
     const kind = crit ? 'crit' : 'phys';
     this.enemiesOf(u).forEach((o) => {
@@ -967,8 +968,9 @@ export class CombatEngine {
 
   hurt(src: Combatant | null, t: Combatant, amount: number, kind: string): number {
     if (!t.alive) return 0;
-    let dmg = amount * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
-    if (kind === 'true') dmg = amount;
+    const out = amount * (1 + (src?.dmgBuff || 0));
+    let dmg = out * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
+    if (kind === 'true') dmg = out;
     if (t.boss) dmg *= t.bossTaken ?? BOSS_DAMAGE_TAKEN;
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
@@ -1094,19 +1096,11 @@ export class CombatEngine {
 
     if (kit === 'storm') {
       E.forEach((o) => this.hurt(u, o, (190 + sp) * m, 'magic'));
-      A.forEach((a) => {
-        a.shield += (160 + sp) * m;
-        if (!a.buffAs) {
-          a.buffAs = 1.22;
-          a.as *= 1.22;
-          a.buffT = 4;
-        }
+      A.forEach((ally) => {
+        ally.shield += (160 + sp) * m;
+        this.applyAsBuff(ally, 1.22, 4);
       });
-      if (!u.buffAs) {
-        u.buffAs = 1.12;
-        u.as *= 1.12;
-        u.buffT = 4;
-      }
+      this.applyAsBuff(u, 1.12, 4);
       E.slice()
         .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)
         .slice(0, 2)
@@ -1157,208 +1151,202 @@ export class CombatEngine {
     }
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
+    const a = ABILITIES[u.hid];
     this.emitFx(u, t, 'cast');
     const E = this.enemiesOf(u);
     const A = this.alliesOf(u);
     const near = (n: number) =>
       E.slice()
-        .sort((a, b) => this.dist(u, a) - this.dist(u, b))
+        .sort((x, y) => this.dist(u, x) - this.dist(u, y))
         .slice(0, n);
+    /** A magnitude at this star, with spell power folded in. */
+    const mag = (base: number) => (base + sp) * m;
+
+    if (!a) {
+      this.hurt(u, t, mag(200), 'magic');
+      return;
+    }
 
     switch (u.hid) {
-      case 'boss': {
-        const slam = 220 + sp + u.star * 40;
-        E.forEach((o) => this.hurt(u, o, slam, 'magic'));
-        break;
-      }
       case 'jorm': {
         let tot = 0;
         E.forEach((o) => {
-          if (this.dist(u, o) <= 1) tot += this.hurt(u, o, (220 + sp) * m, 'magic');
+          if (this.dist(u, o) <= 1) tot += this.hurt(u, o, mag(a.base), 'magic');
         });
         u.hp = Math.min(u.maxHp, u.hp + tot / 2);
         break;
       }
       case 'quetz': {
         const hit = E.filter((o) => o.c === t.c || this.dist(u, o) <= 2);
-        const per = ((300 + sp) * m) / Math.max(1, hit.length);
+        const per = mag(a.base) / Math.max(1, hit.length);
         hit.forEach((o) => this.hurt(u, o, per, 'magic'));
-        A.forEach((a) => {
-          if (!a.buffAs) {
-            a.buffAs = 1.25;
-            a.as *= 1.25;
-            a.buffT = 4;
-          }
-        });
+        A.forEach((ally) => this.applyAsBuff(ally, 1.25, a.duration ?? 4));
         break;
       }
       case 'thund':
         near(3).forEach((o, i) =>
-          this.hurt(u, o, (180 + sp) * m * (i ? 1 + u.critDmg : 1), i ? 'crit' : 'magic'),
+          this.hurt(u, o, mag(a.base) * (i ? 1 + u.critDmg : 1), i ? 'crit' : 'magic'),
         );
         break;
       case 'anans':
         near(2).forEach((o) => {
-          o.snare = 2;
+          o.snare = a.duration ?? 2;
           o.amp = 0.2;
         });
         break;
       case 'bunyi': {
-        const b = E.slice().sort((a, c) => c.atk - a.atk)[0];
+        const b = E.slice().sort((x, y) => y.atk - x.atk)[0];
         if (b) {
-          this.hurt(u, b, (160 + sp) * m, 'magic');
-          b.silence = 3;
+          this.hurt(u, b, mag(a.base), 'magic');
+          b.silence = a.duration ?? 3;
         }
         break;
       }
       case 'garud':
-        this.hurt(u, t, (260 + sp) * m, 'phys');
-        u.shield += 300 * m;
+        this.hurt(u, t, mag(a.base), 'phys');
+        u.shield += (a.secondary ?? 0) * m;
         break;
       case 'kitsu':
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < (a.secondary ?? 9); i++) {
           const o = E[Math.floor(random() * E.length)];
           if (!o) break;
-          const crit = random() < u.crit;
-          this.hurt(u, o, (70 + sp / 3) * m * (crit ? 1 + u.critDmg : 1), crit ? 'crit' : 'magic');
+          const crit = random() < Math.min(1, u.crit);
+          this.hurt(u, o, (a.base + sp / 3) * m * (crit ? 1 + u.critDmg : 1), crit ? 'crit' : 'magic');
         }
         break;
       case 'ifrit':
         E.forEach((o) => {
           if (this.dist(o, t) <= 1) {
-            this.hurt(u, o, (280 + sp) * m, 'magic');
-            o.burn = 40 * m;
-            o.burnT = 4;
+            this.hurt(u, o, mag(a.base), 'magic');
+            o.burn = (a.secondary ?? 0) * m;
+            o.burnT = a.duration ?? 4;
           }
         });
         break;
       case 'zirni':
-        near(3).forEach((o) => this.hurt(u, o, (200 + sp) * m, 'magic'));
+        near(3).forEach((o) => this.hurt(u, o, mag(a.base), 'magic'));
         if (!u.cast2 && u.hp < u.maxHp * 0.35) {
           u.cast2 = true;
           u.mana = 100;
         }
         break;
       case 'taniw':
-        A.forEach((a) => {
-          a.shield += (220 + sp) * m;
-          a.dmgBuff = 0.15;
+        A.forEach((ally) => {
+          ally.shield += mag(a.base);
+          ally.dmgBuff = 0.15;
+          ally.dmgBuffT = 4;
         });
         break;
       case 'anzuu': {
-        const b = E.slice().sort((a, c) => c.mana - a.mana)[0];
+        const b = E.slice().sort((x, y) => y.mana - x.mana)[0];
         if (b) {
-          b.sp = (b.sp || 0) - 25;
-          u.sp = (u.sp || 0) + 25;
+          b.sp = (b.sp || 0) - a.base;
+          u.sp = (u.sp || 0) + a.base;
           u.atk *= 1.08;
         }
         break;
       }
       case 'sphin':
         E.slice()
-          .sort((a, b2) => a.hp - b2.hp)
+          .sort((x, y) => x.hp - y.hp)
           .slice(0, 2)
           .forEach((o) => {
-            o.stun = 2.5;
-            this.hurt(u, o, (240 + sp) * m, 'true');
+            o.stun = a.duration ?? 2.5;
+            this.hurt(u, o, mag(a.base), 'true');
           });
         break;
       case 'kelpi': {
         const b = near(1)[0];
         if (b) {
-          const dealt = this.hurt(u, b, (150 + sp) * m, 'magic');
-          b.snare = 2.5;
+          const dealt = this.hurt(u, b, mag(a.base), 'magic');
+          b.snare = a.duration ?? 2.5;
           this.heal(u, dealt / 2);
         }
         break;
       }
       case 'barng':
-        A.forEach((a) => {
-          a.stun = 0;
-          a.snare = 0;
-          a.shield += (160 + sp) * m;
+        A.forEach((ally) => {
+          ally.stun = 0;
+          ally.snare = 0;
+          ally.shield += mag(a.base);
         });
         break;
       case 'coyot': {
         const o = E[Math.floor(random() * E.length)];
         if (o) {
-          this.hurt(u, o, (140 + sp) * m, 'magic');
-          o.stun = 1.5;
+          this.hurt(u, o, mag(a.base), 'magic');
+          o.stun = a.duration ?? 1.5;
         }
-        A.forEach((a) => {
-          a.crit += 0.15;
+        A.forEach((ally) => {
+          ally.crit = Math.min(1, ally.crit + 0.15);
         });
         break;
       }
       case 'griff': {
-        const ally = A.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || u;
-        ally.shield += (250 + sp) * m;
+        const ally = A.slice().sort((x, y) => x.hp / x.maxHp - y.hp / y.maxHp)[0] || u;
+        ally.shield += mag(a.secondary ?? 0);
         E.forEach((o) => {
-          if (this.dist(ally, o) <= 1) this.hurt(u, o, (180 + sp) * m, 'phys');
+          if (this.dist(ally, o) <= 1) this.hurt(u, o, mag(a.base), 'phys');
         });
         break;
       }
       case 'golem':
-        u.shield += (320 + sp) * m;
+        u.shield += mag(a.secondary ?? 0);
         E.forEach((o) => {
-          if (this.dist(u, o) <= 1) this.hurt(u, o, (90 + sp) * m, 'magic');
+          if (this.dist(u, o) <= 1) this.hurt(u, o, mag(a.base), 'magic');
         });
         break;
       case 'bansh': {
-        const o = E.slice().sort((a, b) => a.hp - b.hp)[0];
+        const o = E.slice().sort((x, y) => x.hp - y.hp)[0];
         if (o) {
-          o.stun = 2;
+          o.stun = a.duration ?? 2;
           const exec = o.hp < o.maxHp * 0.4;
-          this.hurt(u, o, (200 + sp) * m, exec ? 'true' : 'magic');
+          this.hurt(u, o, mag(a.base), exec ? 'true' : 'magic');
         }
         break;
       }
       case 'hydra': {
         let hits = 0;
         near(3).forEach((o) => {
-          this.hurt(u, o, (160 + sp) * m, 'magic');
+          this.hurt(u, o, mag(a.base), 'magic');
           hits++;
         });
-        this.heal(u, 40 * m * hits);
+        this.heal(u, (a.secondary ?? 0) * m * hits);
         break;
       }
       case 'nuwa':
         A.slice()
-          .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)
+          .sort((x, y) => x.hp / x.maxHp - y.hp / y.maxHp)
           .slice(0, 2)
-          .forEach((a) => {
-            this.heal(a, (200 + sp) * m);
-            a.dr = Math.min(0.6, (a.dr || 0) + 0.15);
+          .forEach((ally) => {
+            this.heal(ally, mag(a.base));
+            ally.dr = Math.min(0.6, (ally.dr || 0) + 0.15);
           });
         break;
       case 'camaz': {
         const nearTarget = near(1)[0] || t;
-        const dealt = this.hurt(u, nearTarget, (240 + sp) * m, 'phys');
+        const dealt = this.hurt(u, nearTarget, mag(a.base), 'phys');
         this.heal(u, dealt);
         break;
       }
       case 'simur':
-        A.forEach((a) => {
-          this.heal(a, (160 + sp) * m);
-          if (!a.buffAs) {
-            a.buffAs = 1.2;
-            a.as *= 1.2;
-            a.buffT = 4;
-          }
+        A.forEach((ally) => {
+          this.heal(ally, mag(a.base));
+          this.applyAsBuff(ally, 1.2, a.duration ?? 4);
         });
-        near(2).forEach((o) => this.hurt(u, o, (200 + sp) * m, 'magic'));
+        near(2).forEach((o) => this.hurt(u, o, mag(a.secondary ?? 0), 'magic'));
         break;
       case 'levia':
         E.forEach((o) => {
           if (this.dist(u, o) <= 2) {
-            this.hurt(u, o, (220 + sp) * m, 'magic');
-            o.snare = 1.5;
+            this.hurt(u, o, mag(a.base), 'magic');
+            o.snare = a.duration ?? 1.5;
           }
         });
         break;
       case 'wendi': {
-        const steal = Math.round(t.hp * 0.1);
-        this.hurt(u, t, (280 + sp) * m, 'phys');
+        const steal = Math.round(t.hp * (a.secondary ?? 0.1));
+        this.hurt(u, t, mag(a.base), 'phys');
         if (steal > 0) {
           u.maxHp += steal;
           this.heal(u, steal);
@@ -1367,8 +1355,16 @@ export class CombatEngine {
         break;
       }
       default:
-        this.hurt(u, t, (200 + sp) * m, 'magic');
+        this.hurt(u, t, mag(a.base), 'magic');
     }
+  }
+
+  /** One attack-speed buff at a time, restored when `buffT` runs out. */
+  private applyAsBuff(u: Combatant, mul: number, seconds: number) {
+    if (u.buffAs) return;
+    u.buffAs = mul;
+    u.as *= mul;
+    u.buffT = seconds;
   }
 
   simTick(dt: number) {
@@ -1387,6 +1383,10 @@ export class CombatEngine {
           u.as /= u.buffAs;
           u.buffAs = 0;
         }
+      }
+      if (u.dmgBuffT && u.dmgBuffT > 0) {
+        u.dmgBuffT -= dt;
+        if (u.dmgBuffT <= 0) u.dmgBuff = 0;
       }
       if (u.stun > 0) return;
       const t = this.target(u);
@@ -1407,7 +1407,7 @@ export class CombatEngine {
           if (u.boss) {
             this.bossBasicAttack(u);
           } else {
-            const crit = random() < u.crit;
+            const crit = random() < Math.min(1, u.crit);
             const dmg = u.atk * (crit ? 1 + u.critDmg : 1);
             this.hurt(u, t, dmg, crit ? 'crit' : 'phys');
           }

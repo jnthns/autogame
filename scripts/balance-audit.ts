@@ -10,7 +10,14 @@
  * Report-only by default; `--strict` exits 1 on any hero outside tolerance.
  */
 import { HEROES } from '../src/data/heroes';
-import { A30_TOLERANCE, budgetRow, BUDGET_A30, BUDGET_P, P_TOLERANCE } from '../src/sim/budget';
+import {
+  A30_TOLERANCE,
+  A30_UNREACHABLE,
+  budgetRow,
+  BUDGET_A30,
+  BUDGET_P,
+  P_TOLERANCE,
+} from '../src/sim/budget';
 
 const strict = process.argv.includes('--strict');
 
@@ -48,7 +55,7 @@ for (const h of HEROES) {
       num(row.a30, 8),
       num(row.a30Target, 8, 0),
       num(row.a30Delta * 100, 7),
-      row.ok ? '   ·' : '   ✕',
+      row.ok ? (A30_UNREACHABLE.has(h.id) ? '   ~' : '   ·') : '   ✕',
     ].join(''),
   );
 }
@@ -58,5 +65,10 @@ console.log(
   `targets P ${JSON.stringify(BUDGET_P)} ±${P_TOLERANCE * 100}%  ·  A30 ${JSON.stringify(BUDGET_A30)} ±${A30_TOLERANCE * 100}%`,
 );
 console.log(`${violations} hero(es) outside tolerance`);
+if (A30_UNREACHABLE.size) {
+  console.log(
+    `~ = A30 unreachable by any magnitude, see docs/overhaul/baselines/B2-report.md: ${[...A30_UNREACHABLE].join(', ')}`,
+  );
+}
 
 if (strict && violations > 0) process.exit(1);

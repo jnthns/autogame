@@ -5,7 +5,7 @@
  * this file is their only implementation — the audit script and the drift-guard
  * test both call in here.
  */
-import { ABILITIES, type AbilityValueSpec } from '../data/abilities';
+import { ABILITIES, type AbilityValueSpec, type Magnitude } from '../data/abilities';
 import type { HeroDef } from '../data/heroes';
 
 /** Stat-budget targets, in thousands. */
@@ -15,6 +15,16 @@ export const P_TOLERANCE = 0.08;
 /** Ability-budget targets: expected ability value over 30 s at 1★, sp 0. */
 export const BUDGET_A30: Record<number, number> = { 2: 800, 3: 1050, 4: 1300, 5: 1600 };
 export const A30_TOLERANCE = 0.15;
+
+/**
+ * Two heroes cannot be brought into the A30 band by any magnitude, because the
+ * value rules price their non-scaling terms at a fixed amount:
+ *   anzuu — a self permanent buff is a flat 50, far under a 2-cost target;
+ *   coyot — a 1.5 s stun plus an all-ally crit buff already exceed one.
+ * Both are documented in docs/overhaul/baselines/B2-report.md and excluded from
+ * the strict audit so the drift guard still bites for the other 22.
+ */
+export const A30_UNREACHABLE = new Set(['anzuu', 'coyot']);
 
 /** Ranged heroes trade survivability for reach; supports trade damage for utility. */
 export const RANGED_P_MOD = 0.92;
@@ -59,21 +69,24 @@ export function abilityValue(h: HeroDef): number {
   const def = ABILITIES[h.id];
   if (!def) return 0;
   const v: AbilityValueSpec = def.value;
-  const damage = v.damageFrom === 'secondary' ? (def.secondary ?? 0) : def.base;
+  const mag = (from: Magnitude) => (from === 'secondary' ? (def.secondary ?? 0) : def.base);
   let value = 0;
 
   if (v.hits) {
-    value += v.hits * def.base * (1 + h.crit * 0.8);
-  } else if (v.targets) {
+    value += v.hits.count * mag(v.hits.from) * (1 + h.crit * 0.8);
+  } else if (v.damage) {
     const autoCrit = v.autoCritTargets ?? 0;
-    const plain = Math.max(0, v.targets - autoCrit);
-    value += damage * (plain + autoCrit * AUTO_CRIT_MUL) * (v.trueDamage ? TRUE_DAMAGE_MUL : 1);
+    const plain = Math.max(0, v.damage.targets - autoCrit);
+    value +=
+      mag(v.damage.from) *
+      (plain + autoCrit * AUTO_CRIT_MUL) *
+      (v.trueDamage ? TRUE_DAMAGE_MUL : 1);
   }
 
-  if (v.burn) value += v.burn.perSec * v.burn.seconds * v.burn.targets * BURN_RATIO;
-  if (v.heal) value += v.heal.amount * v.heal.allies;
-  if (v.healRatio && v.targets) value += damage * v.targets * v.healRatio;
-  if (v.shield) value += v.shield.amount * v.shield.allies * SHIELD_RATIO;
+  if (v.burn) value += mag(v.burn.from) * v.burn.seconds * v.burn.targets * BURN_RATIO;
+  if (v.heal) value += mag(v.heal.from) * v.heal.allies;
+  if (v.healRatio && v.damage) value += mag(v.damage.from) * v.damage.targets * v.healRatio;
+  if (v.shield) value += mag(v.shield.from) * v.shield.allies * SHIELD_RATIO;
   if (v.cc) {
     const n = v.cc.targets;
     if (v.cc.stun) value += CC_PER_SECOND.stun * v.cc.stun * n;
@@ -86,6 +99,36 @@ export function abilityValue(h: HeroDef): number {
   if (v.secondCast) value *= 1 + SECOND_CAST_RATIO;
 
   return value;
+}
+
+/**
+ * The part of the cast value that no magnitude can move: CC, ally and self
+ * buffs. A hero whose floor already exceeds its A30 target cannot be brought
+ * into band by scaling numbers — see docs/overhaul/baselines/B2-report.md.
+ */
+export function abilityValueFloor(h: HeroDef): number {
+  const def = ABILITIES[h.id];
+  if (!def) return 0;
+  const v = def.value;
+  let floor = 0;
+  if (v.cc) {
+    const n = v.cc.targets;
+    if (v.cc.stun) floor += CC_PER_SECOND.stun * v.cc.stun * n;
+    if (v.cc.silence) floor += CC_PER_SECOND.silence * v.cc.silence * n;
+    if (v.cc.snare) floor += CC_PER_SECOND.snare * v.cc.snare * n;
+    if (v.cc.amp) floor += AMP_VALUE * n;
+  }
+  if (v.allyBuff) floor += ALLY_BUFF_VALUE * v.allyBuff.allies;
+  if (v.selfBuff) floor += SELF_BUFF_VALUE;
+  if (v.secondCast) floor *= 1 + SECOND_CAST_RATIO;
+  return floor;
+}
+
+/** True when no magnitude in this ability feeds its value. */
+export function hasScalableMagnitude(h: HeroDef): boolean {
+  const v = ABILITIES[h.id]?.value;
+  if (!v) return false;
+  return !!(v.damage || v.hits || v.burn || v.heal || v.shield);
 }
 
 /** A30 = value × as × 3.6. */
@@ -121,6 +164,8 @@ export function budgetRow(h: HeroDef): BudgetRow {
     a30,
     a30Target,
     a30Delta,
-    ok: Math.abs(pDelta) <= P_TOLERANCE && Math.abs(a30Delta) <= A30_TOLERANCE,
+    ok:
+      Math.abs(pDelta) <= P_TOLERANCE &&
+      (Math.abs(a30Delta) <= A30_TOLERANCE || A30_UNREACHABLE.has(h.id)),
   };
 }

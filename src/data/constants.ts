@@ -11,7 +11,11 @@ export const SKY = 'var(--om-sky)';
 export const VIOLET = 'var(--om-violet)';
 export const MUTED = 'var(--om-muted)';
 
-export const STARMUL = [1, 1, 1.85, 3.4] as const;
+/**
+ * Star multipliers. A 2★ is two copies and a 3★ is four, so the old 1.85/3.4
+ * made every merge strictly better than spending the same gold on breadth.
+ */
+export const STARMUL = [1, 1, 1.65, 2.6] as const;
 
 /** Columns per side (player and foe each occupy a 6×6 half). */
 export const BOARD_COLS = 6;
