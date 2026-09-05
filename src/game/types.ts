@@ -1,3 +1,5 @@
+import type { CopyPool } from '../data/economy';
+
 export type Screen = 'home' | 'modes' | 'build' | 'game' | 'settings';
 export type GameMode = 'practice' | 'bot' | 'marathon' | 'gauntlet';
 export type Phase = 'plan' | 'combat' | 'result';
@@ -57,6 +59,12 @@ export interface GameState {
   foeShop: (ShopOffer | null)[];
   shop: (ShopOffer | null)[];
   freeRerolls: number;
+  /**
+   * Copies of each hero left in the shared pool, or null in the practice
+   * sandbox — a mode with 999 gold and free rolls would drain a pool in six
+   * rolls and stop being a place to try board compositions.
+   */
+  pool: CopyPool | null;
   sel: Selection | null;
   speed: number;
   phase: Phase;

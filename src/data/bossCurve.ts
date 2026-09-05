@@ -17,18 +17,26 @@ export interface RefTeam {
 }
 
 /**
- * Medians of the `decent` policy on Mortal, from
- * docs/overhaul/baselines/b4.json (n = 300, seed 1).
+ * Medians of the `decent` policy on Mortal, re-measured in B7 at the final
+ * dials, once the boss fix let matches routinely reach round 13 (n = 600).
  *
- * Round 16 is extrapolated on the 8→12 slope: Marathon matches in the B4
- * baseline did not reach it often enough to take a median from.
+ * The B5 numbers came from the 39% of matches still alive at round 12, which
+ * was survivorship-biased and oversized the round-12 boss. The curve is
+ * self-referential — bosses are fitted to it and it is measured against them —
+ * so it was re-derived twice until the anchors stopped moving.
+ *
+ * `dps` is auto-attack DPS only; ability damage is deliberately outside it, so
+ * raising the ability budget makes bosses easier rather than rescaling them.
+ *
+ * Round 16 is extrapolated on the 8→12 slope — Marathon matches still do not
+ * reach it often enough to take a median from.
  */
 export const REF_ANCHORS: Record<number, RefTeam> = {
-  1: { hp: 1379, dps: 144, avgHp: 689 },
-  4: { hp: 2775, dps: 358, avgHp: 925 },
-  8: { hp: 5412, dps: 707, avgHp: 1082 },
-  12: { hp: 9571, dps: 1126, avgHp: 1063 },
-  16: { hp: 13730, dps: 1545, avgHp: 1063 },
+  1: { hp: 1663, dps: 144, avgHp: 832 },
+  4: { hp: 3574, dps: 299, avgHp: 1192 },
+  8: { hp: 7082, dps: 674, avgHp: 1416 },
+  12: { hp: 12783, dps: 1228, avgHp: 1420 },
+  16: { hp: 18484, dps: 1782, avgHp: 1424 },
 };
 
 const ANCHOR_ROUNDS = Object.keys(REF_ANCHORS)
@@ -75,8 +83,29 @@ export function refTeam(round: number): RefTeam {
   return { ...REF_ANCHORS[last] };
 }
 
-/** Per-round growth on top of the curve. */
-export const ROUND_MUL_RANKED = 0.04;
+/**
+ * `dps` in the anchors is auto-attack damage only, but abilities are ~37% of
+ * what a board actually deals (measured: `abilityShare%` in the final
+ * baseline). Effective output is therefore dps / (1 − 0.37) ≈ dps × 1.6, and
+ * the boss HP fit uses that — otherwise raising the ability budget would
+ * silently make every boss easier.
+ */
+export const REF_ABILITY_UPLIFT = 1.6;
+
+/** Effective damage per second of the reference board, abilities included. */
+export function refEffectiveDps(round: number): number {
+  return refTeam(round).dps * REF_ABILITY_UPLIFT;
+}
+
+/**
+ * Per-round growth *on top of* the reference curve.
+ *
+ * Ranked is small — the curve itself already quadruples between rounds 1 and
+ * 12, so the old 0.04 stacked on that made round 12 unwinnable while round 4
+ * was trivial. The gauntlet keeps its steeper ramp because it replays the same
+ * few rounds of the curve forever and needs somewhere to get harder.
+ */
+export const ROUND_MUL_RANKED = 0.025;
 export const GAUNTLET_ROUND_MUL = 0.09;
 
 export function bossRoundMul(round: number, gauntlet: boolean): number {

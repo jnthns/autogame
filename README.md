@@ -65,4 +65,4 @@ fails the build otherwise. UI timings (intro, bar drain, card stagger) are in
 
 ## Overhaul plan
 
-The design and balance overhaul is planned in [`docs/overhaul/`](docs/overhaul/README.md). Start with the README there for phase order, invariants, and commands. Each phase's measured outcome, and the five acceptance bands that turned out to need a rule change rather than a dial, are in [`docs/overhaul/baselines/`](docs/overhaul/baselines/) — `B6-report.md` is the consolidated scoreboard.
+The design and balance overhaul is planned in [`docs/overhaul/`](docs/overhaul/README.md). Start with the README there for phase order, invariants, and commands. Each phase's measured outcome, and the five acceptance bands that turned out to need a rule change rather than a dial, are in [`docs/overhaul/baselines/`](docs/overhaul/baselines/) — `B7-report.md` is the current scoreboard.

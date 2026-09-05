@@ -1,5 +1,10 @@
 # B6 report — three of eight bands hold; five are blocked upstream
 
+> **Superseded by [`B7-report.md`](B7-report.md).** B7 took the two rule changes
+> this report recommended — the boss fit model and a copy pool — and five of the
+> eight bands now hold. The analysis below is kept as the record of *why* they
+> were needed; its numbers are no longer current.
+
 B6 ran the tuning pass over the dials B1–B5 own. **Three of the eight targets in
 `02-proposal.md` §1.7 hold on both seeds. Five do not, and none of the five can
 be reached by moving a dial** — each is blocked by a structural cause already

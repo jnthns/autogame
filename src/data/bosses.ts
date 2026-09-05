@@ -1,23 +1,37 @@
 export type BossKitId = 'clay' | 'storm' | 'coil';
 
 /**
- * Kit magnitudes as fractions of the reference team's average unit HP, so a
- * boss cast means the same thing at round 4 and at round 16. The values
- * reproduce the pre-B5 literals at round 4. Dial: each ±20%.
+ * How the three kits differ. `slam` is a *relative* weight around 1.0: the
+ * absolute slam damage comes from the boss's damage budget (see
+ * `bossSlamDamage` in engine.ts), so a heavier kit trades nothing but flavour
+ * against a lighter one. Shields and burn stay fractions of the reference
+ * team's average unit HP, so they mean the same thing at every round.
+ *
+ * Because each boss round uses a different kit — clay at 4, storm at 8, coil at
+ * 12 — these weights double as the only per-round difficulty lever there is.
+ *
+ * Dial: each ±30% of parity.
  */
 export interface BossKitScale {
-  /** AOE slam damage. */
+  /** Relative AOE slam weight; the budget supplies the magnitude. */
   slam: number;
-  /** Shield the boss (or its allies) gain. */
+  /** Shield the boss (or its allies) gain, as a fraction of average unit HP. */
   shield: number;
-  /** Burning ground per second, where the kit leaves any. */
-  burn?: number;
+  /**
+   * Fraction of this kit's damage delivered as burning ground instead of
+   * upfront. It comes *out of* the slam, not on top of it — the World Coil's
+   * burn used to be a flat fraction of unit HP and was worth more than its own
+   * slam, which is why round 12 was the one boss nobody ever beat.
+   */
+  burnShare?: number;
+  /** Seconds the burning ground lasts. */
+  burnSeconds?: number;
 }
 
 export const BOSS_KIT_SCALE: Record<BossKitId, BossKitScale> = {
-  clay: { slam: 0.27, shield: 0.48 },
-  storm: { slam: 0.3, shield: 0.25 },
-  coil: { slam: 0.33, shield: 0.29, burn: 0.05 },
+  clay: { slam: 0.72, shield: 0.38 },
+  storm: { slam: 1.15, shield: 0.25 },
+  coil: { slam: 1.1, shield: 0.29, burnShare: 0.4, burnSeconds: 4 },
 };
 
 export interface BossKit {

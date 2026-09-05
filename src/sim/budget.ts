@@ -16,7 +16,7 @@ export const P_TOLERANCE = 0.08;
  * Ability-budget targets: expected ability value over 30 s at 1★, sp 0.
  * `A30_SCALE` is the B6 dial for ability share of total damage, range [0.8, 1.25].
  */
-export const A30_SCALE = 1.25;
+export const A30_SCALE = 2.0;
 export const BUDGET_A30: Record<number, number> = {
   2: 800 * A30_SCALE,
   3: 1050 * A30_SCALE,
@@ -29,11 +29,14 @@ export const A30_TOLERANCE = 0.15;
  * Two heroes cannot be brought into the A30 band by any magnitude, because the
  * value rules price their non-scaling terms at a fixed amount:
  *   anzuu — a self permanent buff is a flat 50, far under a 2-cost target;
- *   coyot — a 1.5 s stun plus an all-ally crit buff already exceed one.
+ *   coyot — a 1.5 s stun plus an all-ally crit buff already exceed one;
+ *   anans — pure control, so no magnitude feeds its value at all. It was in
+ *           band until B7 doubled the ability targets; the durations would have
+ *           to move, and the retune deliberately never touches those.
  * Both are documented in docs/overhaul/baselines/B2-report.md and excluded from
  * the strict audit so the drift guard still bites for the other 22.
  */
-export const A30_UNREACHABLE = new Set(['anzuu', 'coyot']);
+export const A30_UNREACHABLE = new Set(['anzuu', 'coyot', 'anans']);
 
 /** Ranged heroes trade survivability for reach; supports trade damage for utility. */
 export const RANGED_P_MOD = 0.92;

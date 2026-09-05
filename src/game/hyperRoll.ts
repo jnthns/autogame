@@ -177,15 +177,21 @@ export function shopPrice(offer: ShopOffer): number {
   return offer.star === 1 ? cost : cost * MERGE_COPIES;
 }
 
-/** Collapse duplicate 1★ shop rolls into a single 2★ offer (pay for both copies). */
-export function collapseShopOffers(hids: (string | null)[]): (ShopOffer | null)[] {
+/**
+ * Collapse duplicate 1★ shop rolls into a single 2★ offer (pay for both copies).
+ * `canPair` lets the caller refuse when the shared pool cannot cover two copies.
+ */
+export function collapseShopOffers(
+  hids: (string | null)[],
+  canPair: (hid: string) => boolean = () => true,
+): (ShopOffer | null)[] {
   const slots: (ShopOffer | null)[] = hids.map((hid) => (hid ? { hid, star: 1 as const } : null));
   const pending = new Map<string, number>();
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i];
     if (!s || s.star !== 1) continue;
     const prev = pending.get(s.hid);
-    if (prev != null && slots[prev]) {
+    if (prev != null && slots[prev] && canPair(s.hid)) {
       slots[prev] = { hid: s.hid, star: 2 };
       slots[i] = null;
       pending.delete(s.hid);

@@ -33,18 +33,29 @@ export const BOSS_RANGE = 12;
 /** Same-star copies needed to combine into the next star (board + bench). */
 export const MERGE_COPIES = 2;
 /**
- * Boss HP is this many times the *reference* team's HP for the round
- * (src/data/bossCurve.ts), never the live board's — see B5.
+ * Boss HP is set so the *reference* team for the round (src/data/bossCurve.ts)
+ * burns it down in BOSS_BURN_SECONDS, never from the live board — see B5.
+ * The fight is winnable exactly when that is comfortably under
+ * BOSS_BOARD_SURVIVAL, which is the whole point of budgeting both.
  */
-export const BOSS_HP_TEAM_MULT = 7;
-/** If reference DPS would burn the HP floor faster than this, pad boss HP. */
-export const BOSS_DPS_BURN_SECONDS = 30;
+export const BOSS_BURN_SECONDS = 19;
+/** Sanity floor on the HP pool, so a low-DPS reference cannot make a trivial boss. */
+export const BOSS_HP_TEAM_MULT = 3;
 /**
- * Seconds for boss AOE autos to wipe an idle reference board. Boss autos hit
- * every unit at once, so this is when the whole board falls — it must stay
- * above BOSS_DPS_BURN_SECONDS or the fight is unwinnable by construction.
+ * Seconds for the boss's *total* output — board-wide autos plus its kit — to
+ * wipe an idle reference board. Pricing autos alone is what made every boss
+ * unwinnable before B7: the kit was three times the autos and unbudgeted.
  */
-export const BOSS_BOARD_SURVIVAL = 32;
+export const BOSS_BOARD_SURVIVAL = 30;
+/** Share of that output carried by the autos; the remainder is the kit. */
+export const BOSS_AUTO_SHARE = 0.55;
+/**
+ * Measured cadence of boss casts — 8.7 s at round 4, 7.1 s at round 8, 7.2 s at
+ * round 12 over 30 seeded fights. The kit budget is spread across this period.
+ */
+export const BOSS_CAST_PERIOD_SECONDS = 7.5;
+/** Floor on boss attack, so the autos never round away entirely. */
+export const BOSS_MIN_ATK = 16;
 export const BOSS_AS = 0.52;
 /** Boss fights last longer so the 10× HP pool can actually be burned. */
 export const BOSS_COMBAT_LIMIT = 75;

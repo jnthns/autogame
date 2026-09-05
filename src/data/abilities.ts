@@ -55,16 +55,16 @@ export interface AbilityDef {
 
 export const ABILITIES: Record<string, AbilityDef> = {
   // Coils adjacent enemies, heals for half the damage dealt.
-  jorm: { base: 310, value: { damage: { from: 'base', targets: 1.5 }, healRatio: 0.5 } },
+  jorm: { base: 495, value: { damage: { from: 'base', targets: 1.5 }, healRatio: 0.5 } },
   // Gale down the row: damage split among everyone hit, plus an all-ally haste.
   quetz: {
-    base: 495,
+    base: 885,
     duration: 4,
     value: { damage: { from: 'base', targets: 1 }, allyBuff: { allies: 4 } },
   },
   // Three arcs; every arc after the first crits automatically.
   thund: {
-    base: 85,
+    base: 135,
     secondary: 3,
     secondaryKind: 'count',
     value: { damage: { from: 'base', targets: 3 }, autoCritTargets: 2 },
@@ -74,23 +74,23 @@ export const ABILITIES: Record<string, AbilityDef> = {
   anans: { base: 0, duration: 2, value: { cc: { snare: 2, amp: true, targets: 2 } } },
   // Drags the highest-attack enemy under and silences it.
   bunyi: {
-    base: 275,
+    base: 515,
     duration: 3,
     value: { damage: { from: 'base', targets: 1 }, cc: { silence: 3, targets: 1 } },
   },
   // Rake plus a self shield.
   garud: {
-    base: 275,
-    secondary: 325,
+    base: 440,
+    secondary: 520,
     secondaryKind: 'magnitude',
     value: { damage: { from: 'base', targets: 1 }, shield: { from: 'secondary', allies: 1 } },
   },
   // Nine wisps at random enemies, each able to crit.
-  kitsu: { base: 33, secondary: 9, secondaryKind: 'count', value: { hits: { from: 'base', count: 9 } } },
+  kitsu: { base: 55, secondary: 9, secondaryKind: 'count', value: { hits: { from: 'base', count: 9 } } },
   // 2×2 pillar plus burning ground.
   ifrit: {
-    base: 255,
-    secondary: 37,
+    base: 410,
+    secondary: 60,
     secondaryKind: 'magnitude',
     duration: 4,
     value: {
@@ -99,10 +99,10 @@ export const ABILITIES: Record<string, AbilityDef> = {
     },
   },
   // Three cones; heads regrow for a free second cast under 30% HP.
-  zirni: { base: 230, value: { damage: { from: 'base', targets: 3 }, secondCast: true } },
+  zirni: { base: 365, value: { damage: { from: 'base', targets: 3 }, secondCast: true } },
   // Board-wide shield; shielded allies deal more damage.
   taniw: {
-    base: 115,
+    base: 220,
     value: { shield: { from: 'base', allies: 4 }, allyBuff: { allies: 4 } },
   },
   // Steals spell power and keeps it for the round. See B2-report.md: the value
@@ -111,7 +111,7 @@ export const ABILITIES: Record<string, AbilityDef> = {
   anzuu: { base: 25, budgetBias: -0.1, value: { selfBuff: true } },
   // Riddle: stun plus true damage on the two lowest-HP enemies.
   sphin: {
-    base: 195,
+    base: 390,
     duration: 2.5,
     value: {
       damage: { from: 'base', targets: 2 },
@@ -121,7 +121,7 @@ export const ABILITIES: Record<string, AbilityDef> = {
   },
   // Drags the nearest enemy under, snares, heals for half the damage.
   kelpi: {
-    base: 165,
+    base: 290,
     duration: 2.5,
     value: {
       damage: { from: 'base', targets: 1 },
@@ -130,11 +130,11 @@ export const ABILITIES: Record<string, AbilityDef> = {
     },
   },
   // Cleanse plus a board-wide shield.
-  barng: { base: 130, value: { shield: { from: 'base', allies: 4 } } },
+  barng: { base: 210, value: { shield: { from: 'base', allies: 4 } } },
   // Stun a random enemy; the board keeps the crit for the round. See
   // B2-report.md: the stun and the all-ally crit alone exceed the 2-cost target.
   coyot: {
-    base: 16,
+    base: 175,
     duration: 1.5,
     budgetBias: 0.1,
     value: {
@@ -145,39 +145,39 @@ export const ABILITIES: Record<string, AbilityDef> = {
   },
   // Shields the lowest-HP ally and rakes what is next to them.
   griff: {
-    base: 160,
-    secondary: 230,
+    base: 260,
+    secondary: 370,
     secondaryKind: 'magnitude',
     value: { damage: { from: 'base', targets: 1.5 }, shield: { from: 'secondary', allies: 1 } },
   },
   // Self shield plus an adjacent pulse.
   golem: {
-    base: 140,
-    secondary: 500,
+    base: 225,
+    secondary: 800,
     secondaryKind: 'magnitude',
     value: { damage: { from: 'base', targets: 1.5 }, shield: { from: 'secondary', allies: 1 } },
   },
   // Keen on the lowest-HP enemy; true damage under 40%.
   bansh: {
-    base: 265,
+    base: 495,
     duration: 2,
     value: { damage: { from: 'base', targets: 1 }, cc: { stun: 2, targets: 1 } },
   },
   // Three heads strike and each connection heals.
   hydra: {
-    base: 170,
-    secondary: 45,
+    base: 270,
+    secondary: 75,
     secondaryKind: 'magnitude',
     value: { damage: { from: 'base', targets: 3 }, heal: { from: 'secondary', allies: 3 } },
   },
   // Repairs the two most wounded allies and hardens them.
-  nuwa: { base: 240, value: { heal: { from: 'base', allies: 2 }, allyBuff: { allies: 2 } } },
+  nuwa: { base: 410, value: { heal: { from: 'base', allies: 2 }, allyBuff: { allies: 2 } } },
   // Tears the nearest enemy and heals for everything dealt.
-  camaz: { base: 225, value: { damage: { from: 'base', targets: 1 }, healRatio: 1 } },
+  camaz: { base: 360, value: { damage: { from: 'base', targets: 1 }, healRatio: 1 } },
   // Heals the board, hastes it, and burns the two nearest enemies.
   simur: {
-    base: 70,
-    secondary: 90,
+    base: 125,
+    secondary: 165,
     secondaryKind: 'magnitude',
     duration: 4,
     value: {
@@ -188,13 +188,13 @@ export const ABILITIES: Record<string, AbilityDef> = {
   },
   // Everything within two tiles takes damage and is snared.
   levia: {
-    base: 470,
+    base: 770,
     duration: 1.5,
     value: { damage: { from: 'base', targets: 2 }, cc: { snare: 1.5, targets: 2 } },
   },
   // Feasts, steals max HP, and grows its attack for the round.
   wendi: {
-    base: 690,
+    base: 1135,
     secondary: 0.1,
     secondaryKind: 'fraction',
     value: { damage: { from: 'base', targets: 1 }, selfBuff: true },

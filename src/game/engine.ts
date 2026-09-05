@@ -8,7 +8,10 @@ import {
   BOSS_BOARD_SURVIVAL,
   BOSS_COMBAT_LIMIT,
   BOSS_INCOMING_MULT,
-  BOSS_DPS_BURN_SECONDS,
+  BOSS_AUTO_SHARE,
+  BOSS_BURN_SECONDS,
+  BOSS_CAST_PERIOD_SECONDS,
+  BOSS_MIN_ATK,
   BOSS_FOOTPRINT,
   BOSS_HP_TEAM_MULT,
   BOSS_RANGE,
@@ -31,7 +34,7 @@ import {
 } from '../data/constants';
 import { ABILITIES } from '../data/abilities';
 import { BOSS_KIT_SCALE, BOSS_KITS, type BossKitId } from '../data/bosses';
-import { bossRoundMul, refTeam } from '../data/bossCurve';
+import { bossRoundMul, refEffectiveDps, refTeam } from '../data/bossCurve';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP, isMeleeHero } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
@@ -39,6 +42,9 @@ import { TRAITS, type TraitName } from '../data/traits';
 import { random, shuffle } from './rng';
 import {
   BOSS_SURVIVOR_COUNT,
+  createPool,
+  MAX_COPIES_PER_ROLL,
+  type CopyPool,
   BOT_INCOME_BONUS,
   incomeBreakdown,
   INTEREST_MAX,
@@ -150,6 +156,7 @@ export function createGame(
     foeShop: [],
     shop: [],
     freeRerolls: 0,
+    pool: mode === 'practice' ? null : createPool(HEROES.map((h) => h.id), (id) => HERO_MAP[id].cost),
     sel: null,
     speed,
     phase: 'plan',
@@ -229,8 +236,16 @@ function cellBlocked(C: Combatant[], r: number, c: number, skip?: string): boole
  * Five slots, each an independent tier roll from the round's odds row followed
  * by a uniform pick inside that tier. Both the player and the bot use this;
  * only the draft differs.
+ *
+ * A hero is offerable while the shared pool still holds a copy and this roll
+ * has not already shown MAX_COPIES_PER_ROLL of it. Rolling does not reserve
+ * anything — the pool only moves on a buy or a sell.
  */
-export function rollShopOffers(draft: string[], round = 1): (ShopOffer | null)[] {
+export function rollShopOffers(
+  draft: string[],
+  round = 1,
+  pool: CopyPool | null = null,
+): (ShopOffer | null)[] {
   const base = playerShopPool(draft);
   const byTier = new Map<number, string[]>();
   base.forEach((id) => {
@@ -239,17 +254,42 @@ export function rollShopOffers(draft: string[], round = 1): (ShopOffer | null)[]
     list.push(id);
     byTier.set(cost, list);
   });
-  const has = (tier: number) => (byTier.get(tier)?.length ?? 0) > 0;
-  const raw = [0, 0, 0, 0, 0].map(() => {
+
+  const shown: Record<string, number> = {};
+  const left = (id: string) => (pool ? (pool[id] ?? 0) : Infinity) - (shown[id] ?? 0);
+  const offerable = (id: string) => left(id) > 0 && (shown[id] ?? 0) < MAX_COPIES_PER_ROLL;
+  const has = (tier: number) => (byTier.get(tier) ?? []).some(offerable);
+
+  const raw: (string | null)[] = [0, 0, 0, 0, 0].map(() => {
     const tier = rollShopTier(round, has);
-    const pool = byTier.get(tier) ?? base;
-    return pool[Math.floor(random() * pool.length)] ?? base[0];
+    const candidates = (byTier.get(tier) ?? base).filter(offerable);
+    const from = candidates.length ? candidates : base.filter(offerable);
+    if (!from.length) return null;
+    const id = from[Math.floor(random() * from.length)];
+    shown[id] = (shown[id] ?? 0) + 1;
+    return id;
   });
-  return collapseShopOffers(raw);
+  // A pair only collapses into a 2★ offer if the pool can actually pay for both.
+  return collapseShopOffers(raw, (id) => (pool ? (pool[id] ?? 0) : Infinity) >= MERGE_COPIES);
+}
+
+/** Copies of a hero this unit is holding: 1 at 1★, 2 at 2★, 4 at 3★. */
+export function unitCopies(u: { star: 1 | 2 | 3 }): number {
+  return u.star === 1 ? 1 : u.star === 2 ? MERGE_COPIES : MERGE_COPIES * MERGE_COPIES;
+}
+
+function takeFromPool(g: GameState, hid: string, copies: number): void {
+  if (!g.pool) return;
+  g.pool[hid] = Math.max(0, (g.pool[hid] ?? 0) - copies);
+}
+
+function returnToPool(g: GameState, hid: string, copies: number): void {
+  if (!g.pool) return;
+  g.pool[hid] = (g.pool[hid] ?? 0) + copies;
 }
 
 export function rollShop(g: GameState, draft: string[]): void {
-  g.shop = rollShopOffers(draft, g.round);
+  g.shop = rollShopOffers(draft, g.round, g.pool);
 }
 
 export function traitCounts(ids: string[]): Record<string, number> {
@@ -541,6 +581,7 @@ function botBuy(g: GameState, i: number): boolean {
   if (g.foeGold < cost || g.foeBench.length >= 8) return false;
   g.foeGold -= cost;
   g.foeShop = g.foeShop.map((s, j) => (j === i ? null : s));
+  takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
   g.foeBench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   return true;
 }
@@ -572,6 +613,7 @@ function botSellWeakest(g: GameState): boolean {
   const idx = list.findIndex((x) => x.u === worst.u);
   if (idx < 0) return false;
   g.foeGold += sellValue(worst);
+  returnToPool(g, worst.hid, unitCopies(worst));
   list.splice(idx, 1);
   return true;
 }
@@ -592,7 +634,7 @@ export function grantBotRelic(g: GameState): void {
 
 export function runBotTurn(g: GameState): void {
   if (!isRankedMode(g.mode)) return;
-  g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id), g.round);
+  g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id), g.round, g.pool);
 
   const tryBuys = () => {
     let bought = false;
@@ -617,7 +659,7 @@ export function runBotTurn(g: GameState): void {
       Math.min(INTEREST_MAX, Math.floor(g.foeGold / INTEREST_PER)) * INTEREST_PER;
   if (!usefulLeft && keepsInterest && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
     g.foeGold -= MATCH_DEFAULTS.rerollCost;
-    g.foeShop = rollShopOffers(g.foeDraft, g.round);
+    g.foeShop = rollShopOffers(g.foeDraft, g.round, g.pool);
     tryBuys();
     tryBuys();
   }
@@ -640,8 +682,8 @@ export function runBotTurn(g: GameState): void {
 
 const FOE_SCALE: Record<Difficulty, { hp: number; atk: number }> = {
   normal: { hp: 1, atk: 1 },
-  hard: { hp: 1.15, atk: 1.1 },
-  mythic: { hp: 1.3, atk: 1.2 },
+  hard: { hp: 1.1, atk: 1.06 },
+  mythic: { hp: 1.18, atk: 1.1 },
 };
 
 const BOSS_SCALE: Record<Difficulty, { hp: number; atk: number; as: number }> = {
@@ -739,20 +781,52 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
 }
 
 /**
+ * The damage one boss slam does at this round.
+ *
+ * The boss's whole output — board-wide autos plus its kit — is budgeted to wipe
+ * an idle reference board in BOSS_BOARD_SURVIVAL seconds. BOSS_AUTO_SHARE of
+ * that goes to the autos and the rest to the kit, spread over the measured cast
+ * period; the kit's own `slam` weight only decides how the three kits differ.
+ */
+export function bossCastDamage(round: number, kit: BossKitId): { slam: number; burnPerSec: number } {
+  const ref = refTeam(round);
+  const k = BOSS_KIT_SCALE[kit];
+  const perCast =
+    (ref.avgHp * (1 - BOSS_AUTO_SHARE) * BOSS_CAST_PERIOD_SECONDS) / BOSS_BOARD_SURVIVAL;
+  const total = perCast * k.slam;
+  const burnShare = k.burnShare ?? 0;
+  const burnSeconds = k.burnSeconds ?? 1;
+  return {
+    slam: total * (1 - burnShare),
+    burnPerSec: burnShare > 0 ? (total * burnShare) / burnSeconds : 0,
+  };
+}
+
+/** The attack that spends the autos' share of the same budget. */
+export function bossAttack(round: number): number {
+  const ref = refTeam(round);
+  return Math.max(BOSS_MIN_ATK, (ref.avgHp * BOSS_AUTO_SHARE) / (BOSS_AS * BOSS_BOARD_SURVIVAL));
+}
+
+/**
  * Fit every boss to the *reference* team for the round, not to the live board.
  * Growing your board therefore makes the fight easier, which is the whole point
  * of growing it; the round number alone decides how big the boss is.
+ *
+ * HP is whatever the reference team burns down in BOSS_BURN_SECONDS. That is
+ * deliberately well under BOSS_BOARD_SURVIVAL, and the gap between the two is
+ * the boss win rate: `roundMul` closes it as the match goes on, which is why
+ * round 12 is meant to be harder than round 4.
  */
 export function fitBossToTeam(foes: Combatant[], round: number, opts?: { gauntlet?: boolean }): void {
   const bosses = foes.filter((u) => u.boss);
   if (!bosses.length) return;
   const ref = refTeam(round);
   const roundMul = bossRoundMul(round, !!opts?.gauntlet);
+  const byBurn = refEffectiveDps(round) * BOSS_INCOMING_MULT * BOSS_BURN_SECONDS * roundMul;
   const floor = BOSS_HP_TEAM_MULT * ref.hp * roundMul;
-  const burn = floor / (ref.dps * BOSS_INCOMING_MULT);
-  const pad = burn < BOSS_DPS_BURN_SECONDS ? BOSS_DPS_BURN_SECONDS / burn : 1;
-  const target = Math.max(1, Math.round(floor * pad));
-  const atk = Math.max(16, ref.avgHp / (BOSS_AS * BOSS_BOARD_SURVIVAL));
+  const target = Math.max(1, Math.round(Math.max(byBurn, floor)));
+  const atk = bossAttack(round);
 
   bosses.forEach((b) => {
     b.maxHp = target;
@@ -1105,10 +1179,12 @@ export class CombatEngine {
     const m = STARMUL[u.star as 1 | 2 | 3];
     const kit = (u.bossKit as BossKitId) || 'clay';
     const k = BOSS_KIT_SCALE[kit];
-    // Kit magnitudes track the reference board's average unit, so a slam is
+    const round = u.bossRound ?? 4;
+    // Kit magnitudes track the reference board's average unit, so a cast is
     // always worth about the same fraction of a hero at every round.
-    const unit = refTeam(u.bossRound ?? 4).avgHp;
-    const slam = (unit * k.slam + sp) * m;
+    const unit = refTeam(round).avgHp;
+    const cast = bossCastDamage(round, kit);
+    const slam = (cast.slam + sp) * m;
     const shield = (unit * k.shield + sp) * m;
     const fxTarget = E[0] || u;
     this.emitFx(u, fxTarget, 'cast');
@@ -1119,6 +1195,10 @@ export class CombatEngine {
         ally.shield += shield;
         this.applyAsBuff(ally, 1.22, 4);
       });
+      // "The court steels itself" — with the solo 4×4 boss there is no court to
+      // steel, so the ward lands on the boss instead of evaporating. Without
+      // this the round-8 boss was the only one with no defensive layer at all.
+      if (!A.length) u.shield += shield;
       this.applyAsBuff(u, 1.12, 4);
       E.slice()
         .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)
@@ -1132,8 +1212,8 @@ export class CombatEngine {
     if (kit === 'coil') {
       E.forEach((o) => {
         this.hurt(u, o, slam, 'magic');
-        o.burn = unit * (k.burn ?? 0) * m;
-        o.burnT = 4;
+        o.burn = cast.burnPerSec * m;
+        o.burnT = k.burnSeconds ?? 4;
         o.amp = Math.max(o.amp || 0, 0.16);
         o.silence = Math.max(o.silence, 1.4);
       });
@@ -1493,6 +1573,7 @@ export const gameActions = {
     if (g.gold < cost || g.bench.length >= 8) return;
     g.gold -= cost;
     g.shop = g.shop.map((s, j) => (j === i ? null : s));
+    takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
     g.bench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   },
 
@@ -1503,6 +1584,7 @@ export const gameActions = {
     if (idx < 0) return;
     const un = list[idx];
     g.gold += sellValue(un);
+    returnToPool(g, un.hid, unitCopies(un));
     list.splice(idx, 1);
     g.sel = null;
   },
