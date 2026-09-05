@@ -9,6 +9,8 @@ interface GameHudProps {
   game: GameState;
   boardCap: number;
   uiEvents: StampedUiEvent[];
+  /** True while the result modal is held back for the bar drain. */
+  pendingResult?: boolean;
   onQuit: () => void;
 }
 
@@ -19,7 +21,7 @@ function modeLabel(g: GameState): string {
   return `ROUND ${g.round}/${g.matchRounds}`;
 }
 
-export function GameHud({ game: g, boardCap, uiEvents, onQuit }: GameHudProps) {
+export function GameHud({ game: g, boardCap, uiEvents, pendingResult, onQuit }: GameHudProps) {
   const gauntlet = isGauntletMode(g.mode);
   const [showIncome, setShowIncome] = useState(false);
   // Previewed against the gold held right now, so banking updates it live.
@@ -98,6 +100,9 @@ export function GameHud({ game: g, boardCap, uiEvents, onQuit }: GameHudProps) {
               />
             </div>
             <span className="om-hud__hp-value mono">{g.myHp}</span>
+            {pendingResult && g.lastResult && !g.lastResult.win && g.lastResult.dmg > 0 && (
+              <span className="om-hud__hit">-{g.lastResult.dmg}</span>
+            )}
           </div>
           <div className="om-hud__hp">
             <span className="om-label">FOE</span>
@@ -108,6 +113,9 @@ export function GameHud({ game: g, boardCap, uiEvents, onQuit }: GameHudProps) {
               />
             </div>
             <span className="om-hud__hp-value mono">{g.foeHp}</span>
+            {pendingResult && g.lastResult?.win && g.lastResult.dmg > 0 && (
+              <span className="om-hud__hit">-{g.lastResult.dmg}</span>
+            )}
           </div>
         </div>
       )}

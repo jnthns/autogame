@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, JADE, PLAYER_ROW_START, RUST, SAF, USER_DRAFT_MAX } from '../data/constants';
+import { BAR_DRAIN_MS, BOSS_INTRO_MS, FIGHT_INTRO_MS, RESULT_DELAY_MS } from '../data/ui';
 import { RELIC_PICKS_LOSS, RELIC_PICKS_WIN } from '../data/economy';
 import {
   battlegroundUnlocked,
@@ -98,9 +99,13 @@ export function useGame() {
   const [combatants, setCombatants] = useState<Combatant[] | null>(null);
   const [combatFx, setCombatFx] = useState<CombatFx[]>([]);
   const [uiEvents, setUiEvents] = useState<StampedUiEvent[]>([]);
+  const [intro, setIntro] = useState<{ boss: { name: string; kit: string } | null; until: number } | null>(null);
+  const [pendingResult, setPendingResult] = useState(false);
   const [tick, setTick] = useState(0);
 
   const engineRef = useRef<CombatEngine | null>(null);
+  const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startTickingRef = useRef<(() => void) | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameRef = useRef<GameState | null>(null);
   const progressRef = useRef(progress);
@@ -245,6 +250,10 @@ export function useGame() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    if (introTimerRef.current) {
+      clearTimeout(introTimerRef.current);
+      introTimerRef.current = null;
+    }
   }, []);
 
   const startGame = useCallback(
@@ -266,6 +275,8 @@ export function useGame() {
       setBanner('');
       setSheet(null);
       setUiEvents([]);
+      setIntro(null);
+      setPendingResult(false);
       knownUnits.current = new Set();
       setScreen('game');
     },
@@ -323,8 +334,14 @@ export function useGame() {
       engineRef.current = null;
       setCombatants(null);
       setCombatFx([]);
-      setOverlay(result);
+      // Resolve first so the HP bar has a new value to animate to, then hold the
+      // modal back for one drain so the player sees where the damage landed.
       syncGame(g);
+      setPendingResult(true);
+      setTimeout(() => {
+        setPendingResult(false);
+        setOverlay(result);
+      }, BAR_DRAIN_MS);
     },
     [syncGame],
   );
@@ -364,25 +381,46 @@ export function useGame() {
     g.phase = 'combat';
     syncGame(g);
     clearTimer();
-    timerRef.current = setInterval(() => {
-      const eng = engineRef.current;
-      const current = gameRef.current;
-      if (!eng || !current) return;
-      eng.tick(current.speed);
-      setCombatants([...eng.C]);
-      pruneTransients();
-      setTick((t) => t + 1);
-      if (eng.isDone()) {
-        clearTimer();
-        const win = eng.getWinner();
-        const survivors = {
-          me: eng.C.filter((u) => u.alive && u.side === 'me').length,
-          foe: eng.C.filter((u) => u.alive && u.side === 'foe').length,
-        };
-        setTimeout(() => resolveCombat(win, survivors), 500);
-      }
-    }, 100);
+
+    // The board is live and the shop has collapsed, but the engine's clock does
+    // not start until the intro has played. A tap skips it.
+    const introMs = (boss ? BOSS_INTRO_MS : 0) + FIGHT_INTRO_MS;
+    setIntro({ boss: boss ? { name: boss.name, kit: boss.bossKit ?? 'clay' } : null, until: Date.now() + introMs });
+    const startTicking = () => {
+      timerRef.current = setInterval(() => {
+        const eng = engineRef.current;
+        const current = gameRef.current;
+        if (!eng || !current) return;
+        eng.tick(current.speed);
+        setCombatants([...eng.C]);
+        pruneTransients();
+        setTick((t) => t + 1);
+        if (eng.isDone()) {
+          clearTimer();
+          const win = eng.getWinner();
+          const survivors = {
+            me: eng.C.filter((u) => u.alive && u.side === 'me').length,
+            foe: eng.C.filter((u) => u.alive && u.side === 'foe').length,
+          };
+          setTimeout(() => resolveCombat(win, survivors), RESULT_DELAY_MS);
+        }
+      }, 100);
+    };
+    startTickingRef.current = startTicking;
+    introTimerRef.current = setTimeout(() => {
+      setIntro(null);
+      startTicking();
+    }, introMs);
   }, [clearTimer, emit, pop, pruneTransients, resolveCombat, spawnFx, syncGame]);
+
+  /** Tapping during the intro starts the fight immediately. */
+  const skipIntro = useCallback(() => {
+    if (!introTimerRef.current) return;
+    clearTimeout(introTimerRef.current);
+    introTimerRef.current = null;
+    setIntro(null);
+    startTickingRef.current?.();
+  }, []);
 
   const buy = useCallback(
     (i: number) => {
@@ -578,6 +616,9 @@ export function useGame() {
     combatants,
     combatFx,
     uiEvents,
+    intro,
+    pendingResult,
+    skipIntro,
     tick,
     saveDraft,
     toggleHero,

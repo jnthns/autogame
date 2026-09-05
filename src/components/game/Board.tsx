@@ -4,6 +4,7 @@ import {
   BOARD_CELL_WIDTH_PCT,
   BOARD_COLS,
 } from '../../data/constants';
+import { BOSS_KITS, type BossKitId } from '../../data/bosses';
 import { occupiesCell } from '../../game/engine';
 import type { Combatant, CombatFx, Floater, GameState, Unit } from '../../game/types';
 import { recent, type StampedUiEvent } from '../../game/uiEvents';
@@ -23,6 +24,9 @@ interface BoardProps {
   planBanner: { text: string; tone: 'boss' | 'final' } | null;
   battlegroundId: string;
   reduceVfx?: boolean;
+  /** Fight/boss intro playing over the board; tapping it skips ahead. */
+  intro?: { boss: { name: string; kit: string } | null } | null;
+  onSkipIntro?: () => void;
   onTapCell: (r: number, c: number) => void;
   onTapBoard: (u: Unit) => void;
   onOpenSheet: (u: Unit) => void;
@@ -93,6 +97,8 @@ export function Board({
   planBanner,
   battlegroundId,
   reduceVfx,
+  intro,
+  onSkipIntro,
   onTapCell,
   onTapBoard,
   onOpenSheet,
@@ -231,6 +237,18 @@ export function Board({
           {f.text}
         </div>
       ))}
+
+      {intro && (
+        <div className="om-intro" onClick={onSkipIntro} role="presentation">
+          {intro.boss && (
+            <div className="om-boss-intro">
+              <div className="slab om-boss-intro__name">{intro.boss.name}</div>
+              <div className="om-boss-intro__kit">{BOSS_KITS[intro.boss.kit as BossKitId]?.banner}</div>
+            </div>
+          )}
+          <span className="om-stamp om-stamp--fight slab">FIGHT</span>
+        </div>
+      )}
 
       {banner && (
         <div className="om-board__banner">

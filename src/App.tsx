@@ -1,4 +1,5 @@
 import { useGame } from './hooks/useGame';
+import { ScreenFrame } from './components/ScreenFrame';
 import { InspectModal } from './components/InspectModal';
 import { BuildScreen } from './components/screens/BuildScreen';
 import { GameScreen, OverlayModal, SheetModal } from './components/screens/GameScreen';
@@ -30,6 +31,7 @@ export default function App() {
           .filter(Boolean)
           .join(' ')}
       >
+        <ScreenFrame screen={game.screen}>
         {game.screen === 'home' && (
           <HomeScreen
             teamCount={game.draft.length}
@@ -81,6 +83,9 @@ export default function App() {
               floaters={game.floaters}
               banner={game.banner}
               uiEvents={game.uiEvents}
+              intro={game.intro}
+              pendingResult={game.pendingResult}
+              onSkipIntro={game.skipIntro}
               boardCap={game.cap}
               battlegroundId={game.settings.battlegroundId}
               reduceVfx={game.settings.reduceVfx}
@@ -118,6 +123,7 @@ export default function App() {
             )}
           </>
         )}
+        </ScreenFrame>
         {game.inspectId && (
           <InspectModal
             heroId={game.inspectId}

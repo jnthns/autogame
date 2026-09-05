@@ -30,6 +30,9 @@ interface GameScreenProps {
   floaters: Floater[];
   banner: string;
   uiEvents: StampedUiEvent[];
+  intro?: { boss: { name: string; kit: string } | null } | null;
+  pendingResult?: boolean;
+  onSkipIntro?: () => void;
   boardCap: number;
   battlegroundId: string;
   reduceVfx?: boolean;
@@ -111,7 +114,13 @@ export function GameScreen(props: GameScreenProps) {
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <GameHud game={g} boardCap={boardCap} uiEvents={props.uiEvents} onQuit={props.onQuit} />
+      <GameHud
+        game={g}
+        boardCap={boardCap}
+        uiEvents={props.uiEvents}
+        pendingResult={props.pendingResult}
+        onQuit={props.onQuit}
+      />
       <SynergyBar
         synergies={activeSynergies(g.board.map((u) => u.hid)).filter((t) => t.count >= 1)}
         onOpenTraits={props.onOpenTraits}
@@ -126,6 +135,8 @@ export function GameScreen(props: GameScreenProps) {
         planBanner={planBannerFor(g)}
         battlegroundId={props.battlegroundId}
         reduceVfx={props.reduceVfx}
+        intro={props.intro}
+        onSkipIntro={props.onSkipIntro}
         onTapCell={props.onTapCell}
         onTapBoard={props.onTapBoard}
         onOpenSheet={props.onOpenSheet}
@@ -144,7 +155,7 @@ export function GameScreen(props: GameScreenProps) {
           setSellArmed(false);
         }}
       />
-      <div className="om-shop">
+      <div className={`om-shop${plan ? '' : ' om-shop--collapse'}`}>
         {plan && (
           <Shop
             game={g}
@@ -158,7 +169,9 @@ export function GameScreen(props: GameScreenProps) {
           />
         )}
         {g.phase === 'combat' && (
-          <CombatBar speed={g.speed} onToggleSpeed={props.onToggleSpeed} />
+          <div className="om-combat-bar--enter">
+            <CombatBar speed={g.speed} onToggleSpeed={props.onToggleSpeed} />
+          </div>
         )}
       </div>
     </div>

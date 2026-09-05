@@ -1109,3 +1109,79 @@
   opacity: 1;
   transform: none;
 }
+
+/* ── Screen frame ──────────────────────────────────────────────────────── */
+.om-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.om-screen--enter {
+  animation: omScreenEnter var(--dur-base) var(--ease-out) both;
+}
+
+/* ── Fight and boss intro ──────────────────────────────────────────────── */
+.om-intro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  background: rgba(14, 13, 10, 0.35);
+  z-index: var(--z-banner);
+  cursor: pointer;
+}
+
+.om-boss-intro {
+  text-align: center;
+  padding: var(--sp-4) var(--sp-6);
+  animation: omBossRise var(--dur-deliberate) var(--ease-out) both;
+}
+
+.om-boss-intro__name {
+  font-size: var(--text-2xl);
+  line-height: 1;
+  color: var(--om-bone);
+  text-shadow: 2px 2px 0 var(--om-ink);
+}
+
+.om-boss-intro__kit {
+  margin-top: var(--sp-3);
+  font-size: var(--text-sm);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--om-accent);
+}
+
+.om-stamp--fight {
+  font-size: var(--text-xl);
+  animation: omStamp var(--dur-deliberate) var(--ease-snap) both;
+}
+
+/* ── Round flow ────────────────────────────────────────────────────────── */
+.om-shop--collapse {
+  overflow: hidden;
+  transition: max-height var(--dur-base) var(--ease-in-out);
+}
+
+.om-combat-bar--enter {
+  animation: omRise var(--dur-base) var(--ease-out) both;
+}
+
+.om-hud__hit {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  color: var(--om-bad);
+  animation: omFloatUp var(--dur-linger) var(--ease-out) both;
+}
+
+.om-relic-card--deal,
+.om-unlock-row--deal {
+  animation: omDeal var(--dur-base) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}

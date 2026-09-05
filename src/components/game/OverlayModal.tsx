@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
@@ -219,8 +220,12 @@ export function OverlayModal({
                 Unsealed
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {overlay.unlocked.map((id) => (
-                  <div key={id} className="om-tile om-unlock-row">
+                {overlay.unlocked.map((id, i) => (
+                  <div
+                    key={id}
+                    className="om-tile om-unlock-row om-unlock-row--deal"
+                    style={{ '--i': i } as CSSProperties}
+                  >
                     <PixelSprite src={spriteCss(id)} size={28} />
                     <span style={{ flex: 1 }}>
                       <span className="slab om-unlock-row__name">{HERO_MAP[id].name}</span>
@@ -239,10 +244,14 @@ export function OverlayModal({
                 Battleground unlocked
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {overlay.unlockedBattlegrounds.map((id) => {
+                {overlay.unlockedBattlegrounds.map((id, i) => {
                   const b = BATTLEGROUND_MAP[id];
                   return (
-                    <div key={id} className="om-tile om-unlock-row">
+                    <div
+                      key={id}
+                      className="om-tile om-unlock-row om-unlock-row--deal"
+                      style={{ '--i': i } as CSSProperties}
+                    >
                       <div className="om-unlock-row__thumb">
                         <BattlegroundPreview id={id} />
                       </div>
@@ -261,7 +270,13 @@ export function OverlayModal({
           {c.relics.length > 0 && (
             <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {c.relics.map((r, i) => (
-                <button key={i} type="button" className="om-relic-card btn-active-sm" onClick={r.onTap}>
+                <button
+                  key={i}
+                  type="button"
+                  className="om-relic-card om-relic-card--deal btn-active-sm"
+                  style={{ '--i': i } as CSSProperties}
+                  onClick={r.onTap}
+                >
                   <span className="om-relic-card__glyph">{r.glyph}</span>
                   <span style={{ flex: 1 }}>
                     <span className="slab om-unlock-row__name">{r.name}</span>
