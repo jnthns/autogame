@@ -80,6 +80,7 @@ export default function App() {
               combatFx={game.combatFx}
               floaters={game.floaters}
               banner={game.banner}
+              uiEvents={game.uiEvents}
               boardCap={game.cap}
               battlegroundId={game.settings.battlegroundId}
               reduceVfx={game.settings.reduceVfx}

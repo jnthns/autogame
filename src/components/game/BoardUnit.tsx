@@ -14,18 +14,36 @@ interface BoardUnitProps {
   boardUnit?: Unit;
   selected: boolean;
   combat: boolean;
+  /** Just combined into this star, or just dropped onto the board. */
+  merged?: boolean;
+  placed?: boolean;
   /** Lunge transform from the FX layer, when this unit is swinging. */
   lunge?: string;
   onTap: () => void;
 }
 
-export function BoardUnit({ unit: u, boardUnit, selected, combat, lunge, onTap }: BoardUnitProps) {
+export function BoardUnit({
+  unit: u,
+  boardUnit,
+  selected,
+  combat,
+  merged,
+  placed,
+  lunge,
+  onTap,
+}: BoardUnitProps) {
   const fp = u.footprint ?? (u.boss ? BOSS_FOOTPRINT : 1);
   const isBoss = fp > 1;
   const hpPct = Math.max(0, Math.min(1, u.hp / u.maxHp));
   const stunned = u.stun > 0 && !selected;
 
-  const wrapClass = ['om-unit', isBoss ? 'om-unit--boss' : '', selected ? 'om-unit--sel' : '']
+  const wrapClass = [
+    'om-unit',
+    isBoss ? 'om-unit--boss' : '',
+    selected ? 'om-unit--sel' : '',
+    merged ? 'om-unit--merge' : '',
+    placed ? 'om-unit--placed' : '',
+  ]
     .filter(Boolean)
     .join(' ');
   const bodyClass = [
@@ -62,7 +80,11 @@ export function BoardUnit({ unit: u, boardUnit, selected, combat, lunge, onTap }
             })}
           </span>
         )}
-        <span className={`om-badge-star om-badge-star--${u.star}`}>{'★'.repeat(u.star)}</span>
+        <span
+          className={`om-badge-star om-badge-star--${u.star}${merged ? ' om-badge-star--pop' : ''}`}
+        >
+          {'★'.repeat(u.star)}
+        </span>
         <span className="om-bar om-bar--unit">
           <span
             className={`om-bar__fill om-bar__fill--unit-${u.side === 'me' ? 'me' : 'foe'}`}

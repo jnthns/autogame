@@ -12,6 +12,7 @@ import {
 import { boardPower, getGauntletEncounter, makeGauntletBossUnits } from '../../game/gauntlet';
 import { getBossEncounter, isBossRound, makeBossUnits, periodInfo } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, Unit } from '../../game/types';
+import type { StampedUiEvent } from '../../game/uiEvents';
 import { Bench } from '../game/Bench';
 import { Board } from '../game/Board';
 import { CombatBar } from '../game/CombatBar';
@@ -28,6 +29,7 @@ interface GameScreenProps {
   combatFx: CombatFx[];
   floaters: Floater[];
   banner: string;
+  uiEvents: StampedUiEvent[];
   boardCap: number;
   battlegroundId: string;
   reduceVfx?: boolean;
@@ -109,7 +111,7 @@ export function GameScreen(props: GameScreenProps) {
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <GameHud game={g} boardCap={boardCap} onQuit={props.onQuit} />
+      <GameHud game={g} boardCap={boardCap} uiEvents={props.uiEvents} onQuit={props.onQuit} />
       <SynergyBar
         synergies={activeSynergies(g.board.map((u) => u.hid)).filter((t) => t.count >= 1)}
         onOpenTraits={props.onOpenTraits}
@@ -120,6 +122,7 @@ export function GameScreen(props: GameScreenProps) {
         combatFx={props.combatFx}
         floaters={props.floaters}
         banner={props.banner}
+        uiEvents={props.uiEvents}
         planBanner={planBannerFor(g)}
         battlegroundId={props.battlegroundId}
         reduceVfx={props.reduceVfx}
@@ -132,6 +135,7 @@ export function GameScreen(props: GameScreenProps) {
         selUnit={selUnit}
         sellValue={selUnit ? sellValue(selUnit) : 0}
         sellArmed={sellArmed}
+        uiEvents={props.uiEvents}
         onTapBench={props.onTapBench}
         onInfo={props.onInfo}
         onArmSell={() => setSellArmed(true)}
@@ -147,6 +151,7 @@ export function GameScreen(props: GameScreenProps) {
             rerollLabel={rerollLabel}
             canReroll={canReroll}
             fightLabel={fightLabelFor(g)}
+            uiEvents={props.uiEvents}
             onBuy={props.onBuy}
             onReroll={props.onReroll}
             onStartCombat={props.onStartCombat}

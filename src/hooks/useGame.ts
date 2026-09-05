@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, PLAYER_ROW_START, RUST, SAF, USER_DRAFT_MAX } from '../data/constants';
+import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, JADE, PLAYER_ROW_START, RUST, SAF, USER_DRAFT_MAX } from '../data/constants';
 import { RELIC_PICKS_LOSS, RELIC_PICKS_WIN } from '../data/economy';
 import {
   battlegroundUnlocked,
@@ -38,6 +38,7 @@ import {
   usesDifficulty,
 } from '../game/engine';
 import { pickGauntletRelics } from '../game/gauntlet';
+import { pruneUiEvents, stamp, type StampedUiEvent, type UiEvent } from '../game/uiEvents';
 import { debugRoundFromUrl, debugStateFromUrl } from '../game/debugUrl';
 import type {
   Combatant,
@@ -91,6 +92,7 @@ export function useGame() {
   const [banner, setBanner] = useState('');
   const [combatants, setCombatants] = useState<Combatant[] | null>(null);
   const [combatFx, setCombatFx] = useState<CombatFx[]>([]);
+  const [uiEvents, setUiEvents] = useState<StampedUiEvent[]>([]);
   const [tick, setTick] = useState(0);
 
   const engineRef = useRef<CombatEngine | null>(null);
@@ -111,10 +113,57 @@ export function useGame() {
     settingsRef.current = settings;
   }, [settings]);
 
-  const syncGame = useCallback((g: GameState) => {
-    setGame({ ...g });
-    setTick((t) => t + 1);
+  /** Append a UI event and prune what has aged out. */
+  const emit = useCallback((...events: UiEvent[]) => {
+    if (!events.length) return;
+    setUiEvents((prev) => [...pruneUiEvents(prev), ...events.map((e) => stamp(e))].slice(-24));
   }, []);
+
+  /**
+   * Ids we have already seen on the roster. A star-2-or-3 unit whose id is new
+   * was just combined, which is the merge cue for the board and the bench.
+   */
+  const knownUnits = useRef(new Set<string>());
+
+  const emitMerges = useCallback(
+    (g: GameState, landedBenchIndex?: number) => {
+      const events: UiEvent[] = [];
+      const seen = new Set<string>();
+      [...g.board, ...g.bench].forEach((u) => {
+        seen.add(u.u);
+        if (u.star < 2 || knownUnits.current.has(u.u)) return;
+        const onBoard = u.r != null && u.c != null;
+        events.push({
+          kind: 'merge',
+          u: u.u,
+          star: u.star as 2 | 3,
+          where: onBoard ? 'board' : 'bench',
+          r: u.r,
+          c: u.c,
+          index: onBoard ? undefined : g.bench.findIndex((b) => b.u === u.u),
+        });
+      });
+      knownUnits.current = seen;
+      if (!events.length && landedBenchIndex != null) return;
+      emit(...events);
+    },
+    [emit],
+  );
+
+  /**
+   * Sync React to the mutable game state, emitting a `gold` event when the
+   * total moved so the HUD can flash and tween.
+   */
+  const syncGame = useCallback(
+    (g: GameState) => {
+      const before = gameRef.current?.gold;
+      setGame({ ...g });
+      setUiEvents((prev) => pruneUiEvents(prev));
+      if (before != null && before !== g.gold) emit({ kind: 'gold', from: before, to: g.gold });
+      setTick((t) => t + 1);
+    },
+    [emit],
+  );
 
   const pop = useCallback(
     (r: number, c: number, text: string, color = SAF, size = 'var(--damage-font)', variant: FloaterVariant = 'damage') => {
@@ -190,6 +239,8 @@ export function useGame() {
       setCombatFx([]);
       setBanner('');
       setSheet(null);
+      setUiEvents([]);
+      knownUnits.current = new Set();
       setScreen('game');
     },
     [clearTimer, draft],
@@ -280,6 +331,9 @@ export function useGame() {
       },
       (fx) => spawnFx(fx),
     );
+    const boss = theirs.find((u) => u.boss);
+    if (boss) emit({ kind: 'bossIntro', name: boss.name, kit: boss.bossKit ?? 'clay' });
+    emit({ kind: 'fight' });
     engine.C = mine.concat(theirs);
     engineRef.current = engine;
     setCombatants(engine.C);
@@ -304,7 +358,7 @@ export function useGame() {
         setTimeout(() => resolveCombat(win, survivors), 500);
       }
     }, 100);
-  }, [clearTimer, pop, resolveCombat, spawnFx, syncGame]);
+  }, [clearTimer, emit, pop, resolveCombat, spawnFx, syncGame]);
 
   const buy = useCallback(
     (i: number) => {
@@ -313,26 +367,46 @@ export function useGame() {
       const offer = g.shop[i];
       const hid = offer?.hid;
       const twoStarBefore = hid ? countHeroStar(g, hid, 2) : 0;
+      const goldBefore = g.gold;
+      const benchBefore = g.bench.length;
       gameActions.buy(g, i);
-      if (hid) applyMerges(g, { boughtHid: hid, twoStarBeforeBuy: twoStarBefore }, (r, c, text) => pop(r, c, text));
+      if (goldBefore === g.gold) {
+        emit({ kind: 'blocked', reason: g.bench.length >= 8 ? 'bench' : 'gold', index: i });
+        return;
+      }
+      emit({ kind: 'buy', hid: hid!, benchIndex: benchBefore });
+      if (hid) {
+        applyMerges(g, { boughtHid: hid, twoStarBeforeBuy: twoStarBefore }, (r, c, text) =>
+          pop(r, c, text),
+        );
+        emitMerges(g, benchBefore);
+      }
       syncGame(g);
     },
-    [pop, syncGame],
+    [emit, emitMerges, pop, syncGame],
   );
 
   const sell = useCallback(() => {
     const g = gameRef.current;
     if (!g) return;
+    const benchIndex = g.sel?.from === 'bench' ? g.bench.findIndex((u) => u.u === g.sel!.u) : null;
+    const goldBefore = g.gold;
     gameActions.sell(g);
+    if (g.gold !== goldBefore) {
+      emit({ kind: 'sell', benchIndex, gold: g.gold - goldBefore });
+      pop(PLAYER_ROW_START + 1, 2, `+◈${g.gold - goldBefore}`, JADE, 'var(--heal-font)', 'heal');
+    }
     syncGame(g);
-  }, [syncGame]);
+  }, [emit, pop, syncGame]);
 
   const reroll = useCallback(() => {
     const g = gameRef.current;
     if (!g) return;
+    const before = g.shop;
     gameActions.reroll(g, draft);
+    if (g.shop !== before) emit({ kind: 'roll' });
     syncGame(g);
-  }, [draft, syncGame]);
+  }, [draft, emit, syncGame]);
 
   const tapUnit = useCallback(
     (u: Parameters<typeof gameActions.tapUnit>[1], from: 'bench' | 'board') => {
@@ -340,22 +414,26 @@ export function useGame() {
       if (!g) return;
       gameActions.tapUnit(g, u, from, g.matchRounds);
       mergeUnits(g, (r, c, text) => pop(r, c, text));
+      emitMerges(g);
       syncGame(g);
     },
-    [pop, syncGame],
+    [emitMerges, pop, syncGame],
   );
 
   const tapCell = useCallback(
     (r: number, c: number) => {
       const g = gameRef.current;
       if (!g) return;
+      const placed = g.sel?.u;
       gameActions.tapCell(g, r, c, g.matchRounds, (text) =>
         pop(PLAYER_ROW_START + 1, 1, text, RUST, '12px'),
       );
+      if (placed && g.board.some((u) => u.u === placed)) emit({ kind: 'place', u: placed });
       mergeUnits(g, (r2, c2, text) => pop(r2, c2, text));
+      emitMerges(g);
       syncGame(g);
     },
-    [pop, syncGame],
+    [emit, emitMerges, pop, syncGame],
   );
 
   const toggleSpeed = useCallback(() => {
@@ -475,6 +553,7 @@ export function useGame() {
     banner,
     combatants,
     combatFx,
+    uiEvents,
     tick,
     saveDraft,
     toggleHero,

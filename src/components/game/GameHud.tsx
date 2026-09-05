@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { useCountUp } from '../../hooks/useCountUp';
 import { incomeBreakdown } from '../../data/economy';
 import { isRankedMode, isGauntletMode } from '../../game/engine';
 import type { GameState } from '../../game/types';
+import { recent, type StampedUiEvent } from '../../game/uiEvents';
 
 interface GameHudProps {
   game: GameState;
   boardCap: number;
+  uiEvents: StampedUiEvent[];
   onQuit: () => void;
 }
 
@@ -16,12 +19,19 @@ function modeLabel(g: GameState): string {
   return `ROUND ${g.round}/${g.matchRounds}`;
 }
 
-export function GameHud({ game: g, boardCap, onQuit }: GameHudProps) {
+export function GameHud({ game: g, boardCap, uiEvents, onQuit }: GameHudProps) {
   const gauntlet = isGauntletMode(g.mode);
   const [showIncome, setShowIncome] = useState(false);
   // Previewed against the gold held right now, so banking updates it live.
   const income = incomeBreakdown(g.round + 1, g.gold, g.streak, g.lastResult?.win ?? null);
   const showChip = g.mode !== 'practice';
+  const goldEvent = recent(uiEvents, 'gold', undefined, 600);
+  const goldClass = goldEvent
+    ? goldEvent.to > goldEvent.from
+      ? ' om-hud__gold--gain'
+      : ' om-hud__gold--spend'
+    : '';
+  const shownGold = useCountUp(g.gold, 300);
   return (
     <div className="om-hud screen-header screen-header-game">
       <div className="om-hud__row">
@@ -30,9 +40,9 @@ export function GameHud({ game: g, boardCap, onQuit }: GameHudProps) {
         </button>
         <div className="om-hud__title">{modeLabel(g)}</div>
         <div style={{ flex: 1 }} />
-        <div className="om-hud__gold">
+        <div className={`om-hud__gold${goldClass}`}>
           <span aria-hidden>◈</span>
-          <span>{g.mode === 'practice' ? '∞' : g.gold}</span>
+          <span>{g.mode === 'practice' ? '∞' : shownGold}</span>
         </div>
         {showChip && (
           <button

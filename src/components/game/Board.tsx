@@ -6,6 +6,7 @@ import {
 } from '../../data/constants';
 import { occupiesCell } from '../../game/engine';
 import type { Combatant, CombatFx, Floater, GameState, Unit } from '../../game/types';
+import { recent, type StampedUiEvent } from '../../game/uiEvents';
 import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
 import { CombatFxLayer, getLungeTransform } from '../CombatFxLayer';
 import { BoardUnit } from './BoardUnit';
@@ -17,6 +18,7 @@ interface BoardProps {
   combatFx: CombatFx[];
   floaters: Floater[];
   banner: string;
+  uiEvents: StampedUiEvent[];
   /** Plan-phase banner under the top edge: the boss name, the final call, … */
   planBanner: { text: string; tone: 'boss' | 'final' } | null;
   battlegroundId: string;
@@ -34,6 +36,7 @@ export function Board({
   combatFx,
   floaters,
   banner,
+  uiEvents,
   planBanner,
   battlegroundId,
   reduceVfx,
@@ -64,6 +67,8 @@ export function Board({
     if (!combat) seenFx.current.clear();
   }, [combat]);
 
+  const merged = recent(uiEvents, 'merge', (e) => e.where === 'board', 700);
+  const placed = recent(uiEvents, 'place', undefined, 400);
   const living = src.filter((u) => u.alive !== false);
   const occupiedKey = living
     .flatMap((u) => {
@@ -94,6 +99,8 @@ export function Board({
             boardUnit={boardUnit}
             selected={selected}
             combat={combat}
+            merged={merged?.u === u.u}
+            placed={placed?.u === u.u}
             lunge={combat ? getLungeTransform(combatFx, u.r, u.c) : undefined}
             onTap={() => {
               if (!boardUnit) return;
