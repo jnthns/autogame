@@ -1,8 +1,15 @@
-export const JADE = '#1B6B52';
-export const SAF = '#E8A317';
-export const BONE = '#F2E9D4';
-export const INK = '#14120E';
-export const RUST = '#B4442B';
+/**
+ * Palette handles are token references, not literals, so every inline use is
+ * theme-aware. The values themselves live in src/styles/tokens.css.
+ */
+export const JADE = 'var(--om-jade)';
+export const SAF = 'var(--om-saffron)';
+export const BONE = 'var(--om-bone)';
+export const INK = 'var(--om-ink)';
+export const RUST = 'var(--om-rust)';
+export const SKY = 'var(--om-sky)';
+export const VIOLET = 'var(--om-violet)';
+export const MUTED = 'var(--om-muted)';
 
 export const STARMUL = [1, 1, 1.85, 3.4] as const;
 
@@ -107,5 +114,5 @@ export const GAUNTLET = {
 } as const;
 
 export function costTone(c: number): string {
-  return c >= 5 ? '#7A3E9D' : c >= 4 ? RUST : c >= 3 ? JADE : '#4a4436';
+  return c >= 5 ? VIOLET : c >= 4 ? RUST : c >= 3 ? JADE : MUTED;
 }

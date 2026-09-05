@@ -37,7 +37,7 @@ import {
   usesDifficulty,
 } from '../game/engine';
 import { pickGauntletRelics } from '../game/gauntlet';
-import { debugRoundFromUrl } from '../game/hyperRoll';
+import { debugRoundFromUrl, debugStateFromUrl } from '../game/debugUrl';
 import type {
   Combatant,
   CombatFx,
@@ -434,6 +434,22 @@ export function useGame() {
   }, [saveDraft]);
 
   useEffect(() => () => clearTimer(), [clearTimer]);
+
+  // Dev-only: `?screen=…&mode=…&phase=…&theme=…` drives npm run screens.
+  const debugApplied = useRef(false);
+  useEffect(() => {
+    if (debugApplied.current) return;
+    const d = debugStateFromUrl();
+    if (!d) return;
+    debugApplied.current = true;
+    if (d.theme) updateSettings({ darkMode: d.theme === 'dark' });
+    if (d.screen === 'game') startGame(d.mode ?? 'bot');
+    else if (d.screen) setScreen(d.screen);
+    if (d.phase === 'combat') {
+      // Let the board mount and the shop settle before the engine starts.
+      setTimeout(() => startCombat(), 120);
+    }
+  }, [startCombat, startGame, updateSettings]);
 
   return {
     screen,

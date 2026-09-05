@@ -1,3 +1,5 @@
+@import './styles/tokens.css';
+
 html,
 body {
   margin: 0;
@@ -692,13 +694,6 @@ button:disabled {
 }
 
 .phone {
-  --om-bg: #f2e9d4;
-  --om-fg: #14120e;
-  --om-muted: #6b6455;
-  --om-card: #f2e9d4;
-  --om-line: #14120e;
-  --om-board: #dfd3b6;
-  --om-synergy: #e7dcc2;
   width: var(--shell-w);
   max-width: var(--shell-max-w);
   height: var(--shell-h);
@@ -714,16 +709,6 @@ button:disabled {
   box-shadow: var(--shell-shadow);
   padding-left: var(--safe-left);
   padding-right: var(--safe-right);
-}
-
-.phone.theme-dark {
-  --om-bg: #1a1610;
-  --om-fg: #f2e9d4;
-  --om-muted: #b8ad93;
-  --om-card: #241e16;
-  --om-line: #c4b89a;
-  --om-board: #2c2418;
-  --om-synergy: #1f1b16;
 }
 
 .om-muted {
@@ -979,25 +964,22 @@ button:disabled {
 }
 
 .phone.reduce-motion .battleground-preview,
-.phone.reduce-motion .board-wallpaper-canvas {
-  animation: none !important;
-}
-
+.phone.reduce-motion .board-wallpaper-canvas,
 .phone.reduce-motion .home-parade * {
-  animation: none !important;
+  animation: none;
 }
 
 .phone.reduce-motion .game-board .board-unit,
 .phone.reduce-motion .game-board > div > button {
-  animation-duration: 0.08s !important;
+  animation-duration: var(--dur-instant);
 }
 
 .phone.reduce-motion .damage-floater,
 .phone.reduce-motion .combat-fx,
 .phone.reduce-motion .combat-fx * {
-  animation-duration: 0.35s !important;
+  animation-duration: var(--dur-linger);
 }
 
 .phone.reduce-motion .game-board--shake {
-  animation-duration: 0.2s !important;
+  animation-duration: var(--dur-fast);
 }

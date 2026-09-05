@@ -4,7 +4,6 @@ import {
   BOSS_ROUNDS,
   HYPER_ROLL_ROUNDS,
   MARATHON_BOSS_ROUNDS,
-  MATCH_DEFAULTS,
   MERGE_COPIES,
 } from '../data/constants';
 import { HERO_MAP } from '../data/heroes';
@@ -224,17 +223,6 @@ export function rewardLines(reward: BossRewardGrant): string[] {
   }
   if (reward.relic) lines.push('relic offer');
   return lines;
-}
-
-export function debugRoundFromUrl(): number | undefined {
-  if (typeof window === 'undefined') return undefined;
-  try {
-    const n = Number(new URLSearchParams(window.location.search).get('round'));
-    if (!Number.isFinite(n) || n < 1 || n > MATCH_DEFAULTS.matchRounds) return undefined;
-    return Math.floor(n);
-  } catch {
-    return undefined;
-  }
 }
 
 export function unitPower(u: Unit): number {

@@ -1,0 +1,137 @@
+/*
+ * Design tokens for Twelve Omens.
+ *
+ * The brutalist pixel identity is fixed (see docs/overhaul/README.md): Alfa Slab
+ * One display, Barlow Semi Condensed body, Space Mono numerals, 2px/3px ink
+ * borders, hard offset shadows, square corners, bone/ink/jade/saffron/rust.
+ * Everything below is that identity expressed once, so components never carry
+ * a hex literal or a hard-coded duration.
+ *
+ * Rule: chips and buttons that sit on a *colored* background (saffron, jade,
+ * rust) always use `--om-ink` borders regardless of theme; surfaces use
+ * `--om-line`.
+ */
+:root {
+  /* Brand palette (fixed) */
+  --om-ink: #14120e;
+  --om-bone: #f2e9d4;
+  --om-jade: #1b6b52;
+  --om-saffron: #e8a317;
+  --om-rust: #b4442b;
+  --om-sky: #4c7bd1;
+  --om-violet: #7a3e9d;
+  --om-ember: #d0553a;
+  --om-sand: #dfd3b6;
+  --om-parchment: #e7dcc2;
+  --om-dust: #cfc3a6;
+  --om-stone: #8a8271;
+
+  /* Type */
+  --font-display: 'Alfa Slab One', serif;
+  --font-body: 'Barlow Semi Condensed', system-ui, sans-serif;
+  --font-mono: 'Space Mono', monospace;
+  --text-2xs: 9px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 21px;
+  --text-2xl: 26px;
+  --text-display: 42px;
+  --track-wide: 0.1em;
+  --track-wider: 0.14em;
+
+  /* Space */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+
+  /* Borders and hard shadows (no blur, no radius) */
+  --bw-1: 1px;
+  --bw-2: 2px;
+  --bw-3: 3px;
+
+  /* Motion */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 360ms;
+  --dur-deliberate: 600ms;
+  --dur-linger: 1300ms;
+  --ease-out: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  --ease-in: cubic-bezier(0.5, 0, 0.9, 0.4);
+  --ease-in-out: cubic-bezier(0.6, 0, 0.2, 1);
+
+  /* Layers */
+  --z-board-bg: 0;
+  --z-cells: 1;
+  --z-unit: 10;
+  --z-boss: 15;
+  --z-unit-sel: 20;
+  --z-fx: 27;
+  --z-floater: 30;
+  --z-banner: 31;
+  --z-sheet: 40;
+  --z-overlay: 50;
+}
+
+.phone {
+  /* Semantic, light */
+  --om-bg: var(--om-bone);
+  --om-fg: var(--om-ink);
+  --om-muted: #6b6455;
+  --om-muted-2: var(--om-stone);
+  --om-card: var(--om-bone);
+  --om-surface-2: var(--om-parchment);
+  --om-surface-3: var(--om-sand);
+  --om-disabled: var(--om-dust);
+  --om-line: var(--om-ink);
+  --om-board: var(--om-sand);
+  --om-synergy: var(--om-parchment);
+  --om-hud-bg: var(--om-ink);
+  --om-hud-fg: var(--om-bone);
+  --om-hud-line: #6b6455;
+  --om-good: var(--om-jade);
+  --om-bad: var(--om-rust);
+  --om-accent: var(--om-saffron);
+  --om-info: var(--om-sky);
+  --om-on-accent: var(--om-ink);
+  --om-on-good: var(--om-bone);
+  --om-on-bad: var(--om-bone);
+  --shadow-hard-sm: 2px 2px 0 var(--om-line);
+  --shadow-hard-md: 3px 3px 0 var(--om-line);
+  --shadow-hard-lg: 5px 5px 0 var(--om-line);
+  --shadow-hard-accent: 7px 7px 0 var(--om-accent);
+}
+
+.phone.theme-dark {
+  --om-bg: #1a1610;
+  --om-fg: var(--om-bone);
+  --om-muted: #b8ad93;
+  --om-muted-2: #8f8878;
+  --om-card: #241e16;
+  --om-surface-2: #2c2418;
+  --om-surface-3: #332a1d;
+  --om-disabled: #4a4234;
+  --om-line: #c4b89a;
+  --om-board: #2c2418;
+  --om-synergy: #1f1b16;
+  --om-hud-bg: #0e0d0a;
+  --om-hud-fg: var(--om-bone);
+  --om-hud-line: #4a4234;
+}
+
+.phone.reduce-motion {
+  --dur-instant: 0ms;
+  --dur-fast: 0ms;
+  --dur-base: 0ms;
+  --dur-slow: 0ms;
+  --dur-deliberate: 0ms;
+  --dur-linger: 350ms;
+}

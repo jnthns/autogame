@@ -1,4 +1,5 @@
 import {
+  BONE,
   BOARD_COLS,
   BOARD_ROWS,
   BOARD_SIDE_ROWS,
@@ -23,7 +24,10 @@ import {
   MERGE_COPIES,
   PLAYER_ROW_START,
   PRACTICE_BOARD_CAP,
+  RUST,
   SAF,
+  SKY,
+  JADE,
   STARMUL,
   USER_DRAFT_MAX,
 } from '../data/constants';
@@ -985,7 +989,7 @@ export class CombatEngine {
         popPos.r,
         popPos.c,
         `-${Math.round(dmg)}`,
-        isMagic ? '#4C7BD1' : isCrit ? SAF : '#F2E9D4',
+        isMagic ? SKY : isCrit ? SAF : BONE,
         isCrit ? 'var(--crit-font)' : 'var(--damage-font)',
         isCrit ? 'crit' : 'damage',
       );
@@ -1001,7 +1005,7 @@ export class CombatEngine {
       t.alive = false;
       t.hp = 0;
       const popPos = unitCenter(t);
-      this.onPop(popPos.r, popPos.c, '✕', '#B4442B', 'var(--crit-font)', 'death');
+      this.onPop(popPos.r, popPos.c, '✕', RUST, 'var(--crit-font)', 'death');
     }
     return dmg;
   }
@@ -1012,7 +1016,7 @@ export class CombatEngine {
     if (t.hp <= 0) {
       t.hp = 0;
       t.alive = false;
-      this.onPop(t.r, t.c, '✕', '#B4442B', 'var(--crit-font)', 'death');
+      this.onPop(t.r, t.c, '✕', RUST, 'var(--crit-font)', 'death');
     }
   }
 
@@ -1022,7 +1026,7 @@ export class CombatEngine {
     if (got <= 0) return;
     u.hp += got;
     const popPos = unitCenter(u);
-    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, '#1B6B52', 'var(--heal-font)', 'heal');
+    this.onPop(popPos.r, popPos.c, `+${Math.round(got)}`, JADE, 'var(--heal-font)', 'heal');
   }
 
   enemiesOf(u: Combatant) {
@@ -1671,13 +1675,21 @@ export function traitCard(name: string, counts: Record<string, number>) {
     glyph: def.glyph,
     desc: def.desc,
     countLabel: `${n} on board`,
-    cardBg: best ? '#F2E9D4' : '#ece2ca',
-    headBg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#E8A317' : '#14120E') : '#d8cdb2',
-    headFg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#14120E' : '#F2E9D4') : '#6b6455',
+    cardBg: best ? 'var(--om-card)' : 'var(--om-surface-2)',
+    headBg: best
+      ? best >= def.tiers[def.tiers.length - 1][0]
+        ? 'var(--om-accent)'
+        : 'var(--om-hud-bg)'
+      : 'var(--om-surface-3)',
+    headFg: best
+      ? best >= def.tiers[def.tiers.length - 1][0]
+        ? 'var(--om-on-accent)'
+        : 'var(--om-hud-fg)'
+      : 'var(--om-muted)',
     tiers: def.tiers.map(([need, text]) => ({
       n: need,
       text,
-      fg: n >= need ? '#14120E' : '#a99f86',
+      fg: n >= need ? 'var(--om-fg)' : 'var(--om-muted-2)',
       mark: n >= need ? '●' : '○',
     })),
   };
@@ -1695,13 +1707,17 @@ export function classCard(name: string, counts: Record<string, number>) {
     glyph: def.glyph,
     desc: def.desc,
     countLabel: `${n} drafted`,
-    cardBg: best ? '#e7dcc2' : '#ece2ca',
-    headBg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#4C7BD1' : '#14120E') : '#d8cdb2',
-    headFg: best ? (best >= def.tiers[def.tiers.length - 1][0] ? '#F2E9D4' : '#F2E9D4') : '#6b6455',
+    cardBg: best ? 'var(--om-surface-2)' : 'var(--om-surface-3)',
+    headBg: best
+      ? best >= def.tiers[def.tiers.length - 1][0]
+        ? 'var(--om-info)'
+        : 'var(--om-hud-bg)'
+      : 'var(--om-surface-3)',
+    headFg: best ? 'var(--om-hud-fg)' : 'var(--om-muted)',
     tiers: def.tiers.map(([need, text]) => ({
       n: need,
       text,
-      fg: n >= need ? '#14120E' : '#a99f86',
+      fg: n >= need ? 'var(--om-fg)' : 'var(--om-muted-2)',
       mark: n >= need ? '●' : '○',
     })),
   };

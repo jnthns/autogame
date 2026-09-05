@@ -130,7 +130,7 @@ export function GameScreen({
 
   return (
     <div className="game-root" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div className="screen-header screen-header-game" style={{ borderBottom: '3px solid #14120E', background: INK, color: BONE }}>
+      <div className="screen-header screen-header-game" style={{ borderBottom: '3px solid var(--om-ink)', background: INK, color: BONE }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
@@ -138,7 +138,7 @@ export function GameScreen({
             style={{
               width: 24,
               height: 24,
-              border: '2px solid #6b6455',
+              border: '2px solid var(--om-muted)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -159,19 +159,19 @@ export function GameScreen({
                   : `ROUND ${g.round}/${g.matchRounds}`}
           </div>
           <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '2px solid #E8A317', padding: '1px 6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '2px solid var(--om-saffron)', padding: '1px 6px' }}>
             <span style={{ color: SAF, fontSize: 11 }}>◈</span>
             <span className="mono" style={{ fontWeight: 700, fontSize: 13, color: SAF }}>
               {g.mode === 'practice' ? '∞' : g.gold}
             </span>
           </div>
-          <div className="mono" style={{ border: '2px solid #6b6455', padding: '1px 6px', fontWeight: 700, fontSize: 11 }}>
+          <div className="mono" style={{ border: '2px solid var(--om-muted)', padding: '1px 6px', fontWeight: 700, fontSize: 11 }}>
             {g.board.length}/{boardCap}
           </div>
         </div>
         {gauntlet && g.gauntletLives != null && (
           <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8f8878' }}>
+            <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--om-muted-2)' }}>
               LIVES
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
@@ -181,8 +181,8 @@ export function GameScreen({
                   style={{
                     width: 14,
                     height: 14,
-                    border: '2px solid #E8A317',
-                    background: i < g.gauntletLives! ? JADE : '#2a2721',
+                    border: '2px solid var(--om-saffron)',
+                    background: i < g.gauntletLives! ? JADE : 'var(--om-hud-line)',
                   }}
                 />
               ))}
@@ -195,10 +195,10 @@ export function GameScreen({
         {isRankedMode(g.mode) && (
           <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8f8878', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--om-muted-2)', flexShrink: 0 }}>
                 YOU
               </span>
-              <div style={{ flex: 1, height: 8, border: `1px solid ${BONE}`, background: '#2a2721', position: 'relative', minWidth: 0 }}>
+              <div style={{ flex: 1, height: 8, border: `1px solid ${BONE}`, background: 'var(--om-hud-line)', position: 'relative', minWidth: 0 }}>
                 <div
                   style={{
                     position: 'absolute',
@@ -216,10 +216,10 @@ export function GameScreen({
               </span>
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8f8878', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--om-muted-2)', flexShrink: 0 }}>
                 FOE
               </span>
-              <div style={{ flex: 1, height: 8, border: `1px solid ${BONE}`, background: '#2a2721', position: 'relative', minWidth: 0 }}>
+              <div style={{ flex: 1, height: 8, border: `1px solid ${BONE}`, background: 'var(--om-hud-line)', position: 'relative', minWidth: 0 }}>
                 <div
                   style={{
                     position: 'absolute',
@@ -246,7 +246,7 @@ export function GameScreen({
           display: 'flex',
           gap: 4,
           padding: '4px 10px',
-          borderBottom: '2px solid #14120E',
+          borderBottom: '2px solid var(--om-ink)',
           overflowX: 'auto',
           minHeight: 28,
           alignItems: 'center',
@@ -263,15 +263,15 @@ export function GameScreen({
               display: 'flex',
               alignItems: 'center',
               gap: 4,
-              border: '2px solid #14120E',
+              border: '2px solid var(--om-ink)',
               padding: '2px 6px',
-              background: t.lvl > 1 ? (t.kind === 'class' ? '#4C7BD1' : SAF) : t.lvl ? INK : BONE,
+              background: t.lvl > 1 ? (t.kind === 'class' ? 'var(--om-sky)' : SAF) : t.lvl ? INK : 'var(--om-card)',
             }}
           >
             <span
               style={{
                 fontSize: 12,
-                color: t.lvl ? (t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE) : '#8a8271',
+                color: t.lvl ? (t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE) : 'var(--om-muted-2)',
               }}
             >
               {t.glyph}
@@ -282,7 +282,7 @@ export function GameScreen({
                 fontSize: 10,
                 letterSpacing: '0.07em',
                 textTransform: 'uppercase',
-                color: t.lvl ? (t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE) : '#8a8271',
+                color: t.lvl ? (t.lvl > 1 ? (t.kind === 'class' ? BONE : INK) : BONE) : 'var(--om-muted-2)',
               }}
             >
               {t.name} {t.count}
@@ -290,7 +290,7 @@ export function GameScreen({
           </button>
         ))}
         {shown.length === 0 && (
-          <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8271' }}>
+          <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--om-muted-2)' }}>
             No synergies active
           </span>
         )}
@@ -392,7 +392,7 @@ export function GameScreen({
                     pointerEvents: 'auto',
                     transform: lunge,
                     transition: lunge ? 'transform 0.07s ease-out' : undefined,
-                    boxShadow: u.stun > 0 && !sel ? '0 0 0 2px #4C7BD1' : undefined,
+                    boxShadow: u.stun > 0 && !sel ? '0 0 0 2px var(--om-sky)' : undefined,
                   }}
                 >
                   <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 132 : undefined} />
@@ -418,8 +418,8 @@ export function GameScreen({
                       fontWeight: 700,
                       letterSpacing: '-0.5px',
                       color: INK,
-                      background: u.star === 3 ? SAF : u.star === 2 ? BONE : '#cfc3a6',
-                      border: '1px solid #14120E',
+                      background: u.star === 3 ? SAF : u.star === 2 ? BONE : 'var(--om-disabled)',
+                      border: '1px solid var(--om-ink)',
                       padding: '0 3px',
                       lineHeight: '11px',
                     }}
@@ -434,7 +434,7 @@ export function GameScreen({
                       bottom: -7,
                       height: 5,
                       background: INK,
-                      border: '1px solid #14120E',
+                      border: '1px solid var(--om-ink)',
                     }}
                   >
                     <span
@@ -442,7 +442,7 @@ export function GameScreen({
                         display: 'block',
                         height: '100%',
                         width: `${pct * 100}%`,
-                        background: me ? JADE : '#D0553A',
+                        background: me ? JADE : 'var(--om-ember)',
                       }}
                     />
                   </span>
@@ -462,7 +462,7 @@ export function GameScreen({
                           display: 'block',
                           height: '100%',
                           width: `${u.mana || 0}%`,
-                          background: '#4C7BD1',
+                          background: 'var(--om-sky)',
                         }}
                       />
                     </span>
@@ -479,7 +479,7 @@ export function GameScreen({
                         letterSpacing: '0.08em',
                         background: SAF,
                         color: INK,
-                        border: '1px solid #14120E',
+                        border: '1px solid var(--om-ink)',
                         padding: '0 3px',
                         lineHeight: '10px',
                       }}
@@ -495,7 +495,7 @@ export function GameScreen({
                         top: -10,
                         right: -12,
                         background: SAF,
-                        border: '2px solid #14120E',
+                        border: '2px solid var(--om-ink)',
                         width: 19,
                         height: 19,
                         fontWeight: 700,
@@ -534,7 +534,7 @@ export function GameScreen({
                 fontWeight: 700,
                 fontSize: f.size,
                 color: f.color,
-                textShadow: '0 1px 0 #14120E',
+                textShadow: '0 1px 0 var(--om-ink)',
               }}
             >
               {f.text}
@@ -549,7 +549,7 @@ export function GameScreen({
                 display: 'inline-block',
                 background: INK,
                 color: SAF,
-                border: '2px solid #E8A317',
+                border: '2px solid var(--om-saffron)',
                 padding: '3px 10px',
                 fontSize: 13,
                 animation: 'omStamp 0.3s both',
@@ -601,7 +601,7 @@ export function GameScreen({
           display: 'flex',
           gap: 4,
           padding: '5px 10px',
-          borderBottom: '2px solid #14120E',
+          borderBottom: '2px solid var(--om-ink)',
           overflowX: 'auto',
           minHeight: 44,
           alignItems: 'center',
@@ -616,14 +616,14 @@ export function GameScreen({
                 key={i}
                 className="bench-slot"
                 style={{
-                  border: '2px solid #14120E',
-                  background: BONE,
+                  border: '2px solid var(--om-ink)',
+                  background: 'var(--om-card)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <span style={{ fontSize: 16, color: '#c3b99e' }}>·</span>
+                <span style={{ fontSize: 16, color: 'var(--om-muted-2)' }}>·</span>
               </div>
             );
           }
@@ -652,8 +652,8 @@ export function GameScreen({
                   fontSize: 8,
                   fontWeight: 700,
                   letterSpacing: '-0.5px',
-                  background: u.star === 3 ? SAF : BONE,
-                  border: '1px solid #14120E',
+                  background: u.star === 3 ? SAF : 'var(--om-card)',
+                  border: '1px solid var(--om-ink)',
                   padding: '0 3px',
                   lineHeight: '11px',
                 }}
@@ -671,7 +671,7 @@ export function GameScreen({
               onClick={onInfo}
               style={{
                 flex: '0 0 auto',
-                border: '2px solid #14120E',
+                border: '2px solid var(--om-ink)',
                 padding: '8px 9px',
                 fontWeight: 700,
                 fontSize: 11,
@@ -693,15 +693,15 @@ export function GameScreen({
               }}
               style={{
                 flex: '0 0 auto',
-                border: '2px solid #14120E',
-                background: sellArmed ? RUST : BONE,
+                border: '2px solid var(--om-ink)',
+                background: sellArmed ? RUST : 'var(--om-card)',
                 color: sellArmed ? BONE : RUST,
                 padding: '8px 10px',
                 fontWeight: 700,
                 fontSize: 11,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                boxShadow: sellArmed ? '3px 3px 0 #14120E' : undefined,
+                boxShadow: sellArmed ? '3px 3px 0 var(--om-ink)' : undefined,
               }}
             >
               {sellArmed ? `Confirm ◈${sv}` : `Sell ◈${sv}`}
@@ -710,7 +710,7 @@ export function GameScreen({
         )}
       </div>
 
-      <div style={{ flex: '0 0 auto', flexShrink: 0, display: 'flex', flexDirection: 'column', background: BONE }}>
+      <div style={{ flex: '0 0 auto', flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--om-card)' }}>
         {plan && (
           <>
             <div style={{ display: 'flex', gap: 5, padding: '8px 10px 6px', alignItems: 'stretch' }}>
@@ -722,8 +722,8 @@ export function GameScreen({
                       style={{
                         flex: 1,
                         minWidth: 0,
-                        border: '2px solid #14120E',
-                        background: '#e2d8bf',
+                        border: '2px solid var(--om-ink)',
+                        background: 'var(--om-disabled)',
                         padding: '5px 3px 6px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -732,8 +732,8 @@ export function GameScreen({
                         opacity: 0.5,
                       }}
                     >
-                      <span style={{ fontSize: 18, lineHeight: '30px', color: '#b3a98f' }}>·</span>
-                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: '#b3a98f' }}>sold</span>
+                      <span style={{ fontSize: 18, lineHeight: '30px', color: 'var(--om-muted-2)' }}>·</span>
+                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--om-muted-2)' }}>sold</span>
                     </div>
                   );
                 }
@@ -749,8 +749,8 @@ export function GameScreen({
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      border: '2px solid #14120E',
-                      background: BONE,
+                      border: '2px solid var(--om-ink)',
+                      background: 'var(--om-card)',
                       padding: '5px 3px 6px',
                       display: 'flex',
                       flexDirection: 'column',
@@ -782,7 +782,7 @@ export function GameScreen({
                         fontSize: 10,
                         fontWeight: 700,
                         color: INK,
-                        background: afford ? SAF : '#cfc3a6',
+                        background: afford ? SAF : 'var(--om-disabled)',
                         padding: '0 4px',
                       }}
                     >
@@ -799,13 +799,13 @@ export function GameScreen({
                 onClick={onReroll}
                 style={{
                   flex: 1,
-                  border: '3px solid #14120E',
-                  background: canReroll ? BONE : '#e2d8bf',
-                  boxShadow: '3px 3px 0 #14120E',
+                  border: '3px solid var(--om-ink)',
+                  background: canReroll ? 'var(--om-card)' : 'var(--om-disabled)',
+                  boxShadow: '3px 3px 0 var(--om-ink)',
                   padding: '8px 6px',
                   fontFamily: "'Alfa Slab One', serif",
                   fontSize: 13,
-                  color: canReroll ? INK : '#a99f86',
+                  color: canReroll ? INK : 'var(--om-muted-2)',
                 }}
               >
                 ↻ {rerollLabel}
@@ -816,13 +816,13 @@ export function GameScreen({
                 onClick={onStartCombat}
                 style={{
                   flex: 1.2,
-                  border: '3px solid #14120E',
-                  background: g.board.length ? RUST : '#cfc3a6',
-                  boxShadow: '3px 3px 0 #14120E',
+                  border: '3px solid var(--om-ink)',
+                  background: g.board.length ? RUST : 'var(--om-disabled)',
+                  boxShadow: '3px 3px 0 var(--om-ink)',
                   padding: '8px 6px',
                   fontFamily: "'Alfa Slab One', serif",
                   fontSize: 13,
-                  color: g.board.length ? BONE : '#8a8271',
+                  color: g.board.length ? BONE : 'var(--om-muted-2)',
                 }}
               >
                 {fightLabel}
@@ -835,14 +835,14 @@ export function GameScreen({
             <span className="slab" style={{ fontSize: 17, color: RUST, animation: 'omPulse 1s infinite' }}>
               COMBAT
             </span>
-            <span style={{ flex: 1, fontSize: 13, color: '#6b6455', lineHeight: 1.3 }}>
+            <span style={{ flex: 1, fontSize: 13, color: 'var(--om-muted)', lineHeight: 1.3 }}>
               {g.log || 'Creatures act on their own.'}
             </span>
             <button
               type="button"
               onClick={onToggleSpeed}
               className="mono"
-              style={{ border: '2px solid #14120E', padding: '6px 9px', fontWeight: 700, fontSize: 12 }}
+              style={{ border: '2px solid var(--om-ink)', padding: '6px 9px', fontWeight: 700, fontSize: 12 }}
             >
               ×{g.speed}
             </button>
@@ -886,8 +886,8 @@ export function SheetModal({
             width: '100%',
             maxHeight: '86%',
             overflowY: 'auto',
-            background: BONE,
-            borderTop: '3px solid #14120E',
+            background: 'var(--om-card)',
+            borderTop: '3px solid var(--om-ink)',
             animation: 'omRise 0.2s ease both',
           }}
           onClick={(e) => e.stopPropagation()}
@@ -896,7 +896,7 @@ export function SheetModal({
           <div style={{ padding: '14px 16px 20px', display: 'flex', flexDirection: 'column', gap: 9 }}>
             {classNames.length > 0 && (
               <>
-                <div style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+                <div style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--om-muted)' }}>
                   Classes
                 </div>
                 {classNames.map((n) => {
@@ -914,7 +914,7 @@ export function SheetModal({
                     fontSize: 11,
                     letterSpacing: '0.18em',
                     textTransform: 'uppercase',
-                    color: '#6b6455',
+                    color: 'var(--om-muted)',
                   }}
                 >
                   Myth traits
@@ -950,8 +950,8 @@ export function SheetModal({
           width: '100%',
           maxHeight: '86%',
           overflowY: 'auto',
-          background: BONE,
-          borderTop: '3px solid #14120E',
+          background: 'var(--om-card)',
+          borderTop: '3px solid var(--om-ink)',
           animation: 'omRise 0.2s ease both',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -973,27 +973,27 @@ export function SheetModal({
               <StatBox key={st.k} label={st.k} value={String(st.v)} />
             ))}
           </div>
-          <div style={{ marginTop: 12, border: '3px solid #14120E', background: INK, color: BONE, padding: 12 }}>
+          <div style={{ marginTop: 12, border: '3px solid var(--om-ink)', background: INK, color: BONE, padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <span className="slab" style={{ fontSize: 16, color: SAF }}>
                 ✦ {h.ability}
               </span>
-              <span className="mono" style={{ fontSize: 11, color: '#4C7BD1', border: '1px solid #4C7BD1', padding: '1px 5px' }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--om-sky)', border: '1px solid var(--om-sky)', padding: '1px 5px' }}>
                 100 MANA
               </span>
             </div>
-            <div style={{ marginTop: 7, fontSize: 14, lineHeight: 1.4, color: '#d8cfb8', textWrap: 'pretty' }}>{h.abilityText}</div>
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #3a352b', fontSize: 13, lineHeight: 1.35, color: SAF }}>
+            <div style={{ marginTop: 7, fontSize: 14, lineHeight: 1.4, color: 'var(--om-disabled)', textWrap: 'pretty' }}>{h.abilityText}</div>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--om-hud-line)', fontSize: 13, lineHeight: 1.35, color: SAF }}>
               At ★{sheet.star} every number above is multiplied by {m}× · {attackLabel(h)} only · {h.quirk}
             </div>
           </div>
-          <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+          <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--om-muted)' }}>
             Class on this creature
           </div>
           <div style={{ marginTop: 7 }}>
             <TraitCardBlock card={classCard(h.heroClass, classBoard)} showDesc />
           </div>
-          <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+          <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--om-muted)' }}>
             Myth traits on this creature
           </div>
           <div style={{ marginTop: 7, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1003,7 +1003,7 @@ export function SheetModal({
           </div>
           {sheet.relics.length > 0 && (
             <>
-              <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6b6455' }}>
+              <div style={{ marginTop: 14, fontWeight: 700, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--om-muted)' }}>
                 Relics carried
               </div>
               <div style={{ marginTop: 7, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1016,14 +1016,14 @@ export function SheetModal({
                         display: 'flex',
                         gap: 8,
                         alignItems: 'center',
-                        border: '2px solid #14120E',
+                        border: '2px solid var(--om-ink)',
                         padding: '6px 9px',
-                        background: '#e7dcc2',
+                        background: 'var(--om-surface-2)',
                       }}
                     >
                       <span style={{ fontSize: 16, color: JADE }}>{rel.glyph}</span>
                       <span style={{ fontWeight: 700, fontSize: 13 }}>{rel.name}</span>
-                      <span style={{ flex: 1, fontSize: 12, color: '#6b6455', textAlign: 'right' }}>{rel.desc}</span>
+                      <span style={{ flex: 1, fontSize: 12, color: 'var(--om-muted)', textAlign: 'right' }}>{rel.desc}</span>
                     </div>
                   );
                 })}
@@ -1056,8 +1056,8 @@ function SheetHeader({
           width: 60,
           height: 60,
           flex: '0 0 auto',
-          border: '2px solid #E8A317',
-          background: '#221f19',
+          border: '2px solid var(--om-saffron)',
+          background: 'var(--om-hud-line)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1073,7 +1073,7 @@ function SheetHeader({
         <div className="slab" style={{ fontSize: 21, lineHeight: 1.05, color: BONE }}>
           {title}
         </div>
-        <div style={{ marginTop: 4, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#a99f86' }}>
+        <div style={{ marginTop: 4, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--om-muted-2)' }}>
           {subtitle}
         </div>
       </div>
@@ -1083,7 +1083,7 @@ function SheetHeader({
         style={{
           width: 28,
           height: 28,
-          border: '2px solid #6b6455',
+          border: '2px solid var(--om-muted)',
           color: BONE,
           fontSize: 15,
           flex: '0 0 auto',
@@ -1097,11 +1097,11 @@ function SheetHeader({
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ border: '2px solid #14120E', padding: '6px 4px', textAlign: 'center', background: '#e7dcc2' }}>
+    <div style={{ border: '2px solid var(--om-ink)', padding: '6px 4px', textAlign: 'center', background: 'var(--om-surface-2)' }}>
       <div className="mono" style={{ fontWeight: 700, fontSize: 15 }}>
         {value}
       </div>
-      <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6b6455', marginTop: 1 }}>
+      <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--om-muted)', marginTop: 1 }}>
         {label}
       </div>
     </div>
@@ -1116,7 +1116,7 @@ function TraitCardBlock({
   showDesc?: boolean;
 }) {
   return (
-    <div style={{ border: '2px solid #14120E', background: card.cardBg }}>
+    <div style={{ border: '2px solid var(--om-ink)', background: card.cardBg }}>
       <div
         style={{
           display: 'flex',
@@ -1135,7 +1135,7 @@ function TraitCardBlock({
         </span>
       </div>
       <div style={{ padding: '7px 9px 8px' }}>
-        {showDesc && <div style={{ fontSize: 12, color: '#6b6455', lineHeight: 1.3, marginBottom: 5 }}>{card.desc}</div>}
+        {showDesc && <div style={{ fontSize: 12, color: 'var(--om-muted)', lineHeight: 1.3, marginBottom: 5 }}>{card.desc}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {card.tiers.map((tr) => (
             <div key={tr.n} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.3, color: tr.fg }}>
@@ -1250,7 +1250,7 @@ export function OverlayModal({
   } else if (overlay.kind === 'spar') {
     title = overlay.win ? 'SPAR WON' : 'SPAR LOST';
     subtitle = 'Sandbox — nothing is at stake';
-    bannerBg = overlay.win ? JADE : '#4a4436';
+    bannerBg = overlay.win ? JADE : 'var(--om-muted)';
     body = 'Adjust the board and spar again. Gold and rerolls are free here.';
     actionLabel = 'BACK TO BOARD';
   } else {
@@ -1294,14 +1294,14 @@ export function OverlayModal({
       <div
         style={{
           width: '100%',
-          background: BONE,
-          border: '3px solid #14120E',
-          boxShadow: '7px 7px 0 #E8A317',
+          background: 'var(--om-card)',
+          border: '3px solid var(--om-ink)',
+          boxShadow: '7px 7px 0 var(--om-saffron)',
           animation: 'omStamp 0.3s both',
           overflow: 'hidden',
         }}
       >
-        <div style={{ background: bannerBg, borderBottom: '3px solid #14120E', padding: '14px 16px' }}>
+        <div style={{ background: bannerBg, borderBottom: '3px solid var(--om-ink)', padding: '14px 16px' }}>
           <div className="slab" style={{ fontSize: 26, lineHeight: 1, color: bannerFg }}>
             {title}
           </div>
@@ -1319,13 +1319,13 @@ export function OverlayModal({
           </div>
         </div>
         <div style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 15, lineHeight: 1.4, color: '#4a4436', textWrap: 'pretty' }}>{body}</div>
+          <div style={{ fontSize: 15, lineHeight: 1.4, color: 'var(--om-muted)', textWrap: 'pretty' }}>{body}</div>
           {overlay.kind === 'result' && overlay.win && overlay.boss?.reward && (
             <div
               style={{
                 marginTop: 12,
-                border: '2px solid #14120E',
-                background: '#e7dcc2',
+                border: '2px solid var(--om-ink)',
+                background: 'var(--om-surface-2)',
                 padding: '9px 10px',
                 display: 'flex',
                 flexWrap: 'wrap',
@@ -1340,7 +1340,7 @@ export function OverlayModal({
                     fontSize: 13,
                     background: SAF,
                     color: INK,
-                    border: '2px solid #14120E',
+                    border: '2px solid var(--om-ink)',
                     padding: '3px 8px',
                   }}
                 >
@@ -1357,7 +1357,7 @@ export function OverlayModal({
                   fontSize: 11,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: '#6b6455',
+                  color: 'var(--om-muted)',
                   marginBottom: 8,
                 }}
               >
@@ -1373,8 +1373,8 @@ export function OverlayModal({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
-                        border: '2px solid #14120E',
-                        background: '#e7dcc2',
+                        border: '2px solid var(--om-ink)',
+                        background: 'var(--om-surface-2)',
                         padding: '7px 9px',
                       }}
                     >
@@ -1390,7 +1390,7 @@ export function OverlayModal({
                             fontSize: 11,
                             letterSpacing: '0.08em',
                             textTransform: 'uppercase',
-                            color: '#6b6455',
+                            color: 'var(--om-muted)',
                           }}
                         >
                           {h.traits.join(' · ')}
@@ -1411,7 +1411,7 @@ export function OverlayModal({
                   fontSize: 11,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: '#6b6455',
+                  color: 'var(--om-muted)',
                   marginBottom: 8,
                 }}
               >
@@ -1427,8 +1427,8 @@ export function OverlayModal({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
-                        border: '2px solid #14120E',
-                        background: '#e7dcc2',
+                        border: '2px solid var(--om-ink)',
+                        background: 'var(--om-surface-2)',
                         padding: '7px 9px',
                       }}
                     >
@@ -1436,7 +1436,7 @@ export function OverlayModal({
                         style={{
                           width: 28,
                           height: 28,
-                          border: '2px solid #14120E',
+                          border: '2px solid var(--om-ink)',
                           flexShrink: 0,
                           overflow: 'hidden',
                         }}
@@ -1454,7 +1454,7 @@ export function OverlayModal({
                             fontSize: 11,
                             letterSpacing: '0.08em',
                             textTransform: 'uppercase',
-                            color: '#6b6455',
+                            color: 'var(--om-muted)',
                           }}
                         >
                           {b?.theme}
@@ -1480,9 +1480,9 @@ export function OverlayModal({
                     gap: 10,
                     alignItems: 'center',
                     textAlign: 'left',
-                    border: '2px solid #14120E',
+                    border: '2px solid var(--om-ink)',
                     padding: '9px 10px',
-                    background: '#e7dcc2',
+                    background: 'var(--om-surface-2)',
                   }}
                 >
                   <span style={{ fontSize: 22, color: JADE }}>{r.glyph}</span>
@@ -1490,7 +1490,7 @@ export function OverlayModal({
                     <span className="slab" style={{ display: 'block', fontSize: 15, lineHeight: 1.1 }}>
                       {r.name}
                     </span>
-                    <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#6b6455', lineHeight: 1.3 }}>
+                    <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--om-muted)', lineHeight: 1.3 }}>
                       {r.desc}
                     </span>
                   </span>
@@ -1507,7 +1507,7 @@ export function OverlayModal({
                 onClick={onSecondary}
                 style={{
                   flex: 1,
-                  border: '2px solid #14120E',
+                  border: '2px solid var(--om-ink)',
                   padding: 12,
                   fontWeight: 700,
                   letterSpacing: '0.1em',
@@ -1526,8 +1526,8 @@ export function OverlayModal({
                 flex: 1.4,
                 background: JADE,
                 color: BONE,
-                border: '3px solid #14120E',
-                boxShadow: '4px 4px 0 #14120E',
+                border: '3px solid var(--om-ink)',
+                boxShadow: '4px 4px 0 var(--om-ink)',
                 padding: 12,
                 fontFamily: "'Alfa Slab One', serif",
                 fontSize: 17,

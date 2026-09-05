@@ -129,8 +129,8 @@ export function HomeScreen({
             alignItems: 'center',
             gap: 14,
             background: JADE,
-            border: '3px solid #14120E',
-            boxShadow: '5px 5px 0 #14120E',
+            border: '3px solid var(--om-ink)',
+            boxShadow: '5px 5px 0 var(--om-ink)',
             padding: 17,
           }}
         >

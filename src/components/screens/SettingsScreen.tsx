@@ -350,7 +350,7 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                   overflow: 'hidden',
                   position: 'relative',
                   marginBottom: 10,
-                  background: 'var(--om-board, #e8dcc8)',
+                  background: 'var(--om-board, var(--om-surface-2))',
                 }}
               >
                 <BattlegroundBoardBackground id={shown.id} animate={!settings.reduceMotion} />

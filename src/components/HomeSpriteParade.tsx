@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { BONE, INK, JADE, RUST, SAF, costTone } from '../data/constants';
+import { INK, JADE, RUST, SAF, costTone } from '../data/constants';
 import { HEROES } from '../data/heroes';
 import { spriteCss } from '../data/sprites';
 import { PixelSprite } from './PixelSprite';
@@ -11,10 +11,10 @@ const SPARKLES = [
   { left: '22%', top: '68%', delay: 1.2, glyph: '✷', color: RUST },
   { left: '78%', top: '18%', delay: 0.6, glyph: '☖', color: JADE },
   { left: '88%', top: '55%', delay: 1.8, glyph: '⌃', color: SAF },
-  { left: '52%', top: '8%', delay: 2.4, glyph: '≋', color: '#7A3E9D' },
+  { left: '52%', top: '8%', delay: 2.4, glyph: '≋', color: 'var(--om-violet)' },
   { left: '65%', top: '78%', delay: 0.9, glyph: '⌇', color: JADE },
   { left: '12%', top: '42%', delay: 2.1, glyph: '⁂', color: RUST },
-  { left: '92%', top: '32%', delay: 1.5, glyph: '⏄', color: '#4C7BD1' },
+  { left: '92%', top: '32%', delay: 1.5, glyph: '⏄', color: 'var(--om-sky)' },
 ];
 
 const GLYPHS = ['☰', '☱', '☲', '☳', '☴', '☵', '☶', '☷', '✧', '✷', '⌃', '≋'];
@@ -69,7 +69,7 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
             >
               <div
                 style={{
-                  background: BONE,
+                  background: 'var(--om-card)',
                   border: `3px solid ${INK}`,
                   boxShadow: `3px 3px 0 ${costTone(hero.cost)}`,
                   padding: 6,
@@ -91,7 +91,7 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
                   fontSize: 8,
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
-                  color: '#6b6455',
+                  color: 'var(--om-muted)',
                   whiteSpace: 'nowrap',
                 }}
               >

@@ -15,7 +15,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sim:balance": "tsx scripts/balance-sim.ts",
-    "audit:budget": "tsx scripts/balance-audit.ts"
+    "audit:budget": "tsx scripts/balance-audit.ts",
+    "check:styles": "node scripts/check-styles.mjs",
+    "prebuild": "node scripts/check-styles.mjs --report",
+    "screens": "node scripts/screens.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
