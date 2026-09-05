@@ -12,8 +12,17 @@ import type { HeroDef } from '../data/heroes';
 export const BUDGET_P: Record<number, number> = { 2: 13.5, 3: 17.5, 4: 22.5, 5: 28.0 };
 export const P_TOLERANCE = 0.08;
 
-/** Ability-budget targets: expected ability value over 30 s at 1★, sp 0. */
-export const BUDGET_A30: Record<number, number> = { 2: 800, 3: 1050, 4: 1300, 5: 1600 };
+/**
+ * Ability-budget targets: expected ability value over 30 s at 1★, sp 0.
+ * `A30_SCALE` is the B6 dial for ability share of total damage, range [0.8, 1.25].
+ */
+export const A30_SCALE = 1.25;
+export const BUDGET_A30: Record<number, number> = {
+  2: 800 * A30_SCALE,
+  3: 1050 * A30_SCALE,
+  4: 1300 * A30_SCALE,
+  5: 1600 * A30_SCALE,
+};
 export const A30_TOLERANCE = 0.15;
 
 /**

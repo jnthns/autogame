@@ -48,6 +48,9 @@ function parseArgs(argv: string[]): Args {
   };
 }
 
+/** Matches per seed before two --seed values could collide. */
+const SEED_STRIDE = 100_003;
+
 function median(xs: number[]): number {
   if (!xs.length) return 0;
   const s = xs.slice().sort((a, b) => a - b);
@@ -108,7 +111,9 @@ function main(): void {
       difficulty: args.difficulty,
       draft,
       policy: args.policy,
-      seed: args.seed + i,
+      // Stride so two --seed values give disjoint match sets rather than
+      // 99% overlapping ones (`seed 1` vs `seed 7` differing by six matches).
+      seed: args.seed * SEED_STRIDE + i,
     });
     records.push(m);
     drafted.push({ draft, win: m.win });
