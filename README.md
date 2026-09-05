@@ -38,3 +38,7 @@ On mobile, open the deployed URL in Safari (iOS) or Chrome (Android) and use **A
 - React + TypeScript + Vite
 - vite-plugin-pwa (service worker + manifest)
 - Pixel sprites rendered from embedded art data
+
+## Overhaul plan
+
+The design and balance overhaul is planned in [`docs/overhaul/`](docs/overhaul/README.md). Start with the README there for phase order, invariants, and commands.
