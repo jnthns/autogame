@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { INK, JADE, RUST, SAF, costTone } from '../data/constants';
 import { HEROES } from '../data/heroes';
 import { spriteCss } from '../data/sprites';
@@ -43,13 +43,8 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
       }}
     >
       <div
-        style={{
-          display: 'flex',
-          width: 'max-content',
-          gap: 10,
-          padding: '10px 0',
-          animation: `${direction === 'left' ? 'omMarqueeLeft' : 'omMarqueeRight'} ${duration}s linear infinite`,
-        }}
+        className={`om-marquee om-marquee--${direction === 'left' ? 'left' : 'right'}`}
+        style={{ '--parade-marquee-dur': `${duration}s` } as CSSProperties}
       >
         {track.map((id, i) => {
           const hero = HEROES.find((h) => h.id === id)!;
@@ -58,14 +53,8 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
           return (
             <div
               key={`${id}-${i}`}
-              style={{
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 4,
-                animation: `omHomeBob 2.8s ease-in-out ${delay}s infinite`,
-              }}
+              className="om-parade-bob"
+              style={{ '--delay': `${delay}s` } as CSSProperties}
             >
               <div
                 style={{
@@ -120,17 +109,13 @@ export function HomeSpriteParade({ unboundIds = HERO_IDS }: HomeSpriteParadeProp
         <span
           key={i}
           aria-hidden
+          className="om-parade-sparkle"
           style={{
-            position: 'absolute',
             left: s.left,
             top: s.top,
-            fontSize: 14,
             color: s.color,
-            opacity: 0.75,
-            pointerEvents: 'none',
-            animation: `omHomeSparkle 3.2s ease-in-out ${s.delay}s infinite`,
-            zIndex: 2,
-          }}
+            '--delay': `${s.delay}s`,
+          } as CSSProperties}
         >
           {s.glyph}
         </span>
@@ -146,14 +131,7 @@ export function HomeSpriteParade({ unboundIds = HERO_IDS }: HomeSpriteParadeProp
           opacity: 0.35,
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            width: 'max-content',
-            gap: 18,
-            animation: 'omGlyphDrift 28s linear infinite',
-          }}
-        >
+        <div className="om-glyph-drift">
           {[...GLYPHS, ...GLYPHS, ...GLYPHS].map((g, i) => (
             <span
               key={i}

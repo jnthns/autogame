@@ -35,12 +35,12 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
       onClick={onClose}
     >
       <div
+        className="om-rise"
         style={{
           width: '100%',
           background: 'var(--om-card)',
           borderTop: '3px solid var(--om-ink)',
           padding: '18px 18px 26px',
-          animation: 'omRise 0.22s ease both',
           maxHeight: '80%',
           overflowY: 'auto',
         }}

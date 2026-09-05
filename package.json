@@ -17,7 +17,7 @@
     "sim:balance": "tsx scripts/balance-sim.ts",
     "audit:budget": "tsx scripts/balance-audit.ts",
     "check:styles": "node scripts/check-styles.mjs",
-    "prebuild": "node scripts/check-styles.mjs --report",
+    "prebuild": "node scripts/check-styles.mjs",
     "screens": "node scripts/screens.mjs"
   },
   "dependencies": {
@@ -28,6 +28,7 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
+    "playwright": "^1.63.0",
     "sharp": "^0.35.4",
     "tsx": "^4.23.13",
     "typescript": "~5.8.3",
