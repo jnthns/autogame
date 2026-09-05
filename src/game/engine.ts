@@ -7,12 +7,11 @@ import {
   BOSS_AS,
   BOSS_BOARD_SURVIVAL,
   BOSS_COMBAT_LIMIT,
-  BOSS_DAMAGE_TAKEN,
+  BOSS_INCOMING_MULT,
   BOSS_DPS_BURN_SECONDS,
   BOSS_FOOTPRINT,
   BOSS_HP_TEAM_MULT,
   BOSS_RANGE,
-  BOSS_TAKEN_BY_DIFFICULTY,
   BOT_BOARD_CAPS,
   BOT_DRAFT_SIZE,
   COMBAT_LIMIT,
@@ -39,7 +38,10 @@ import { TRAITS, type TraitName } from '../data/traits';
 import { random, shuffle } from './rng';
 import {
   BOSS_SURVIVOR_COUNT,
+  BOT_INCOME_BONUS,
   incomeBreakdown,
+  INTEREST_MAX,
+  INTEREST_PER,
   lossDamage,
   MATCH_DEFAULTS,
   RELIC_ROUNDS,
@@ -151,7 +153,6 @@ export function createGame(
     sel: null,
     speed,
     phase: 'plan',
-    log: '',
     lastResult: null,
     gauntletLives: mode === 'gauntlet' ? GAUNTLET.startLives : undefined,
     gauntletGoldPenalty: mode === 'gauntlet' ? 0 : undefined,
@@ -247,9 +248,8 @@ export function rollShopOffers(draft: string[], round = 1): (ShopOffer | null)[]
   return collapseShopOffers(raw);
 }
 
-export function rollShop(g: GameState, draft: string[], silent = false): void {
+export function rollShop(g: GameState, draft: string[]): void {
   g.shop = rollShopOffers(draft, g.round);
-  void silent;
 }
 
 export function traitCounts(ids: string[]): Record<string, number> {
@@ -498,8 +498,10 @@ function placeBotBoard(units: Unit[], capN: number): { board: Unit[]; bench: Uni
   for (const r of [5, 4, 3, 2, 1, 0]) {
     for (const c of [2, 3, 1, 4, 0, 5]) cells.push({ r, c });
   }
+  // Rows 0–2 only: a ranged bot unit that starts on row 3 is already inside a
+  // player kiter's dead zone on the first tick.
   const backCells: { r: number; c: number }[] = [];
-  for (const r of [0, 1, 2, 3, 4, 5]) {
+  for (const r of [0, 1, 2]) {
     for (const c of [2, 3, 1, 4, 0, 5]) backCells.push({ r, c });
   }
   const used = new Set<string>();
@@ -574,6 +576,20 @@ function botSellWeakest(g: GameState): boolean {
   return true;
 }
 
+/**
+ * The bot carries relics too, on the same schedule the player is offered them.
+ * Without this the player's board silently gains three stacking modifiers over
+ * a match and the bot's does not.
+ */
+export function grantBotRelic(g: GameState): void {
+  if (!isRankedMode(g.mode)) return;
+  const eligible = g.foe.filter((u) => u.relics.length < 3);
+  if (!eligible.length) return;
+  const holder = eligible.slice().sort((a, b) => unitPower(b) - unitPower(a))[0];
+  const [rid] = pickRelics(1);
+  if (rid) holder.relics.push(rid);
+}
+
 export function runBotTurn(g: GameState): void {
   if (!isRankedMode(g.mode)) return;
   g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id), g.round);
@@ -595,7 +611,11 @@ export function runBotTurn(g: GameState): void {
   }
 
   const usefulLeft = g.foeShop.some((offer) => offer && botOwns(g, offer.hid));
-  if (!usefulLeft && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
+  const keepsInterest =
+    g.round >= 9 ||
+    g.foeGold - MATCH_DEFAULTS.rerollCost >=
+      Math.min(INTEREST_MAX, Math.floor(g.foeGold / INTEREST_PER)) * INTEREST_PER;
+  if (!usefulLeft && keepsInterest && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
     g.foeGold -= MATCH_DEFAULTS.rerollCost;
     g.foeShop = rollShopOffers(g.foeDraft, g.round);
     tryBuys();
@@ -618,41 +638,28 @@ export function runBotTurn(g: GameState): void {
   }
 }
 
-const FOE_SCALE: Record<Difficulty, { hp: number; atk: number; extra: number }> = {
-  normal: { hp: 1, atk: 1, extra: 0 },
-  hard: { hp: 1.2, atk: 1.12, extra: 0 },
-  mythic: { hp: 1.4, atk: 1.28, extra: 1 },
+const FOE_SCALE: Record<Difficulty, { hp: number; atk: number }> = {
+  normal: { hp: 1, atk: 1 },
+  hard: { hp: 1.15, atk: 1.1 },
+  mythic: { hp: 1.3, atk: 1.2 },
 };
 
 const BOSS_SCALE: Record<Difficulty, { hp: number; atk: number; as: number }> = {
   normal: { hp: 1, atk: 1, as: 1 },
-  hard: { hp: 1.25, atk: 1.15, as: 1.08 },
-  mythic: { hp: 1.5, atk: 1.3, as: 1.15 },
+  hard: { hp: 1.2, atk: 1.1, as: 1.05 },
+  mythic: { hp: 1.45, atk: 1.2, as: 1.1 },
 };
 
-export function makeFoeBoard(g: GameState, difficulty: Difficulty = 'normal'): void {
-  const extra = g.mode === 'bot' ? FOE_SCALE[difficulty].extra : 0;
-  const n = Math.min(3 + Math.floor(g.round * 0.7) + extra, 12);
+/** Practice sandbox only — ranked modes fight the persistent bot board. */
+export function makeFoeBoard(g: GameState): void {
+  const n = Math.min(3 + Math.floor(g.round * 0.7), 12);
   const ids = shuffle(HEROES.map((h) => h.id)).slice(0, n);
   const cells: { r: number; c: number }[] = [];
   for (let r = 0; r < BOARD_SIDE_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) cells.push({ r, c });
   const shuffledCells = shuffle(cells);
   g.foe = ids.map((hid, i) => {
-    let star: 1 | 2 | 3 =
-      g.round >= 9
-        ? random() < 0.4
-          ? 3
-          : 2
-        : g.round >= 5
-          ? random() < 0.5
-            ? 2
-            : 1
-          : 1;
-    if (g.mode === 'bot' && difficulty === 'mythic' && star < 3 && random() < 0.22) {
-      star = (star + 1) as 2 | 3;
-    } else if (g.mode === 'bot' && difficulty === 'hard' && star === 1 && random() < 0.18) {
-      star = 2;
-    }
+    const star: 1 | 2 | 3 =
+      g.round >= 9 ? (random() < 0.4 ? 3 : 2) : g.round >= 5 ? (random() < 0.5 ? 2 : 1) : 1;
     const pos = shuffledCells[i];
     return { u: uid(), hid, star, relics: [], r: pos.r, c: pos.c };
   });
@@ -719,7 +726,7 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
     cast2: false,
     boss: isBoss,
     bossKit: u.bossKit,
-    bossTaken: isBoss ? BOSS_DAMAGE_TAKEN : undefined,
+    bossTaken: isBoss ? BOSS_INCOMING_MULT : undefined,
     footprint: isBoss ? BOSS_FOOTPRINT : 1,
     rooted: isBoss,
   };
@@ -744,7 +751,7 @@ export function fitBossToTeam(
   foes: Combatant[],
   allies: Combatant[],
   round: number,
-  opts?: { difficulty?: Difficulty; gauntlet?: boolean },
+  opts?: { gauntlet?: boolean },
 ): void {
   const bosses = foes.filter((u) => u.boss);
   if (!bosses.length) return;
@@ -754,8 +761,7 @@ export function fitBossToTeam(
   );
   const dps = Math.max(1, teamDps(allies));
   const n = Math.max(1, allies.length);
-  const difficulty = opts?.difficulty ?? 'normal';
-  const taken = BOSS_TAKEN_BY_DIFFICULTY[difficulty];
+  const taken = BOSS_INCOMING_MULT;
   const roundMul = 1 + Math.max(0, round - 1) * (opts?.gauntlet ? 0.09 : 0.04);
   const floor = BOSS_HP_TEAM_MULT * teamHp * roundMul;
   const effectiveDps = dps * taken;
@@ -976,7 +982,7 @@ export class CombatEngine {
     const out = amount * (1 + (src?.dmgBuff || 0));
     let dmg = out * (1 - (t.dr || 0)) * (1 + (t.amp || 0));
     if (kind === 'true') dmg = out;
-    if (t.boss) dmg *= t.bossTaken ?? BOSS_DAMAGE_TAKEN;
+    if (t.boss) dmg *= t.bossTaken ?? BOSS_INCOMING_MULT;
     if (t.shield > 0) {
       const a = Math.min(t.shield, dmg);
       t.shield -= a;
@@ -1638,7 +1644,7 @@ export const gameActions = {
     return { kind: 'result' as const, win, dmg, offer };
   },
 
-  nextRound(g: GameState, draft: string[]) {
+  nextRound(g: GameState, draft: string[], difficulty: Difficulty = 'normal') {
     const pvpWin = g.lastResult && !g.lastResult.boss ? g.lastResult.win : null;
     const botPvpWin = g.lastResult && !g.lastResult.boss ? !g.lastResult.win : null;
     g.round++;
@@ -1646,7 +1652,7 @@ export const gameActions = {
     g.sel = null;
     if (g.mode === 'practice') {
       g.foe = [];
-      rollShop(g, draft, true);
+      rollShop(g, draft);
       return;
     }
     if (g.mode === 'gauntlet') {
@@ -1656,13 +1662,18 @@ export const gameActions = {
         g.gauntletGoldPenalty = 0;
       }
       g.gold += gauntletRoundIncome(g.round, g.gold);
-      rollShop(g, draft, true);
+      rollShop(g, draft);
       return;
     }
     g.gold += incomeBreakdown(g.round, g.gold, g.streak, pvpWin).total;
-    g.foeGold += incomeBreakdown(g.round, g.foeGold, g.foeStreak, botPvpWin).total;
-    rollShop(g, draft, true);
+    g.foeGold +=
+      incomeBreakdown(g.round, g.foeGold, g.foeStreak, botPvpWin).total +
+      BOT_INCOME_BONUS[difficulty];
+    rollShop(g, draft);
     runBotTurn(g);
+    if (RELIC_ROUNDS.includes(g.round as (typeof RELIC_ROUNDS)[number]) || isBossRound(g.round, g.matchRounds)) {
+      grantBotRelic(g);
+    }
   },
 
   bindRelic(_g: GameState, rid: string, u: Unit) {

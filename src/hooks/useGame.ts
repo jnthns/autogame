@@ -232,7 +232,7 @@ export function useGame() {
         startRound: mode === 'bot' ? debugRoundFromUrl() : undefined,
         draft,
       });
-      rollShop(g, draft, true);
+      rollShop(g, draft);
       setGame(g);
       setOverlay(null);
       setFloaters([]);
@@ -311,16 +311,13 @@ export function useGame() {
       return;
     }
     const difficulty = usesDifficulty(g.mode) ? settingsRef.current.difficulty : 'normal';
-    if (g.mode === 'practice') makeFoeBoard(g, difficulty);
+    if (g.mode === 'practice') makeFoeBoard(g);
     const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
     const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
     applyTraits(mine);
     applyTraits(theirs);
     if (theirs.some((u) => u.boss)) {
-      fitBossToTeam(theirs, mine, g.round, {
-        difficulty,
-        gauntlet: isGauntletMode(g.mode),
-      });
+      fitBossToTeam(theirs, mine, g.round, { gauntlet: isGauntletMode(g.mode) });
     }
     if (usesDifficulty(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(
@@ -447,7 +444,7 @@ export function useGame() {
     const g = gameRef.current;
     if (!g) return;
     const prevRound = g.round;
-    gameActions.nextRound(g, draft);
+    gameActions.nextRound(g, draft, settingsRef.current.difficulty);
     if (isGauntletMode(g.mode)) {
       const before = progressRef.current;
       let next = before;

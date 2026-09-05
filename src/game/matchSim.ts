@@ -3,7 +3,7 @@ import {
   BOSS_FOOTPRINT,
   BOSS_HP_TEAM_MULT,
   BOSS_RANGE,
-  BOSS_TAKEN_BY_DIFFICULTY,
+  BOSS_INCOMING_MULT,
   BOT_BOARD_CAPS,
   BOT_DRAFT_SIZE,
   GAUNTLET,
@@ -319,10 +319,7 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   const teamHp = mine.reduce((s, u) => s + u.maxHp, 0);
   const boss = theirs.find((u) => u.boss);
   assert(!!boss, 'period 1 fight has a boss unit');
-  assert(boss!.bossTaken === BOSS_TAKEN_BY_DIFFICULTY.normal, 'mortal bosses use the normal taken lever');
-  fitBossToTeam(theirs, mine, hpG.round, { difficulty: 'mythic' });
-  assert(boss!.bossTaken === BOSS_TAKEN_BY_DIFFICULTY.mythic, 'mythic bosses take less incoming damage');
-  fitBossToTeam(theirs, mine, hpG.round);
+  assert(boss!.bossTaken === BOSS_INCOMING_MULT, 'bosses use one incoming-damage lever');
   assert(boss!.footprint === BOSS_FOOTPRINT, 'boss occupies a 4×4 footprint');
   assert(boss!.r === BOSS_ANCHOR.r && boss!.c === BOSS_ANCHOR.c, 'boss is pinned to the 4×4 anchor');
   assert(boss!.rooted === true, 'boss is rooted');

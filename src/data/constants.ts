@@ -43,15 +43,10 @@ export const BOSS_AS = 0.52;
 export const BOSS_COMBAT_LIMIT = 75;
 export const COMBAT_LIMIT = 45;
 /**
- * Incoming damage vs bosses by trial difficulty. Lower = tankier bosses.
- * Player DPS compounds faster than HP, so this is the main compounding lever.
+ * Incoming damage multiplier vs bosses. One value for every difficulty: BOSS_SCALE
+ * is the difficulty lever, so the two no longer compound.
  */
-export const BOSS_TAKEN_BY_DIFFICULTY = {
-  normal: 2.35,
-  hard: 1.95,
-  mythic: 1.65,
-} as const;
-export const BOSS_DAMAGE_TAKEN = BOSS_TAKEN_BY_DIFFICULTY.normal;
+export const BOSS_INCOMING_MULT = 2.35;
 
 export const BOARD_CELL_WIDTH_PCT = 100 / BOARD_COLS;
 export const BOARD_CELL_HEIGHT_PCT = 100 / BOARD_ROWS;

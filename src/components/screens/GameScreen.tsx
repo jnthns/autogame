@@ -158,7 +158,7 @@ export function GameScreen(props: GameScreenProps) {
           />
         )}
         {g.phase === 'combat' && (
-          <CombatBar speed={g.speed} hint={g.log} onToggleSpeed={props.onToggleSpeed} />
+          <CombatBar speed={g.speed} onToggleSpeed={props.onToggleSpeed} />
         )}
       </div>
     </div>

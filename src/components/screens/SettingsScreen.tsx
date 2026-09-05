@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { BONE, JADE, BOSS_TAKEN_BY_DIFFICULTY } from '../../data/constants';
+import { BONE, JADE } from '../../data/constants';
 import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
 import { BattlegroundPreview } from '../BattlegroundPreview';
 import {
@@ -22,9 +22,9 @@ interface SettingsScreenProps {
 }
 
 const DIFFICULTIES: { id: Difficulty; label: string; hint: string }[] = [
-  { id: 'normal', label: 'Mortal', hint: `Bosses take ${Math.round(BOSS_TAKEN_BY_DIFFICULTY.normal * 100)}% dmg` },
-  { id: 'hard', label: 'Hard', hint: `Bosses take ${Math.round(BOSS_TAKEN_BY_DIFFICULTY.hard * 100)}% dmg · +25% HP` },
-  { id: 'mythic', label: 'Mythic', hint: `Bosses take ${Math.round(BOSS_TAKEN_BY_DIFFICULTY.mythic * 100)}% dmg · +50% HP` },
+  { id: 'normal', label: 'Mortal', hint: 'Baseline bot, baseline bosses' },
+  { id: 'hard', label: 'Hard', hint: 'Bot +1 gold/round · +15% HP · bosses +20% HP' },
+  { id: 'mythic', label: 'Mythic', hint: 'Bot +2 gold/round · +30% HP · bosses +45% HP' },
 ];
 
 const SPEEDS: CombatSpeed[] = [1, 2, 4];

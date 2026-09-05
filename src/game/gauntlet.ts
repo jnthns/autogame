@@ -54,14 +54,6 @@ export function boardPower(board: Unit[]): number {
   return units + synergyBonus;
 }
 
-function roundScale(round: number): number {
-  return 1 + (round - 1) * GAUNTLET.roundScalePerRound;
-}
-
-function powerScale(power: number): number {
-  return 1 + power / GAUNTLET.boardPowerDivisor;
-}
-
 function scaledStar(base: 1 | 2 | 3, round: number): 1 | 2 | 3 {
   if (round >= 30) return 3;
   if (round >= 15) return base >= 2 ? 3 : 2;
@@ -69,23 +61,23 @@ function scaledStar(base: 1 | 2 | 3, round: number): 1 | 2 | 3 {
   return base;
 }
 
-function buildScaledUnits(template: BossUnitSpec[], round: number, power: number): BossUnitSpec[] {
-  const rs = roundScale(round);
-  const ps = powerScale(power);
-  const combined = rs * ps;
+/**
+ * Gauntlet encounters are a solo 4×4 boss whose HP and attack are fitted to the
+ * live player board in combat, so the only thing scaling here is the star.
+ */
+function buildScaledUnits(template: BossUnitSpec[], round: number): BossUnitSpec[] {
   return template.map((spec) => ({
     ...spec,
     star: scaledStar(spec.star, round),
-    // The 4×4 boss HP/ATK is fitted to the live player board in combat; minions still scale.
-    scaleHp: spec.boss ? 1 : spec.scaleHp * combined,
-    scaleAtk: spec.boss ? 1 : spec.scaleAtk * Math.sqrt(combined),
+    scaleHp: 1,
+    scaleAtk: 1,
     boss: spec.boss ?? false,
     bossKit: spec.bossKit,
   }));
 }
 
-/** Rotate boss templates and scale by round number + player board power. */
-export function getGauntletEncounter(round: number, power: number): BossEncounter {
+/** Rotate boss templates by round; the boss itself is fitted to the board in combat. */
+export function getGauntletEncounter(round: number, _power = 0): BossEncounter {
   const template = BOSS_ENCOUNTERS[(round - 1) % BOSS_ENCOUNTERS.length];
   const period = Math.min(4, Math.ceil(round / 4));
   const suffix = round > BOSS_ENCOUNTERS.length ? ` · Wave ${round}` : '';
@@ -95,7 +87,7 @@ export function getGauntletEncounter(round: number, power: number): BossEncounte
     id: `${template.id}-w${round}`,
     name: `${template.name}${suffix}`,
     blurb: template.blurb,
-    units: buildScaledUnits(template.units, round, power),
+    units: buildScaledUnits(template.units, round),
     reward: {
       gold: gauntletGoldReward(round),
       freeRerolls: round >= 12 ? 2 : round >= 6 ? 1 : 0,

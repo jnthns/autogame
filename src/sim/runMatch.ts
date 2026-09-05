@@ -88,7 +88,7 @@ export function runMatch(opts: MatchOptions): MatchRecord {
   const draft = opts.draft?.length ? opts.draft : [...DEFAULT_DRAFT];
   const policy = getPolicy(opts.policy ?? 'decent');
   const g: GameState = createGame(opts.mode);
-  rollShop(g, draft, true);
+  rollShop(g, draft);
 
   const rounds: RoundRecord[] = [];
   let threeStarRound: number | null = null;
@@ -152,7 +152,7 @@ export function runMatch(opts: MatchOptions): MatchRecord {
       g.streak,
       g.lastResult && !g.lastResult.boss ? g.lastResult.win : null,
     );
-    gameActions.nextRound(g, draft);
+    gameActions.nextRound(g, draft, opts.difficulty);
     record.goldAfter = g.gold;
     record.income = g.gold - goldBeforeIncome;
     record.incomeBase = breakdown.base;
@@ -184,7 +184,7 @@ function fightRound(
   applyTraits(mine);
   applyTraits(theirs);
   if (theirs.some((u) => u.boss)) {
-    fitBossToTeam(theirs, mine, round, { difficulty, gauntlet: isGauntletMode(g.mode) });
+    fitBossToTeam(theirs, mine, round, { gauntlet: isGauntletMode(g.mode) });
   }
   if (usesDifficulty(g.mode)) scaleFoeCombatants(theirs, difficulty);
 

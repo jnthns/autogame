@@ -274,7 +274,7 @@ export function getPolicy(name: PolicyName): Policy {
 
 /** Convenience for the sim: refresh the shop the way the app does on entering a round. */
 export function openShop(g: GameState, draft: string[]): void {
-  rollShop(g, draft, true);
+  rollShop(g, draft);
 }
 
 export { cap };

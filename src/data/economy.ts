@@ -89,6 +89,9 @@ export function nextInterestAt(goldHeld: number): number | null {
   return step > INTEREST_MAX ? null : step * INTEREST_PER;
 }
 
+/** Difficulty is bought with the bot's wallet, not with hidden stat padding. */
+export const BOT_INCOME_BONUS = { normal: 0, hard: 1, mythic: 2 } as const;
+
 /* ── Punishment ────────────────────────────────────────────────────────── */
 
 export const LOSS_BASE = (round: number): number =>

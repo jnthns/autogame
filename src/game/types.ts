@@ -60,7 +60,6 @@ export interface GameState {
   sel: Selection | null;
   speed: number;
   phase: Phase;
-  log: string;
   lastResult: { win: boolean; dmg: number; boss?: boolean } | null;
   /** Gauntlet-only: remaining lives (starts at 3). */
   gauntletLives?: number;
