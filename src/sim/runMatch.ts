@@ -1,4 +1,5 @@
 import { BOSS_COMBAT_LIMIT, COMBAT_LIMIT, DEFAULT_DRAFT, GAUNTLET } from '../data/constants';
+import { incomeBreakdown, RELIC_PICKS_LOSS, RELIC_PICKS_WIN } from '../data/economy';
 import { HERO_MAP } from '../data/heroes';
 import {
   applyTraits,
@@ -46,6 +47,10 @@ export interface RoundRecord {
   goldBefore: number;
   goldAfter: number;
   income: number;
+  incomeBase: number;
+  incomeWin: number;
+  incomeInterest: number;
+  incomeStreak: number;
   boardStars: number[];
   boardCost: number[];
   foeBoardStars: number[];
@@ -108,12 +113,16 @@ export function runMatch(opts: MatchOptions): MatchRecord {
     record.goldBefore = goldBefore;
 
     const before = { myHp: g.myHp, foeHp: g.foeHp };
-    const result = gameActions.resolveRound(g, win, g.matchRounds);
+    const result = gameActions.resolveRound(g, win, g.matchRounds, {
+      me: record.survivorsMe,
+      foe: record.survivorsFoe,
+    });
     record.dmg = Math.max(before.myHp - g.myHp, before.foeHp - g.foeHp);
     if (win) roundsCleared = round;
 
     if (result.kind === 'result' && result.offer) {
-      const picks = isGauntletMode(g.mode) ? pickGauntletRelics(g.round) : pickRelics();
+      const count = win ? RELIC_PICKS_WIN : RELIC_PICKS_LOSS;
+      const picks = isGauntletMode(g.mode) ? pickGauntletRelics(g.round, count) : pickRelics(count);
       if (picks.length && g.board.length) {
         const rid = policy.chooseRelic(picks, g.board);
         const holder = policy.chooseRelicHolder(rid, g.board);
@@ -137,9 +146,19 @@ export function runMatch(opts: MatchOptions): MatchRecord {
     }
 
     const goldBeforeIncome = g.gold;
+    const breakdown = incomeBreakdown(
+      g.round + 1,
+      goldBeforeIncome,
+      g.streak,
+      g.lastResult && !g.lastResult.boss ? g.lastResult.win : null,
+    );
     gameActions.nextRound(g, draft);
     record.goldAfter = g.gold;
     record.income = g.gold - goldBeforeIncome;
+    record.incomeBase = breakdown.base;
+    record.incomeWin = breakdown.win;
+    record.incomeInterest = breakdown.interest;
+    record.incomeStreak = breakdown.streak;
     if (g.round > maxRound) break;
   }
 
@@ -205,6 +224,10 @@ function fightRound(
     goldBefore: 0,
     goldAfter: 0,
     income: 0,
+    incomeBase: 0,
+    incomeWin: 0,
+    incomeInterest: 0,
+    incomeStreak: 0,
     boardStars: g.board.map((u) => u.star),
     boardCost: g.board.map((u) => HERO_MAP[u.hid]?.cost ?? 0),
     foeBoardStars: theirs.map((u) => u.star),

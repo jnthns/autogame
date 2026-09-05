@@ -126,6 +126,8 @@ function main(): void {
   );
   const earlyThree = records.filter((m) => m.threeStarRound != null && m.threeStarRound < 4).length;
   const goldFlow = records.map((m) => m.rounds.reduce((s, r) => s + Math.max(0, r.income), 0));
+  const interestFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeInterest, 0));
+  const streakFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeStreak, 0));
 
   const head = `mode=${args.mode} diff=${args.difficulty} policy=${args.policy} n=${args.n} seed=${args.seed}`;
   const lines = [
@@ -136,7 +138,8 @@ function main(): void {
     `boss4 win%     ${f(bossWinPct(records, 4))}   boss8 win% ${f(bossWinPct(records, 8))}   boss12 win% ${f(bossWinPct(records, 12))}`,
     `abilityShare%  ${f(pct(abilityDmg, abilityDmg + autoDmg))}`,
     `3★<r4 %        ${f(pct(earlyThree, records.length))}`,
-    `goldFlow avg   ${f(mean(goldFlow))}   medRounds ${f(median(records.map((m) => m.rounds.length)))}`,
+    `goldFlow avg   ${f(mean(goldFlow))}   interest avg ${f(mean(interestFlow))}   streakGold avg ${f(mean(streakFlow))}`,
+    `medRounds      ${f(median(records.map((m) => m.rounds.length)))}`,
     `medRoundsClear ${f(median(records.map((m) => m.roundsCleared)))}`,
   ];
 

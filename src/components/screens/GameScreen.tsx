@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MATCH_DEFAULTS } from '../../data/constants';
+import { MATCH_DEFAULTS } from '../../data/economy';
 import {
   activeSynergies,
   applyTraits,

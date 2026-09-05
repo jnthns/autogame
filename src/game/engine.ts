@@ -20,7 +20,6 @@ import {
   HERO_HP_MUL,
   MARATHON,
   MARATHON_BOARD_CAPS,
-  MATCH_DEFAULTS,
   MERGE_COPIES,
   PLAYER_ROW_START,
   PRACTICE_BOARD_CAP,
@@ -39,12 +38,17 @@ import { RELIC_MAP, RELICS } from '../data/relics';
 import { TRAITS, type TraitName } from '../data/traits';
 import { random, shuffle } from './rng';
 import {
+  BOSS_SURVIVOR_COUNT,
+  incomeBreakdown,
+  lossDamage,
+  MATCH_DEFAULTS,
+  RELIC_ROUNDS,
+} from '../data/economy';
+import {
   collapseShopOffers,
   getBossEncounter,
   isBossRound,
-  lossDamage,
   makeBossUnits,
-  roundIncome,
   rollShopTier,
   shopPrice,
   unitPower,
@@ -132,8 +136,9 @@ export function createGame(
     myHp: hp,
     foeHp: hp,
     maxHp: hp,
-    lossStreak: 0,
-    foeLossStreak: 0,
+    streak: 0,
+    foeStreak: 0,
+    lastSurvivors: { me: 0, foe: 0 },
     bench: [],
     board: [],
     foe: [],
@@ -184,8 +189,8 @@ function fastForwardMatch(g: GameState, target: number): void {
   const capR = Math.min(target, g.matchRounds);
   for (let r = 1; r < capR; r++) {
     g.round++;
-    g.gold += roundIncome(g.round, false);
-    g.foeGold += roundIncome(g.round, null);
+    g.gold += incomeBreakdown(g.round, g.gold, g.streak, false).total;
+    g.foeGold += incomeBreakdown(g.round, g.foeGold, g.foeStreak, null).total;
     runBotTurn(g);
   }
   g.phase = 'plan';
@@ -1540,15 +1545,21 @@ export const gameActions = {
     g.sel = null;
   },
 
-  resolveRound(g: GameState, win: boolean, maxR: number): OverlayKind {
+  resolveRound(
+    g: GameState,
+    win: boolean,
+    maxR: number,
+    survivors?: { me: number; foe: number },
+  ): OverlayKind {
     g.phase = 'result';
+    if (survivors) g.lastSurvivors = survivors;
     if (g.mode === 'practice') {
       return { kind: 'spar' as const, win };
     }
     if (g.mode === 'gauntlet') {
       const enc = getGauntletEncounter(g.round, boardPower(g.board));
       if (win) {
-        g.lossStreak = 0;
+        g.streak = Math.max(0, g.streak) + 1;
         g.gold += enc.reward.gold;
         g.freeRerolls += enc.reward.freeRerolls;
         g.gauntletRoundsCleared = g.round;
@@ -1561,7 +1572,7 @@ export const gameActions = {
           boss: { name: enc.name, period: enc.period, reward: enc.reward },
         };
       }
-      g.lossStreak++;
+      g.streak = Math.min(0, g.streak) - 1;
       g.gauntletLives = Math.max(0, (g.gauntletLives ?? GAUNTLET.startLives) - 1);
       g.gauntletGoldPenalty = GAUNTLET.goldPenalty;
       g.lastResult = { win: false, dmg: 0, boss: true };
@@ -1581,7 +1592,7 @@ export const gameActions = {
     let dmg = 0;
     if (boss) {
       if (win) {
-        g.lossStreak = 0;
+        g.streak = Math.max(0, g.streak) + 1;
         g.gold += boss.reward.gold;
         g.freeRerolls += boss.reward.freeRerolls;
         g.lastResult = { win: true, dmg: 0, boss: true };
@@ -1595,8 +1606,8 @@ export const gameActions = {
           boss: { name: boss.name, period: boss.period, reward: boss.reward },
         };
       }
-      g.lossStreak++;
-      dmg = lossDamage(g.round, g.lossStreak);
+      g.streak = Math.min(0, g.streak) - 1;
+      dmg = lossDamage(g.round, BOSS_SURVIVOR_COUNT, true);
       g.myHp = Math.max(0, g.myHp - dmg);
       g.lastResult = { win: false, dmg, boss: true };
       const over = g.myHp <= 0 || g.foeHp <= 0 || g.round >= maxR;
@@ -1610,20 +1621,20 @@ export const gameActions = {
       };
     }
     if (win) {
-      g.foeLossStreak++;
-      g.lossStreak = 0;
-      dmg = lossDamage(g.round, g.foeLossStreak);
+      g.streak = Math.max(0, g.streak) + 1;
+      g.foeStreak = Math.min(0, g.foeStreak) - 1;
+      dmg = lossDamage(g.round, g.lastSurvivors.me);
       g.foeHp = Math.max(0, g.foeHp - dmg);
     } else {
-      g.lossStreak++;
-      g.foeLossStreak = 0;
-      dmg = lossDamage(g.round, g.lossStreak);
+      g.streak = Math.min(0, g.streak) - 1;
+      g.foeStreak = Math.max(0, g.foeStreak) + 1;
+      dmg = lossDamage(g.round, g.lastSurvivors.foe);
       g.myHp = Math.max(0, g.myHp - dmg);
     }
     g.lastResult = { win, dmg, boss: false };
     const over = g.myHp <= 0 || g.foeHp <= 0 || g.round >= maxR;
     if (over) return { kind: 'over' as const, win: g.foeHp <= 0 || (g.myHp > 0 && g.foeHp < g.myHp) };
-    const offer = win && (g.round % 2 === 1 || g.round >= 7);
+    const offer = RELIC_ROUNDS.includes(g.round as (typeof RELIC_ROUNDS)[number]);
     return { kind: 'result' as const, win, dmg, offer };
   },
 
@@ -1644,12 +1655,12 @@ export const gameActions = {
         g.gold = Math.max(0, g.gold - penalty);
         g.gauntletGoldPenalty = 0;
       }
-      g.gold += gauntletRoundIncome(g.round);
+      g.gold += gauntletRoundIncome(g.round, g.gold);
       rollShop(g, draft, true);
       return;
     }
-    g.gold += roundIncome(g.round, pvpWin);
-    g.foeGold += roundIncome(g.round, botPvpWin);
+    g.gold += incomeBreakdown(g.round, g.gold, g.streak, pvpWin).total;
+    g.foeGold += incomeBreakdown(g.round, g.foeGold, g.foeStreak, botPvpWin).total;
     rollShop(g, draft, true);
     runBotTurn(g);
   },

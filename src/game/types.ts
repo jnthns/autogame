@@ -43,8 +43,11 @@ export interface GameState {
   myHp: number;
   foeHp: number;
   maxHp: number;
-  lossStreak: number;
-  foeLossStreak: number;
+  /** Signed: +n wins in a row, −n losses in a row. */
+  streak: number;
+  foeStreak: number;
+  /** Units left standing on each side after the last fight. */
+  lastSurvivors: { me: number; foe: number };
   bench: Unit[];
   board: Unit[];
   foe: Unit[];

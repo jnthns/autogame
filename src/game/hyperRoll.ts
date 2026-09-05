@@ -1,12 +1,12 @@
 import { BOSS_KITS, type BossKitId } from '../data/bosses';
+import { BOSS_ANCHOR, MERGE_COPIES } from '../data/constants';
 import {
-  BOSS_ANCHOR,
   BOSS_ROUNDS,
   HYPER_ROLL_ROUNDS,
   MARATHON_BOSS_ROUNDS,
-  MERGE_COPIES,
-} from '../data/constants';
-import { SHOP_TIERS, shopOdds } from '../data/economy';
+  SHOP_TIERS,
+  shopOdds,
+} from '../data/economy';
 import { HERO_MAP } from '../data/heroes';
 import { random } from './rng';
 import type { BossRewardGrant, ShopOffer, Unit } from './types';
@@ -74,15 +74,6 @@ export function periodInfo(round: number, matchRounds = HYPER_ROLL_ROUNDS): Peri
     roundsUntilBoss: isFinal || nextBoss == null ? null : nextBoss - round,
     encounter,
   };
-}
-
-export function roundIncome(roundAfter: number, pvpWin: boolean | null): number {
-  const winBonus = pvpWin === true ? 1 : 0;
-  return 4 + winBonus + Math.min(2, Math.floor(roundAfter / 5));
-}
-
-export function lossDamage(round: number, streak: number): number {
-  return 8 + 4 * (streak - 1) + Math.floor(round / 3) * 2;
 }
 
 export const BOSS_ENCOUNTERS: BossEncounter[] = [

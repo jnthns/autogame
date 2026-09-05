@@ -9,10 +9,9 @@ import {
   GAUNTLET,
   HERO_HP_MUL,
   MARATHON,
-  MARATHON_BOSS_ROUNDS,
-  MATCH_DEFAULTS,
   MERGE_COPIES,
 } from '../data/constants';
+import { MARATHON_BOSS_ROUNDS, MATCH_DEFAULTS } from '../data/economy';
 import { HEROES, HERO_MAP } from '../data/heroes';
 import {
   applyMerges,
@@ -130,7 +129,7 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   g.round = 4;
   g.phase = 'plan';
   g.myHp = 100;
-  g.lossStreak = 0;
+  g.streak = 0;
   const loss = gameActions.resolveRound(g, false, g.matchRounds);
   assert(loss.kind === 'result' && !loss.win, 'boss loss is not a soft-lock');
   assert(g.myHp < 100 && g.myHp > 0, 'boss loss deals standard HP, match continues');

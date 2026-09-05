@@ -5,7 +5,7 @@
  *
  * Returns null outside a dev build so nothing reaches production behaviour.
  */
-import { MATCH_DEFAULTS } from '../data/constants';
+import { MATCH_DEFAULTS } from '../data/economy';
 import type { GameMode, Screen } from './types';
 
 export interface DebugUrlState {

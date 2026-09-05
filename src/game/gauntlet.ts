@@ -1,4 +1,5 @@
 import { BOSS_ANCHOR, GAUNTLET, GAUNTLET_BOARD_CAPS } from '../data/constants';
+import { INTEREST_MAX, INTEREST_PER } from '../data/economy';
 import { HERO_MAP } from '../data/heroes';
 import { CLASSES, type ClassName } from '../data/classes';
 import { GAUNTLET_RELIC_IDS, RELICS } from '../data/relics';
@@ -107,8 +108,10 @@ export function gauntletGoldReward(round: number): number {
   return GAUNTLET.baseGoldReward + round * GAUNTLET.goldPerRound;
 }
 
-export function gauntletRoundIncome(round: number): number {
-  return GAUNTLET.baseRoundIncome + Math.min(4, Math.floor(round / 5));
+/** Same interest term as the ranked modes, on top of the gauntlet's own base. */
+export function gauntletRoundIncome(round: number, goldHeld = 0): number {
+  const interest = Math.min(INTEREST_MAX, Math.floor(Math.max(0, goldHeld) / INTEREST_PER));
+  return GAUNTLET.baseRoundIncome + Math.min(4, Math.floor(round / 5)) + interest;
 }
 
 export function gauntletBoardCap(round: number): number {

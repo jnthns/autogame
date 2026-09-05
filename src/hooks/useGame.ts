@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, PLAYER_ROW_START, RUST, SAF, USER_DRAFT_MAX } from '../data/constants';
+import { RELIC_PICKS_LOSS, RELIC_PICKS_WIN } from '../data/economy';
 import {
   battlegroundUnlocked,
   newlyUnlockedBattlegrounds,
@@ -206,10 +207,10 @@ export function useGame() {
   }, [clearTimer]);
 
   const resolveCombat = useCallback(
-    (win: boolean) => {
+    (win: boolean, survivors: { me: number; foe: number }) => {
       const g = gameRef.current;
       if (!g) return;
-      let result = gameActions.resolveRound(g, win, g.matchRounds);
+      let result = gameActions.resolveRound(g, win, g.matchRounds, survivors);
       if (result.kind === 'over' && isGauntletMode(g.mode)) {
         const before = progressRef.current;
         const peakRound = g.gauntletRoundsCleared ?? Math.max(0, g.round - 1);
@@ -296,7 +297,11 @@ export function useGame() {
       if (eng.isDone()) {
         clearTimer();
         const win = eng.getWinner();
-        setTimeout(() => resolveCombat(win), 500);
+        const survivors = {
+          me: eng.C.filter((u) => u.alive && u.side === 'me').length,
+          foe: eng.C.filter((u) => u.alive && u.side === 'foe').length,
+        };
+        setTimeout(() => resolveCombat(win, survivors), 500);
       }
     }, 100);
   }, [clearTimer, pop, resolveCombat, spawnFx, syncGame]);
@@ -394,8 +399,9 @@ export function useGame() {
 
   const offerRelics = useCallback(() => {
     const g = gameRef.current;
+    const count = g?.lastResult?.win === false ? RELIC_PICKS_LOSS : RELIC_PICKS_WIN;
     const picks =
-      g && isGauntletMode(g.mode) ? pickGauntletRelics(g.round) : pickRelics();
+      g && isGauntletMode(g.mode) ? pickGauntletRelics(g.round, count) : pickRelics(count);
     setOverlay({ kind: 'relic', picks });
   }, []);
 

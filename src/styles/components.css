@@ -1030,3 +1030,8 @@
 .om-title-stamp {
   animation: omStamp var(--dur-deliberate) var(--ease-snap) both;
 }
+
+.om-hud__income-detail {
+  color: var(--om-muted-2);
+  font-size: var(--text-xs);
+}

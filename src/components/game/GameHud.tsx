@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { incomeBreakdown } from '../../data/economy';
 import { isRankedMode, isGauntletMode } from '../../game/engine';
 import type { GameState } from '../../game/types';
 
@@ -16,6 +18,10 @@ function modeLabel(g: GameState): string {
 
 export function GameHud({ game: g, boardCap, onQuit }: GameHudProps) {
   const gauntlet = isGauntletMode(g.mode);
+  const [showIncome, setShowIncome] = useState(false);
+  // Previewed against the gold held right now, so banking updates it live.
+  const income = incomeBreakdown(g.round + 1, g.gold, g.streak, g.lastResult?.win ?? null);
+  const showChip = g.mode !== 'practice';
   return (
     <div className="om-hud screen-header screen-header-game">
       <div className="om-hud__row">
@@ -28,10 +34,32 @@ export function GameHud({ game: g, boardCap, onQuit }: GameHudProps) {
           <span aria-hidden>◈</span>
           <span>{g.mode === 'practice' ? '∞' : g.gold}</span>
         </div>
+        {showChip && (
+          <button
+            type="button"
+            className="om-hud__income"
+            onClick={() => setShowIncome((v) => !v)}
+            aria-expanded={showIncome}
+          >
+            +{income.total}
+          </button>
+        )}
         <div className="om-hud__stat">
           {g.board.length}/{boardCap}
         </div>
       </div>
+
+      {showChip && showIncome && (
+        <div className="om-hud__row om-hud__income-detail">
+          <span className="om-label">NEXT ROUND</span>
+          <span className="mono">
+            {income.base} base
+            {income.win ? ` · +${income.win} win` : ''}
+            {income.interest ? ` · +${income.interest} interest` : ''}
+            {income.streak ? ` · +${income.streak} streak` : ''}
+          </span>
+        </div>
+      )}
 
       {gauntlet && g.gauntletLives != null && (
         <div className="om-hud__row">

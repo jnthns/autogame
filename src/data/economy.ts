@@ -45,3 +45,69 @@ export function shopOdds(round: number): [number, number, number, number] {
 
 /** Cost tiers the odds table indexes, in row order. */
 export const SHOP_TIERS = [2, 3, 4, 5] as const;
+
+/* ── Income ────────────────────────────────────────────────────────────── */
+
+/** Flat gold every round, before wins, interest and streaks. */
+export const INCOME_BASE = (round: number): number => (round <= 3 ? 4 : round <= 7 ? 5 : 6);
+export const WIN_BONUS = 1;
+/** Gold banked per +1 interest, and the cap on it. */
+export const INTEREST_PER = 10;
+export const INTEREST_MAX = 3;
+/** Win *or* loss streaks pay: sitting on a loss streak is a real strategy. */
+export const STREAK_GOLD = (streak: number): number =>
+  Math.abs(streak) >= 4 ? 2 : Math.abs(streak) >= 2 ? 1 : 0;
+
+export interface IncomeBreakdown {
+  base: number;
+  win: number;
+  interest: number;
+  streak: number;
+  total: number;
+}
+
+/**
+ * `goldHeld` is the gold *before* income, so the interest term is what the
+ * player earned by not spending. `wonLast` is null on the first round.
+ */
+export function incomeBreakdown(
+  roundEntered: number,
+  goldHeld: number,
+  streak: number,
+  wonLast: boolean | null,
+): IncomeBreakdown {
+  const base = INCOME_BASE(roundEntered);
+  const win = wonLast === true ? WIN_BONUS : 0;
+  const interest = Math.min(INTEREST_MAX, Math.floor(Math.max(0, goldHeld) / INTEREST_PER));
+  const streakGold = STREAK_GOLD(streak);
+  return { base, win, interest, streak: streakGold, total: base + win + interest + streakGold };
+}
+
+/** The next gold total that would earn another point of interest. */
+export function nextInterestAt(goldHeld: number): number | null {
+  const step = Math.floor(Math.max(0, goldHeld) / INTEREST_PER) + 1;
+  return step > INTEREST_MAX ? null : step * INTEREST_PER;
+}
+
+/* ── Punishment ────────────────────────────────────────────────────────── */
+
+export const LOSS_BASE = (round: number): number =>
+  round <= 3 ? 4 : round <= 7 ? 6 : round <= 11 ? 8 : 10;
+/** Damage scales with how much of the winner's board was still standing. */
+export const LOSS_PER_SURVIVOR = 2;
+export const LOSS_SURVIVOR_CAP = 8;
+export const BOSS_LOSS_EXTRA = 6;
+/** A boss counts as four units when it wins. */
+export const BOSS_SURVIVOR_COUNT = 4;
+
+export function lossDamage(round: number, survivors: number, boss = false): number {
+  const capped = Math.max(0, Math.min(LOSS_SURVIVOR_CAP, Math.round(survivors)));
+  return LOSS_BASE(round) + LOSS_PER_SURVIVOR * capped + (boss ? BOSS_LOSS_EXTRA : 0);
+}
+
+/* ── Relic cadence ─────────────────────────────────────────────────────── */
+
+/** Plus any boss round whose reward has `relic: true`. */
+export const RELIC_ROUNDS = [3, 6, 9, 11] as const;
+export const RELIC_PICKS_WIN = 3;
+export const RELIC_PICKS_LOSS = 2;

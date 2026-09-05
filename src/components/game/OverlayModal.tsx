@@ -29,8 +29,9 @@ interface OverlayCopy {
   relics: RelicChoice[];
 }
 
-function streakNote(losses: number): string {
-  return losses > 1 ? ` — ${losses} losses in a row, and it compounds.` : '.';
+/** `streak` is signed: only a losing run is worth calling out. */
+function streakNote(streak: number): string {
+  return streak <= -2 ? ` — ${-streak} losses in a row, but the streak pays gold.` : '.';
 }
 
 function copyFor(
@@ -65,7 +66,7 @@ function copyFor(
     } else if (overlay.win && b.reward) {
       body = `The omen breaks. You claim ${rewardLines(b.reward).join(' · ')}. The Adversary's board is untouched.`;
     } else {
-      body = `You take ${overlay.dmg} damage${streakNote(game.lossStreak)} The match continues.`;
+      body = `You take ${overlay.dmg} damage${streakNote(game.streak)} The match continues.`;
     }
     return {
       ...base,
@@ -84,13 +85,13 @@ function copyFor(
   }
 
   if (overlay.kind === 'result') {
-    const losses = overlay.win ? game.foeLossStreak : game.lossStreak;
+    const streak = overlay.win ? game.foeStreak : game.streak;
     return {
       ...base,
-      title: overlay.win ? 'ROUND WON' : 'ROUND LOST',
+      title: overlay.win ? 'ROUND WON' : overlay.offer ? 'ROUND LOST · A LESSER SPOIL' : 'ROUND LOST',
       subtitle: overlay.win ? 'The Adversary buckles' : 'The field turns on you',
       tone: overlay.win ? 'good' : 'bad',
-      body: `${overlay.win ? 'The Adversary takes ' : 'You take '}${overlay.dmg} damage${streakNote(losses)}`,
+      body: `${overlay.win ? 'The Adversary takes ' : 'You take '}${overlay.dmg} damage${streakNote(streak)}`,
       actionLabel: overlay.offer ? 'CLAIM RELIC' : 'NEXT ROUND',
     };
   }

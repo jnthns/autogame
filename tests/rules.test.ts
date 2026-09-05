@@ -9,10 +9,9 @@ import {
   GAUNTLET,
   HERO_HP_MUL,
   MARATHON,
-  MARATHON_BOSS_ROUNDS,
-  MATCH_DEFAULTS,
   MERGE_COPIES,
 } from '../src/data/constants';
+import { MARATHON_BOSS_ROUNDS, MATCH_DEFAULTS } from '../src/data/economy';
 import { HEROES, HERO_MAP } from '../src/data/heroes';
 import {
   applyMerges,
@@ -32,6 +31,7 @@ import {
 import {
   boardPower,
   gauntletGoldReward,
+  gauntletRoundIncome,
   getGauntletEncounter,
   makeGauntletBossUnits,
   pickGauntletRelics,
@@ -372,7 +372,8 @@ describe('gauntlet', () => {
     expect(g.gauntletLives).toBe(2);
     expect(g.gauntletGoldPenalty).toBe(GAUNTLET.goldPenalty);
     gameActions.nextRound(g, []);
-    expect(g.gold).toBe(goldBefore - GAUNTLET.goldPenalty + gauntletIncomeRound2());
+    const afterToll = goldBefore - GAUNTLET.goldPenalty;
+    expect(g.gold).toBe(afterToll + gauntletRoundIncome(2, afterToll));
   });
 
   it('ends at zero lives', () => {
@@ -382,11 +383,6 @@ describe('gauntlet', () => {
     expect(gameActions.resolveRound(g, false, g.matchRounds).kind).toBe('over');
   });
 });
-
-function gauntletIncomeRound2(): number {
-  // round 2 income: base only, no gold banked past the interest threshold after the penalty.
-  return GAUNTLET.baseRoundIncome;
-}
 
 describe('roster shape', () => {
   it.each(HEROES.map((h) => [h.id, h] as const))('%s uses a legal attack range', (_id, h) => {

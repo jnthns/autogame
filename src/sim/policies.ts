@@ -1,4 +1,5 @@
-import { MATCH_DEFAULTS, PLAYER_ROW_START } from '../data/constants';
+import { PLAYER_ROW_START } from '../data/constants';
+import { INTEREST_MAX, INTEREST_PER, MATCH_DEFAULTS } from '../data/economy';
 import { HERO_MAP, isMeleeHero } from '../data/heroes';
 import { applyMerges, cap, countHeroStar, gameActions, rollShop, sellValue } from '../game/engine';
 import { shopPrice, unitPower } from '../game/hyperRoll';
@@ -35,8 +36,9 @@ function ownsCopy(g: GameState, hid: string, star: 1 | 2): boolean {
   return countHeroStar(g, hid, star) > 0;
 }
 
-function nextInterestThreshold(gold: number): number {
-  return Math.min(30, (Math.floor(gold / 10) + 1) * 10);
+/** The highest interest threshold this much gold has already cleared. */
+function interestFloor(gold: number): number {
+  return Math.min(INTEREST_MAX, Math.floor(Math.max(0, gold) / INTEREST_PER)) * INTEREST_PER;
 }
 
 function sharesIdentity(g: GameState, hid: string): boolean {
@@ -153,8 +155,9 @@ const decent: Policy = {
       const chasingThree = [...g.board, ...g.bench].some(
         (u) => u.star === 2 && countHeroStar(g, u.hid, 2) >= 1,
       );
+      // Rule 4: before round 10, never roll back below an interest threshold.
       const keepsInterest =
-        ctx.round > 9 || g.freeRerolls > 0 || g.gold - rerollCost >= nextInterestThreshold(g.gold) - 10;
+        ctx.round > 9 || g.freeRerolls > 0 || g.gold - rerollCost >= interestFloor(g.gold);
       if (
         rerolls < 3 &&
         ctx.round >= 2 &&

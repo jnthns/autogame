@@ -77,17 +77,6 @@ export const BOT_DRAFT_SIZE = 12;
 /** Global combat HP multiplier — applied before mode-specific bonuses. */
 export const HERO_HP_MUL = 1.5;
 
-/**
- * Match shape now lives in economy.ts. These re-exports keep the phase-B1 diff
- * small; B3 deletes them and moves every importer over.
- */
-export {
-  BOSS_ROUNDS,
-  HYPER_ROLL_ROUNDS,
-  MARATHON_BOSS_ROUNDS,
-  MATCH_DEFAULTS,
-} from './economy';
-
 export const MARATHON = {
   matchRounds: 18,
   heroHpMul: 1.5,
