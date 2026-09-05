@@ -32,12 +32,19 @@ export const BOSS_ANCHOR = { r: 1, c: 1 } as const;
 export const BOSS_RANGE = 12;
 /** Same-star copies needed to combine into the next star (board + bench). */
 export const MERGE_COPIES = 2;
-/** Boss HP is at least this many times the current player board's total HP. */
-export const BOSS_HP_TEAM_MULT = 10;
-/** If player DPS would burn the HP floor faster than this, pad boss HP. */
-export const BOSS_DPS_BURN_SECONDS = 42;
-/** Seconds for boss AOE autos to wipe an idle board. */
-export const BOSS_BOARD_SURVIVAL = 24;
+/**
+ * Boss HP is this many times the *reference* team's HP for the round
+ * (src/data/bossCurve.ts), never the live board's — see B5.
+ */
+export const BOSS_HP_TEAM_MULT = 7;
+/** If reference DPS would burn the HP floor faster than this, pad boss HP. */
+export const BOSS_DPS_BURN_SECONDS = 30;
+/**
+ * Seconds for boss AOE autos to wipe an idle reference board. Boss autos hit
+ * every unit at once, so this is when the whole board falls — it must stay
+ * above BOSS_DPS_BURN_SECONDS or the fight is unwinnable by construction.
+ */
+export const BOSS_BOARD_SURVIVAL = 32;
 export const BOSS_AS = 0.52;
 /** Boss fights last longer so the 10× HP pool can actually be burned. */
 export const BOSS_COMBAT_LIMIT = 75;
@@ -46,7 +53,7 @@ export const COMBAT_LIMIT = 45;
  * Incoming damage multiplier vs bosses. One value for every difficulty: BOSS_SCALE
  * is the difficulty lever, so the two no longer compound.
  */
-export const BOSS_INCOMING_MULT = 2.35;
+export const BOSS_INCOMING_MULT = 2.8;
 
 export const BOARD_CELL_WIDTH_PCT = 100 / BOARD_COLS;
 export const BOARD_CELL_HEIGHT_PCT = 100 / BOARD_ROWS;

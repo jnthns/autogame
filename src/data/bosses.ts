@@ -1,5 +1,25 @@
 export type BossKitId = 'clay' | 'storm' | 'coil';
 
+/**
+ * Kit magnitudes as fractions of the reference team's average unit HP, so a
+ * boss cast means the same thing at round 4 and at round 16. The values
+ * reproduce the pre-B5 literals at round 4. Dial: each ±20%.
+ */
+export interface BossKitScale {
+  /** AOE slam damage. */
+  slam: number;
+  /** Shield the boss (or its allies) gain. */
+  shield: number;
+  /** Burning ground per second, where the kit leaves any. */
+  burn?: number;
+}
+
+export const BOSS_KIT_SCALE: Record<BossKitId, BossKitScale> = {
+  clay: { slam: 0.27, shield: 0.48 },
+  storm: { slam: 0.3, shield: 0.25 },
+  coil: { slam: 0.33, shield: 0.29, burn: 0.05 },
+};
+
 export interface BossKit {
   id: BossKitId;
   ability: string;

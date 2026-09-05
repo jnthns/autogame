@@ -9,7 +9,7 @@ import {
   isRankedMode,
   sellValue,
 } from '../../game/engine';
-import { boardPower, getGauntletEncounter, makeGauntletBossUnits } from '../../game/gauntlet';
+import { getGauntletEncounter, makeGauntletBossUnits } from '../../game/gauntlet';
 import { getBossEncounter, isBossRound, makeBossUnits, periodInfo } from '../../game/hyperRoll';
 import type { Combatant, CombatFx, Floater, GameState, Unit } from '../../game/types';
 import type { StampedUiEvent } from '../../game/uiEvents';
@@ -50,7 +50,7 @@ interface GameScreenProps {
 /** Foe units to preview during the plan phase — the bot board, or the boss. */
 function previewFoes(g: GameState): Unit[] {
   if (g.phase === 'combat') return [];
-  if (isGauntletMode(g.mode)) return makeGauntletBossUnits(g.round, boardPower(g.board));
+  if (isGauntletMode(g.mode)) return makeGauntletBossUnits(g.round);
   if (!isRankedMode(g.mode)) return [];
   return isBossRound(g.round, g.matchRounds) ? makeBossUnits(g.round, g.matchRounds) : g.foe;
 }
@@ -58,7 +58,7 @@ function previewFoes(g: GameState): Unit[] {
 function planBannerFor(g: GameState): { text: string; tone: 'boss' | 'final' } | null {
   if (g.phase !== 'plan') return null;
   if (isGauntletMode(g.mode)) {
-    return { text: getGauntletEncounter(g.round, boardPower(g.board)).name, tone: 'boss' };
+    return { text: getGauntletEncounter(g.round).name, tone: 'boss' };
   }
   if (g.mode !== 'bot' && g.mode !== 'marathon') return null;
   const period = periodInfo(g.round, g.matchRounds);
@@ -93,7 +93,7 @@ export function GameScreen(props: GameScreenProps) {
       applyTraits(mine);
       applyTraits(theirs);
       if (theirs.some((u) => u.boss)) {
-        fitBossToTeam(theirs, mine, g.round, { gauntlet: isGauntletMode(g.mode) });
+        fitBossToTeam(theirs, g.round, { gauntlet: isGauntletMode(g.mode) });
       }
       return mine.concat(theirs);
     })();

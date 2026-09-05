@@ -317,7 +317,7 @@ export function useGame() {
     applyTraits(mine);
     applyTraits(theirs);
     if (theirs.some((u) => u.boss)) {
-      fitBossToTeam(theirs, mine, g.round, { gauntlet: isGauntletMode(g.mode) });
+      fitBossToTeam(theirs, g.round, { gauntlet: isGauntletMode(g.mode) });
     }
     if (usesDifficulty(g.mode)) scaleFoeCombatants(theirs, difficulty);
     const engine = new CombatEngine(

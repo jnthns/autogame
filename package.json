@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "sim": "npx --yes tsx scripts/run-match-sim.ts",
     "preview": "vite preview",
     "generate-icons": "node scripts/generate-icons.mjs",
     "postinstall": "node scripts/generate-icons.mjs",

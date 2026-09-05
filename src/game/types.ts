@@ -171,8 +171,11 @@ export interface Combatant {
   footprint?: number;
   boss?: boolean;
   bossKit?: string;
-  /** Incoming damage multiplier vs this boss (set from trial difficulty). */
+  /** Incoming damage multiplier vs this boss. */
   bossTaken?: number;
+  /** The round this boss was fitted for — its kit scales off the same curve. */
+  bossRound?: number;
+  bossGauntlet?: boolean;
   rooted?: boolean;
 }
 

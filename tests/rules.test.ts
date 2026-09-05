@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   BOSS_ANCHOR,
   BOSS_FOOTPRINT,
-  BOSS_HP_TEAM_MULT,
   BOSS_RANGE,
   BOT_BOARD_CAPS,
   BOT_DRAFT_SIZE,
@@ -346,8 +345,8 @@ describe('gauntlet', () => {
   });
 
   it('every gauntlet boss offers a relic and is a solo 4×4', () => {
-    expect(getGauntletEncounter(5, 10).reward.relic).toBe(true);
-    expect(makeGauntletBossUnits(10, 20).length).toBe(1);
+    expect(getGauntletEncounter(5).reward.relic).toBe(true);
+    expect(makeGauntletBossUnits(10).length).toBe(1);
   });
 
   it('gauntlet relic picker returns 3 offers', () => {
@@ -429,7 +428,7 @@ describe('bosses', () => {
     const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
     applyTraits(mine);
     const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
-    fitBossToTeam(theirs, mine, round);
+    fitBossToTeam(theirs, round);
     return { mine, theirs, boss: theirs.find((u) => u.boss)! };
   }
 
@@ -443,20 +442,6 @@ describe('bosses', () => {
     expect(boss.range).toBeGreaterThanOrEqual(BOSS_RANGE);
     expect(theirs.filter((u) => u.boss).length).toBe(1);
     expect(theirs.length).toBe(1);
-  });
-
-  it('holds the HP floor above the live team', () => {
-    const { mine, boss } = bossFight(4);
-    const teamHp = mine.reduce((s, u) => s + u.maxHp, 0);
-    expect(boss.maxHp).toBeGreaterThanOrEqual(BOSS_HP_TEAM_MULT * teamHp);
-  });
-
-  it('scales up with a stronger board and later round', () => {
-    const early = bossFight(4);
-    const late = bossFight(12, 2);
-    const team2 = late.mine.reduce((s, u) => s + u.maxHp, 0);
-    expect(late.boss.maxHp).toBeGreaterThanOrEqual(BOSS_HP_TEAM_MULT * team2);
-    expect(late.boss.maxHp).toBeGreaterThan(early.boss.maxHp);
   });
 
   it('never walks off its anchor', () => {

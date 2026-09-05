@@ -77,7 +77,7 @@ function buildScaledUnits(template: BossUnitSpec[], round: number): BossUnitSpec
 }
 
 /** Rotate boss templates by round; the boss itself is fitted to the board in combat. */
-export function getGauntletEncounter(round: number, _power = 0): BossEncounter {
+export function getGauntletEncounter(round: number): BossEncounter {
   const template = BOSS_ENCOUNTERS[(round - 1) % BOSS_ENCOUNTERS.length];
   const period = Math.min(4, Math.ceil(round / 4));
   const suffix = round > BOSS_ENCOUNTERS.length ? ` · Wave ${round}` : '';
@@ -111,8 +111,8 @@ export function gauntletBoardCap(round: number): number {
   return Math.min(12, 10 + Math.floor((round - GAUNTLET_BOARD_CAPS.length) / 4));
 }
 
-export function makeGauntletBossUnits(round: number, power: number): Unit[] {
-  const enc = getGauntletEncounter(round, power);
+export function makeGauntletBossUnits(round: number): Unit[] {
+  const enc = getGauntletEncounter(round);
   return enc.units.map((spec, i) => {
     const isBoss = spec.boss ?? i === 0;
     return {

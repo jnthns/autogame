@@ -30,7 +30,8 @@ import {
   USER_DRAFT_MAX,
 } from '../data/constants';
 import { ABILITIES } from '../data/abilities';
-import { BOSS_KITS, type BossKitId } from '../data/bosses';
+import { BOSS_KIT_SCALE, BOSS_KITS, type BossKitId } from '../data/bosses';
+import { bossRoundMul, refTeam } from '../data/bossCurve';
 import { CLASSES, type ClassName } from '../data/classes';
 import { HEROES, HERO_MAP, isMeleeHero } from '../data/heroes';
 import { RELIC_MAP, RELICS } from '../data/relics';
@@ -56,7 +57,6 @@ import {
   unitPower,
 } from './hyperRoll';
 import {
-  boardPower,
   getGauntletEncounter,
   gauntletBoardCap,
   gauntletRoundIncome,
@@ -481,7 +481,7 @@ export function sellValue(u: Unit): number {
 }
 
 export function combatOpponents(g: GameState): Unit[] {
-  if (g.mode === 'gauntlet') return makeGauntletBossUnits(g.round, boardPower(g.board));
+  if (g.mode === 'gauntlet') return makeGauntletBossUnits(g.round);
   if ((g.mode === 'bot' || g.mode === 'marathon') && isBossRound(g.round, g.matchRounds)) {
     return makeBossUnits(g.round, g.matchRounds);
   }
@@ -738,38 +738,21 @@ export function combatant(u: Unit, side: 'me' | 'foe', heroHpMul = 1): Combatant
   return o;
 }
 
-function teamDps(list: Combatant[]): number {
-  return list.reduce((s, u) => s + u.atk * u.as * (1 + (u.crit || 0) * (u.critDmg || 0)), 0);
-}
-
 /**
- * Pin every boss to the 4×4 anchor and set HP to at least 10× the living team's total HP.
- * Extra HP is added when player DPS (crit included) would burn that floor too fast,
- * because damage compounds harder than raw health.
+ * Fit every boss to the *reference* team for the round, not to the live board.
+ * Growing your board therefore makes the fight easier, which is the whole point
+ * of growing it; the round number alone decides how big the boss is.
  */
-export function fitBossToTeam(
-  foes: Combatant[],
-  allies: Combatant[],
-  round: number,
-  opts?: { gauntlet?: boolean },
-): void {
+export function fitBossToTeam(foes: Combatant[], round: number, opts?: { gauntlet?: boolean }): void {
   const bosses = foes.filter((u) => u.boss);
   if (!bosses.length) return;
-  const teamHp = Math.max(
-    1,
-    allies.reduce((s, u) => s + Math.max(0, u.maxHp), 0),
-  );
-  const dps = Math.max(1, teamDps(allies));
-  const n = Math.max(1, allies.length);
-  const taken = BOSS_INCOMING_MULT;
-  const roundMul = 1 + Math.max(0, round - 1) * (opts?.gauntlet ? 0.09 : 0.04);
-  const floor = BOSS_HP_TEAM_MULT * teamHp * roundMul;
-  const effectiveDps = dps * taken;
-  const burn = floor / effectiveDps;
+  const ref = refTeam(round);
+  const roundMul = bossRoundMul(round, !!opts?.gauntlet);
+  const floor = BOSS_HP_TEAM_MULT * ref.hp * roundMul;
+  const burn = floor / (ref.dps * BOSS_INCOMING_MULT);
   const pad = burn < BOSS_DPS_BURN_SECONDS ? BOSS_DPS_BURN_SECONDS / burn : 1;
   const target = Math.max(1, Math.round(floor * pad));
-  const avgHp = teamHp / n;
-  const atk = Math.max(16, avgHp / (BOSS_AS * BOSS_BOARD_SURVIVAL));
+  const atk = Math.max(16, ref.avgHp / (BOSS_AS * BOSS_BOARD_SURVIVAL));
 
   bosses.forEach((b) => {
     b.maxHp = target;
@@ -783,7 +766,9 @@ export function fitBossToTeam(
     b.c = BOSS_ANCHOR.c;
     b.footprint = BOSS_FOOTPRINT;
     b.rooted = true;
-    b.bossTaken = taken;
+    b.bossTaken = BOSS_INCOMING_MULT;
+    b.bossRound = round;
+    b.bossGauntlet = !!opts?.gauntlet;
   });
 }
 
@@ -947,10 +932,24 @@ export class CombatEngine {
     });
   }
 
-  dist(a: { r: number; c: number; footprint?: number; boss?: boolean }, b: { r: number; c: number; footprint?: number; boss?: boolean }) {
-    const ac = unitCenter(a);
-    const bc = unitCenter(b);
-    return Math.max(Math.abs(ac.r - bc.r), Math.abs(ac.c - bc.c));
+  /**
+   * Chebyshev distance between the two units' *footprints*.
+   *
+   * For 1×1 units this is exactly the old centre-to-centre distance. For a 4×4
+   * boss it is the distance to its nearest occupied cell, which is what makes
+   * the boss reachable at all: a melee hero attacks at distance ≤ 1, and the
+   * centre of a 4×4 block is 1.5 cells inside its own body, so measuring from
+   * the centre put every boss permanently out of melee range.
+   */
+  dist(
+    a: { r: number; c: number; footprint?: number; boss?: boolean },
+    b: { r: number; c: number; footprint?: number; boss?: boolean },
+  ) {
+    const af = unitFootprint(a);
+    const bf = unitFootprint(b);
+    const gap = (a0: number, aSize: number, b0: number, bSize: number) =>
+      Math.max(a0 - (b0 + bSize - 1), b0 - (a0 + aSize - 1), 0);
+    return Math.max(gap(a.r, af, b.r, bf), gap(a.c, af, b.c, bf));
   }
 
   target(u: Combatant): Combatant | null {
@@ -1102,13 +1101,19 @@ export class CombatEngine {
     const sp = u.sp || 0;
     const m = STARMUL[u.star as 1 | 2 | 3];
     const kit = (u.bossKit as BossKitId) || 'clay';
+    const k = BOSS_KIT_SCALE[kit];
+    // Kit magnitudes track the reference board's average unit, so a slam is
+    // always worth about the same fraction of a hero at every round.
+    const unit = refTeam(u.bossRound ?? 4).avgHp;
+    const slam = (unit * k.slam + sp) * m;
+    const shield = (unit * k.shield + sp) * m;
     const fxTarget = E[0] || u;
     this.emitFx(u, fxTarget, 'cast');
 
     if (kit === 'storm') {
-      E.forEach((o) => this.hurt(u, o, (190 + sp) * m, 'magic'));
+      E.forEach((o) => this.hurt(u, o, slam, 'magic'));
       A.forEach((ally) => {
-        ally.shield += (160 + sp) * m;
+        ally.shield += shield;
         this.applyAsBuff(ally, 1.22, 4);
       });
       this.applyAsBuff(u, 1.12, 4);
@@ -1123,25 +1128,25 @@ export class CombatEngine {
 
     if (kit === 'coil') {
       E.forEach((o) => {
-        this.hurt(u, o, (210 + sp) * m, 'magic');
-        o.burn = 32 * m;
+        this.hurt(u, o, slam, 'magic');
+        o.burn = unit * (k.burn ?? 0) * m;
         o.burnT = 4;
         o.amp = Math.max(o.amp || 0, 0.16);
         o.silence = Math.max(o.silence, 1.4);
       });
       this.heal(u, Math.round(u.maxHp * 0.035));
       u.lifesteal = Math.min(0.35, (u.lifesteal || 0) + 0.08);
-      u.shield += (180 + sp) * m;
+      u.shield += shield;
       return;
     }
 
     // clay — default
     E.forEach((o) => {
-      this.hurt(u, o, (170 + sp) * m, 'magic');
+      this.hurt(u, o, slam, 'magic');
       o.snare = Math.max(o.snare, 2.2);
       o.amp = Math.max(o.amp || 0, 0.14);
     });
-    u.shield += (300 + sp) * m;
+    u.shield += shield;
     u.dr = Math.min(0.5, (u.dr || 0) + 0.1);
   }
 
@@ -1563,7 +1568,7 @@ export const gameActions = {
       return { kind: 'spar' as const, win };
     }
     if (g.mode === 'gauntlet') {
-      const enc = getGauntletEncounter(g.round, boardPower(g.board));
+      const enc = getGauntletEncounter(g.round);
       if (win) {
         g.streak = Math.max(0, g.streak) + 1;
         g.gold += enc.reward.gold;
