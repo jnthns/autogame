@@ -44,9 +44,8 @@ import {
   lossDamage,
   makeBossUnits,
   roundIncome,
-  maxShopCost,
+  rollShopTier,
   shopPrice,
-  shopWeight,
   unitPower,
 } from './hyperRoll';
 import {
@@ -219,33 +218,31 @@ function cellBlocked(C: Combatant[], r: number, c: number, skip?: string): boole
   return C.some((o) => o.alive && o.u !== skip && occupiesCell(o, r, c));
 }
 
-export function rollShopOffers(
-  draft: string[],
-  round = 1,
-  matchRounds: number = MATCH_DEFAULTS.matchRounds,
-): (ShopOffer | null)[] {
-  const maxCost = maxShopCost(round, matchRounds);
+/**
+ * Five slots, each an independent tier roll from the round's odds row followed
+ * by a uniform pick inside that tier. Both the player and the bot use this;
+ * only the draft differs.
+ */
+export function rollShopOffers(draft: string[], round = 1): (ShopOffer | null)[] {
   const base = playerShopPool(draft);
-  let pool = base.filter((id) => HERO_MAP[id].cost <= maxCost);
-  if (!pool.length) {
-    const cheapest = Math.min(...base.map((id) => HERO_MAP[id].cost));
-    pool = base.filter((id) => HERO_MAP[id].cost === cheapest);
-  }
-  const w = pool.map((id) => shopWeight(HERO_MAP[id].cost));
-  const tot = w.reduce((a, b) => a + b, 0);
+  const byTier = new Map<number, string[]>();
+  base.forEach((id) => {
+    const cost = HERO_MAP[id].cost;
+    const list = byTier.get(cost) ?? [];
+    list.push(id);
+    byTier.set(cost, list);
+  });
+  const has = (tier: number) => (byTier.get(tier)?.length ?? 0) > 0;
   const raw = [0, 0, 0, 0, 0].map(() => {
-    let r = random() * tot;
-    for (let i = 0; i < pool.length; i++) {
-      r -= w[i];
-      if (r <= 0) return pool[i];
-    }
-    return pool[0];
+    const tier = rollShopTier(round, has);
+    const pool = byTier.get(tier) ?? base;
+    return pool[Math.floor(random() * pool.length)] ?? base[0];
   });
   return collapseShopOffers(raw);
 }
 
 export function rollShop(g: GameState, draft: string[], silent = false): void {
-  g.shop = rollShopOffers(draft, g.round, g.matchRounds);
+  g.shop = rollShopOffers(draft, g.round);
   void silent;
 }
 
@@ -465,10 +462,14 @@ export function applyMerges(
   }
 }
 
-/** 1★ refunds full cost; combined units pay a combine tax so 2-copy merges do not print gold. */
+/**
+ * 1★ pays a one-gold scout tax so rolling through the shop and dumping the
+ * misses costs something; combined units pay a combine tax so 2-copy merges do
+ * not print gold.
+ */
 export function sellValue(u: Unit): number {
   const cost = HERO_MAP[u.hid].cost;
-  if (u.star === 1) return cost;
+  if (u.star === 1) return Math.max(1, cost - 1);
   if (u.star === 2) return Math.max(1, cost * MERGE_COPIES - 1);
   return Math.max(1, cost * 3);
 }
@@ -569,11 +570,7 @@ function botSellWeakest(g: GameState): boolean {
 
 export function runBotTurn(g: GameState): void {
   if (!isRankedMode(g.mode)) return;
-  g.foeShop = rollShopOffers(
-    g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id),
-    g.round,
-    g.matchRounds,
-  );
+  g.foeShop = rollShopOffers(g.foeDraft.length ? g.foeDraft : HEROES.map((h) => h.id), g.round);
 
   const tryBuys = () => {
     let bought = false;
@@ -594,7 +591,7 @@ export function runBotTurn(g: GameState): void {
   const usefulLeft = g.foeShop.some((offer) => offer && botOwns(g, offer.hid));
   if (!usefulLeft && g.foeGold >= MATCH_DEFAULTS.rerollCost + 3) {
     g.foeGold -= MATCH_DEFAULTS.rerollCost;
-    g.foeShop = rollShopOffers(g.foeDraft, g.round, g.matchRounds);
+    g.foeShop = rollShopOffers(g.foeDraft, g.round);
     tryBuys();
     tryBuys();
   }

@@ -6,7 +6,9 @@ import {
   MARATHON_BOSS_ROUNDS,
   MERGE_COPIES,
 } from '../data/constants';
+import { SHOP_TIERS, shopOdds } from '../data/economy';
 import { HERO_MAP } from '../data/heroes';
+import { random } from './rng';
 import type { BossRewardGrant, ShopOffer, Unit } from './types';
 
 export { BOSS_ROUNDS, HYPER_ROLL_ROUNDS };
@@ -41,19 +43,6 @@ export interface PeriodInfo {
   nextBossRound: number | null;
   roundsUntilBoss: number | null;
   encounter: 'bot' | 'boss' | 'final';
-}
-
-/** Same cost-weight table the player shop uses: cheaper heroes appear more often. */
-export function shopWeight(cost: number): number {
-  return Math.max(1, 7 - cost);
-}
-
-/** Max hero cost tier available in the shop for a given round. */
-export function maxShopCost(round: number, matchRounds: number = HYPER_ROLL_ROUNDS): number {
-  if (round >= matchRounds || round >= 12) return 5;
-  if (round >= 9) return 4;
-  if (round >= 5) return 3;
-  return 2;
 }
 
 export function bossRoundsFor(matchRounds: number = HYPER_ROLL_ROUNDS): readonly number[] {
@@ -223,6 +212,30 @@ export function rewardLines(reward: BossRewardGrant): string[] {
   }
   if (reward.relic) lines.push('relic offer');
   return lines;
+}
+
+/**
+ * Roll one cost tier from the round's odds row, then fall back to the nearest
+ * tier the draft actually contains: −1, +1, −2, +2, −3 (bounded to 2..5).
+ */
+export function rollShopTier(round: number, has: (tier: number) => boolean): number {
+  const odds = shopOdds(round);
+  let roll = random() * 100;
+  let tier: number = SHOP_TIERS[0];
+  for (let i = 0; i < SHOP_TIERS.length; i++) {
+    roll -= odds[i];
+    if (roll <= 0) {
+      tier = SHOP_TIERS[i];
+      break;
+    }
+    tier = SHOP_TIERS[i];
+  }
+  if (has(tier)) return tier;
+  for (const step of [-1, 1, -2, 2, -3]) {
+    const t = tier + step;
+    if (t >= 2 && t <= 5 && has(t)) return t;
+  }
+  return tier;
 }
 
 export function unitPower(u: Unit): number {

@@ -43,10 +43,8 @@ import {
   collapseShopOffers,
   getBossEncounter,
   isBossRound,
-  maxShopCost,
   periodInfo,
   shopPrice,
-  shopWeight,
 } from '../src/game/hyperRoll';
 import { seeded, setRng } from '../src/game/rng';
 import type { Unit } from '../src/game/types';
@@ -112,26 +110,13 @@ describe('round structure', () => {
   it('final boss pays 14 gold', () => {
     expect(getBossEncounter(12)?.reward.gold).toBe(14);
   });
-
-  it('shop odds match the cost table', () => {
-    expect(shopWeight(1)).toBe(6);
-    expect(shopWeight(5)).toBe(2);
-  });
-
-  it('shop tier unlocks by round', () => {
-    expect(maxShopCost(1)).toBe(2);
-    expect(maxShopCost(4)).toBe(2);
-    expect(maxShopCost(5)).toBe(3);
-    expect(maxShopCost(9)).toBe(4);
-    expect(maxShopCost(12)).toBe(5);
-  });
 });
 
 describe('selling', () => {
   const cost = HERO_MAP.anans.cost;
 
-  it('1★ sells for full cost', () => {
-    expect(sellValue({ u: 'a', hid: 'anans', star: 1, relics: [] })).toBe(cost);
+  it('1★ sells for cost minus the scout tax', () => {
+    expect(sellValue({ u: 'a', hid: 'anans', star: 1, relics: [] })).toBe(Math.max(1, cost - 1));
   });
 
   it('2★ sells with combine tax', () => {
@@ -150,7 +135,7 @@ describe('selling', () => {
     g.sel = { u: 'sell-me', from: 'bench' };
     gameActions.sell(g);
     expect(g.bench.length).toBe(0);
-    expect(g.gold).toBe(10 + HERO_MAP.anans.cost);
+    expect(g.gold).toBe(10 + Math.max(1, HERO_MAP.anans.cost - 1));
     expect(g.sel).toBeNull();
   });
 

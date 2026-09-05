@@ -43,10 +43,8 @@ import {
   collapseShopOffers,
   getBossEncounter,
   isBossRound,
-  maxShopCost,
   periodInfo,
   shopPrice,
-  shopWeight,
 } from './hyperRoll';
 import type { Unit } from './types';
 
@@ -77,8 +75,6 @@ export function runMatchSim(): { ok: boolean; lines: string[] } {
   assert(getBossEncounter(4)?.reward.gold === 6, 'mini-boss pays 6 gold');
   assert(getBossEncounter(8)?.reward.relic === true, 'mid boss offers a relic');
   assert(getBossEncounter(12)?.reward.gold === 14, 'final boss pays 14 gold');
-  assert(shopWeight(1) === 6 && shopWeight(5) === 2, 'shop odds match cost table 7-cost');
-  assert(maxShopCost(1) === 2 && maxShopCost(4) === 2 && maxShopCost(5) === 3 && maxShopCost(9) === 4 && maxShopCost(12) === 5, 'shop tier unlocks by round');
 
   const one: Unit = { u: 'a', hid: 'anans', star: 1, relics: [] };
   const two: Unit = { u: 'b', hid: 'anans', star: 2, relics: [] };

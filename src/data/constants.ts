@@ -62,9 +62,6 @@ export const MARATHON_BOARD_CAPS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9,
 /** Practice sandbox allows the full 6×6 player board. */
 export const PRACTICE_BOARD_CAP = BOARD_SIDE_ROWS * BOARD_COLS;
 
-/** @deprecated Use BOT_BOARD_CAPS — kept for imports that expect CAPS. */
-export const CAPS = [...BOT_BOARD_CAPS];
-
 export const DEFAULT_DRAFT = ['jorm', 'anans', 'kitsu', 'taniw', 'ifrit', 'thund'];
 export const DRAFT_STORAGE_KEY = 'om_draft';
 
@@ -76,16 +73,16 @@ export const BOT_DRAFT_SIZE = 12;
 /** Global combat HP multiplier — applied before mode-specific bonuses. */
 export const HERO_HP_MUL = 1.5;
 
-export const MATCH_DEFAULTS = {
-  matchRounds: 13,
-  startHealth: 100,
-  startGold: 10,
-  rerollCost: 2,
-} as const;
-
-export const HYPER_ROLL_ROUNDS = 13;
-export const BOSS_ROUNDS = [4, 8, 12] as const;
-export const MARATHON_BOSS_ROUNDS = [4, 8, 12, 16] as const;
+/**
+ * Match shape now lives in economy.ts. These re-exports keep the phase-B1 diff
+ * small; B3 deletes them and moves every importer over.
+ */
+export {
+  BOSS_ROUNDS,
+  HYPER_ROLL_ROUNDS,
+  MARATHON_BOSS_ROUNDS,
+  MATCH_DEFAULTS,
+} from './economy';
 
 export const MARATHON = {
   matchRounds: 18,

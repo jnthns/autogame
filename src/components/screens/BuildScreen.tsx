@@ -1,5 +1,5 @@
 import { BONE, INK, JADE, SAF, USER_DRAFT_MAX, costTone } from '../../data/constants';
-import { HEROES } from '../../data/heroes';
+import { HEROES, HERO_MAP } from '../../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../../data/progress';
 import { spriteCss } from '../../data/sprites';
 import { CLASSES } from '../../data/classes';
@@ -24,6 +24,8 @@ export function BuildScreen({
   onInspect,
 }: BuildScreenProps) {
   const full = draft.length >= USER_DRAFT_MAX;
+  /** Without a cheap creature the early shop rolls are almost all unaffordable. */
+  const slowStart = draft.length > 0 && !draft.some((id) => (HERO_MAP[id]?.cost ?? 9) <= 3);
   const synergies = activeSynergies(draft).filter((t) => t.lvl > 0);
   const unbound = HEROES.filter((h) => heroUnlocked(h.id, progress));
   const sealed = HEROES.filter((h) => !heroUnlocked(h.id, progress));
@@ -69,6 +71,11 @@ export function BuildScreen({
           >
             {draft.length} / {USER_DRAFT_MAX} chosen · {unbound.length} / {HEROES.length} unbound
           </div>
+          {slowStart && (
+            <div style={{ marginTop: 5 }}>
+              <span className="om-chip om-chip--warn">SLOW START · no 2- or 3-cost creature</span>
+            </div>
+          )}
         </div>
         <button
           type="button"
