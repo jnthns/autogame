@@ -73,6 +73,7 @@ export interface MatchRecord {
   threeStars: { round: number; hid: string; cost: number }[];
   shopSlots: number;
   shopFallbacks: number;
+  timeoutCounts: { boss: number; bossTotal: number; nonBoss: number; nonBossTotal: number };
   roundsCleared: number;
   seed: number;
 }
@@ -154,6 +155,7 @@ export function runMatch(opts: MatchOptions): MatchRecord {
         threeStars,
         shopSlots: g.shopSlots,
         shopFallbacks: g.shopFallbacks,
+        timeoutCounts: timeoutCounts(rounds),
         roundsCleared,
         seed: opts.seed,
       };
@@ -185,8 +187,20 @@ export function runMatch(opts: MatchOptions): MatchRecord {
     threeStars,
     shopSlots: g.shopSlots,
     shopFallbacks: g.shopFallbacks,
+    timeoutCounts: timeoutCounts(rounds),
     roundsCleared,
     seed: opts.seed,
+  };
+}
+
+function timeoutCounts(rounds: RoundRecord[]): MatchRecord['timeoutCounts'] {
+  const boss = rounds.filter((round) => round.boss);
+  const nonBoss = rounds.filter((round) => !round.boss);
+  return {
+    boss: boss.filter((round) => round.timedOut).length,
+    bossTotal: boss.length,
+    nonBoss: nonBoss.filter((round) => round.timedOut).length,
+    nonBossTotal: nonBoss.length,
   };
 }
 

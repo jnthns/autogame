@@ -13,5 +13,8 @@ describe('simulation records', () => {
       expect(star.cost).toBe(HERO_MAP[star.hid].cost);
       expect(star.round).toBeGreaterThanOrEqual(match.threeStarRound!);
     });
+    const counts = match.timeoutCounts;
+    expect(counts.boss + counts.nonBoss).toBe(match.rounds.filter((round) => round.timedOut).length);
+    expect(counts.bossTotal + counts.nonBossTotal).toBe(match.rounds.length);
   });
 });

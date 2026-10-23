@@ -126,6 +126,15 @@ function main(): void {
   }
 
   const allRounds = records.flatMap((m) => m.rounds);
+  const timeoutCounts = records.reduce(
+    (sum, m) => ({
+      boss: sum.boss + m.timeoutCounts.boss,
+      bossTotal: sum.bossTotal + m.timeoutCounts.bossTotal,
+      nonBoss: sum.nonBoss + m.timeoutCounts.nonBoss,
+      nonBossTotal: sum.nonBossTotal + m.timeoutCounts.nonBossTotal,
+    }),
+    { boss: 0, bossTotal: 0, nonBoss: 0, nonBossTotal: 0 },
+  );
   const wins = records.filter((m) => m.win).length;
   const abilityDmg = allRounds.reduce(
     (s, r) => s + Object.values(r.dmgByHero).reduce((a, x) => a + x.ability, 0),
@@ -189,6 +198,7 @@ function main(): void {
     `win%           ${f(pct(wins, records.length))}`,
     `medFightSec    ${f(median(allRounds.map((r) => r.fightSeconds)))}`,
     `timeout%       ${f(pct(allRounds.filter((r) => r.timedOut).length, allRounds.length))}`,
+    `timeout split  boss ${f(pct(timeoutCounts.boss, timeoutCounts.bossTotal))} (n=${timeoutCounts.boss}/${timeoutCounts.bossTotal})  non-boss ${f(pct(timeoutCounts.nonBoss, timeoutCounts.nonBossTotal))} (n=${timeoutCounts.nonBoss}/${timeoutCounts.nonBossTotal})`,
     `boss4 win%     ${f(bossWinPct(records, 4))}   boss8 win% ${f(bossWinPct(records, 8))}   boss12 win% ${f(bossWinPct(records, 12))}`,
     `abilityShare%  ${f(pct(abilityDmg, abilityDmg + autoDmg))}`,
     `3★<r4 %        ${f(pct(earlyThree, records.length))}`,
