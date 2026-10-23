@@ -10,12 +10,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_DRAFT, USER_DRAFT_MAX } from '../src/data/constants';
+import { DEFAULT_DRAFT } from '../src/data/constants';
 import { HEROES } from '../src/data/heroes';
 import { runMatch, type MatchRecord } from '../src/sim/runMatch';
 import type { PolicyName } from '../src/sim/policies';
 import type { Difficulty, GameMode } from '../src/game/types';
 import { seeded } from '../src/game/rng';
+import { randomDraft } from '../src/game/draft';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE_DIR = resolve(HERE, '../docs/overhaul/baselines');
@@ -74,15 +75,6 @@ function pct(part: number, whole: number): number {
 
 function f(x: number, w = 6, d = 1): string {
   return x.toFixed(d).padStart(w);
-}
-
-function randomDraft(rng: () => number): string[] {
-  const ids = HEROES.map((h) => h.id);
-  for (let i = ids.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [ids[i], ids[j]] = [ids[j], ids[i]];
-  }
-  return ids.slice(0, USER_DRAFT_MAX);
 }
 
 function bossWinPct(records: MatchRecord[], round: number): number {

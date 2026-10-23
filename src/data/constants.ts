@@ -84,6 +84,8 @@ export const DRAFT_STORAGE_KEY = 'om_draft';
 
 /** Player shop pool cap for Hyper Roll, Marathon, and other ranked bot matches. */
 export const USER_DRAFT_MAX = 6;
+/** A full player draft must include at least this many 2-cost heroes. */
+export const MIN_DRAFT_TWO_COSTS = 2;
 /** Bot shop draws from a wider hero pool than the player. */
 export const BOT_DRAFT_SIZE = 12;
 
