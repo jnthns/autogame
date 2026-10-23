@@ -44,7 +44,7 @@ import {
   scaleFoeCombatants,
   usesDifficulty,
 } from '../game/engine';
-import { isDraftLegal, randomDraft, restoreDraft } from '../game/draft';
+import { isDraftLegal, randomDraft } from '../game/draft';
 import { pickGauntletRelics } from '../game/gauntlet';
 import { pruneUiEvents, stamp, type StampedUiEvent, type UiEvent } from '../game/uiEvents';
 import { debugRoundFromUrl, debugStateFromUrl } from '../game/debugUrl';
@@ -69,15 +69,26 @@ const PRUNE_INTERVAL_MS = 250;
 const HAPTIC_TAP_MS = 10;
 const HAPTIC_BOSS_MS = 25;
 
-function loadDraft(unlocked: string[]): string[] {
-  let saved: unknown = null;
+export function loadDraft(unlocked: string[]): string[] {
+  const allow = new Set(unlocked);
   try {
     const s = localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (s) saved = JSON.parse(s);
+    if (s) {
+      const d = JSON.parse(s);
+      if (Array.isArray(d) && d.length) {
+        const kept = d.filter((id: unknown): id is string => typeof id === 'string' && allow.has(id));
+        if (kept.length) return kept.slice(0, USER_DRAFT_MAX);
+      }
+    }
   } catch {
     /* ignore */
   }
-  return restoreDraft(saved, unlocked, DEFAULT_DRAFT);
+  return DEFAULT_DRAFT.filter((id) => allow.has(id)).slice(0, USER_DRAFT_MAX);
+}
+
+/** Where starting a match lands: an illegal draft is sent back to the build screen, not played. */
+export function matchStartScreen(draft: readonly string[]): Screen {
+  return isDraftLegal(draft) ? 'game' : 'build';
 }
 
 export function useGame() {
@@ -263,7 +274,7 @@ export function useGame() {
 
   const startGame = useCallback(
     (mode: GameMode) => {
-      if (!isDraftLegal(draft)) {
+      if (matchStartScreen(draft) === 'build') {
         setScreen('build');
         return;
       }

@@ -1,10 +1,13 @@
+/// <reference types="vite/client" />
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DRAFT, MIN_DRAFT_TWO_COSTS, USER_DRAFT_MAX } from '../src/data/constants';
+import { DEFAULT_DRAFT, DRAFT_STORAGE_KEY, MIN_DRAFT_TWO_COSTS, USER_DRAFT_MAX } from '../src/data/constants';
 import { HERO_MAP, HEROES } from '../src/data/heroes';
-import { draftTwoCosts, isDraftLegal, randomDraft, restoreDraft } from '../src/game/draft';
+import { draftTwoCosts, isDraftLegal, randomDraft } from '../src/game/draft';
 import { createGame } from '../src/game/engine';
 import { seeded } from '../src/game/rng';
-import { EMPTY_PROGRESS, HERO_UNLOCKS, unlockedHeroIds, type ProgressState } from '../src/data/progress';import { runMatch } from '../src/sim/runMatch';
+import { EMPTY_PROGRESS, HERO_UNLOCKS, unlockedHeroIds, type ProgressState } from '../src/data/progress';
+import { loadDraft, matchStartScreen } from '../src/hooks/useGame';
+import { runMatch } from '../src/sim/runMatch';
 
 describe('draft rule', () => {
   it('every generated draft is legal across a seeded sweep', () => {
@@ -61,18 +64,24 @@ describe('draft rule', () => {
     expect(twoCosts(neverLocked)).toBeGreaterThanOrEqual(MIN_DRAFT_TWO_COSTS);
   });
 
-  it('a saved pre-rule draft is replaced on load, never resumed', () => {
-    const unlocked = unlockedHeroIds(EMPTY_PROGRESS);
-    const preRule = ['jorm', 'anans', 'kitsu', 'taniw', 'ifrit', 'thund'];
-    expect(restoreDraft(preRule, unlocked, DEFAULT_DRAFT)).toEqual(DEFAULT_DRAFT);
-    expect(restoreDraft(['thund', 'kitsu', 'taniw', 'jorm', 'ifrit', 'quetz'], HEROES.map((h) => h.id), DEFAULT_DRAFT))
-      .toEqual(DEFAULT_DRAFT);
-    const legal = ['anans', 'bunyi', 'thund', 'kitsu', 'jorm', 'ifrit'];
-    expect(restoreDraft(legal, unlocked, DEFAULT_DRAFT)).toEqual(legal);
-    // A partial draft resumes for editing; startGame refuses it until it is legal.
-    expect(restoreDraft(['anans', 'jorm'], unlocked, DEFAULT_DRAFT)).toEqual(['anans', 'jorm']);
-    for (const junk of [null, 'x', [], [42], ['nope']]) {
-      expect(restoreDraft(junk, unlocked, DEFAULT_DRAFT)).toEqual(DEFAULT_DRAFT);
+  it('a saved pre-rule draft loads unchanged, and starting a match with it lands on the build screen', () => {
+    const store = new Map<string, string>();
+    const g = globalThis as { localStorage?: unknown };
+    const prev = g.localStorage;
+    g.localStorage = { getItem: (k: string) => store.get(k) ?? null };
+    try {
+      const preRule = ['jorm', 'anans', 'kitsu', 'taniw', 'ifrit', 'thund'];
+      store.set(DRAFT_STORAGE_KEY, JSON.stringify(preRule));
+      const loaded = loadDraft(unlockedHeroIds(EMPTY_PROGRESS));
+      expect(loaded).toEqual(preRule);
+      expect(store.get(DRAFT_STORAGE_KEY)).toBe(JSON.stringify(preRule));
+      expect(matchStartScreen(loaded)).toBe('build');
+
+      const legal = ['anans', 'bunyi', 'thund', 'kitsu', 'jorm', 'ifrit'];
+      store.set(DRAFT_STORAGE_KEY, JSON.stringify(legal));
+      expect(matchStartScreen(loadDraft(unlockedHeroIds(EMPTY_PROGRESS)))).toBe('game');
+    } finally {
+      g.localStorage = prev;
     }
   });
 
