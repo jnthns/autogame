@@ -9,16 +9,35 @@ export type BattlegroundUnlock =
 
 export type BattlegroundGroup = 'Starter' | 'Match Play' | 'Victories' | 'Synergies' | 'Mastery';
 
+export type BattlegroundMotif =
+  | 'dunes'
+  | 'waves'
+  | 'grove'
+  | 'split'
+  | 'web'
+  | 'coil'
+  | 'cliffs'
+  | 'deep'
+  | 'flames'
+  | 'pyramid';
+
+/** Flat art colours: sky→ground gradient, one motif fill, sun/moon/highlight glow. */
+export interface BattlegroundPalette {
+  sky: string;
+  ground: string;
+  motif: string;
+  glow: string;
+}
+
 export interface BattlegroundDef {
   id: string;
   name: string;
   theme: string;
   group: BattlegroundGroup;
   unlock: BattlegroundUnlock;
-  /** Static image path relative to public/ (e.g. img/kitsune-battleground.png). */
-  image?: string;
-  p: Record<string, string>;
-  d: string[];
+  motif: BattlegroundMotif;
+  light: BattlegroundPalette;
+  dark: BattlegroundPalette;
 }
 
 export const BATTLEGROUNDS: BattlegroundDef[] = [
@@ -28,22 +47,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Neutral yard',
     group: 'Starter',
     unlock: { kind: 'always' },
-    image: 'img/training-sands-battleground.png',
-    p: { a: '#E8D9B0', b: '#D4C294', c: '#C4B07A', k: '#B3A06A' },
-    d: [
-      'abababababab',
-      'bcbcbcbcbcbc',
-      'abababababab',
-      'bcbckcbcbcbc',
-      'abababababab',
-      'bcbcbcbcbcbc',
-      'ababkabababa',
-      'bcbcbcbcbcbc',
-      'abababababab',
-      'bcbcbcbckcbc',
-      'abababababab',
-      'bcbcbcbcbcbc',
-    ],
+    motif: 'dunes',
+    light: { sky: '#E9DDBD', ground: '#DCCBA2', motif: '#D1BE90', glow: '#F1E5C4' },
+    dark: { sky: '#2B251B', ground: '#342C1F', motif: '#3E3424', glow: '#43372A' },
   },
   {
     id: 'tide',
@@ -51,21 +57,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Taniwha',
     group: 'Starter',
     unlock: { kind: 'always' },
-    p: { w: '#2E6E8C', l: '#3F8A7A', d: '#1F4A42', s: '#7B8F5A', k: '#14120E' },
-    d: [
-      'wwlwwlwwlwwl',
-      'wlwlwlwlwlwl',
-      'lwwlwwlwwlww',
-      'wlwskswlwlwl',
-      'wwlwwlwwlwwl',
-      'wlwlwlksklwl',
-      'lwwlwwlwwlww',
-      'wlwlwlwlwlwl',
-      'wwlskswwlwwl',
-      'wlwlwlwlwlwl',
-      'lwwlwwlwwlww',
-      'wlwlwlwlwlwl',
-    ],
+    motif: 'waves',
+    light: { sky: '#D5E5E1', ground: '#BDD6D1', motif: '#ABCAC4', glow: '#E4EFEB' },
+    dark: { sky: '#10252D', ground: '#153038', motif: '#1B3B43', glow: '#23474F' },
   },
   {
     id: 'foxfire',
@@ -73,22 +67,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Kitsune',
     group: 'Starter',
     unlock: { kind: 'always' },
-    image: 'img/kitsune-battleground.png',
-    p: { d: '#2A1A12', s: '#3E2A18', e: '#E07A2F', g: '#F0C13B', k: '#14120E' },
-    d: [
-      'dsdsdsdsdsds',
-      'sdsdsedsdsds',
-      'dsdsdsdsgsds',
-      'sdsdsdsdsdsd',
-      'dsedskdsdsds',
-      'sdsdsdsdseds',
-      'dsdsdsgsdsds',
-      'sdsdsdsdsdsd',
-      'dsdsdsdsedsd',
-      'sdsgsdsdsdsd',
-      'dsdsdsdsdsds',
-      'sdsdsdsedsds',
-    ],
+    motif: 'grove',
+    light: { sky: '#EEDCCB', ground: '#DFC8B3', motif: '#D1B69E', glow: '#F6E6CF' },
+    dark: { sky: '#1C1720', ground: '#241C26', motif: '#2E2330', glow: '#3F2A22' },
   },
   {
     id: 'storm',
@@ -96,21 +77,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Thunderbird',
     group: 'Match Play',
     unlock: { kind: 'botMatches', n: 5 },
-    p: { n: '#1A2748', b: '#2A3F80', c: '#5C8AD6', y: '#F5C518', k: '#14120E' },
-    d: [
-      'nbnbbnbnbbnb',
-      'bnbnbnbybnbn',
-      'nbnckcnbnbbn',
-      'bnbnbnbbnbnb',
-      'nbybnbnbnbbn',
-      'bnbnbnckcbnb',
-      'nbnbbnbnbbnb',
-      'bnbynbnbnbnb',
-      'nbnbbnckcbbn',
-      'bnbnbnbbnbnb',
-      'nbnbybnbnbbn',
-      'bnbnbnbbnbnb',
-    ],
+    motif: 'split',
+    light: { sky: '#D7DDEC', ground: '#C6CEE2', motif: '#B7C1DA', glow: '#E6EAF4' },
+    dark: { sky: '#131A2F', ground: '#18213A', motif: '#202B48', glow: '#2D3B5F' },
   },
   {
     id: 'web',
@@ -118,21 +87,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Anansi',
     group: 'Victories',
     unlock: { kind: 'wins', n: 5 },
-    p: { d: '#1C1224', p: '#6B3FA0', l: '#9B6FD4', k: '#14120E', o: '#E07A2F' },
-    d: [
-      'kddddddddddk',
-      'dkpddddddpdk',
-      'ddkplpplpkdd',
-      'dddpkddkpddd',
-      'ddplkooklpdd',
-      'ddpdkddkdpdd',
-      'ddpdkddkdpdd',
-      'ddplkooklpdd',
-      'dddpkddkpddd',
-      'ddkplpplpkdd',
-      'dkpddddddpdk',
-      'kddddddddddk',
-    ],
+    motif: 'web',
+    light: { sky: '#E5DCEB', ground: '#D6CAE0', motif: '#C8B9D5', glow: '#EFE8F3' },
+    dark: { sky: '#191221', ground: '#20162A', motif: '#2B1E37', glow: '#3B2949' },
   },
   {
     id: 'coil',
@@ -140,21 +97,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Jörmungandr',
     group: 'Match Play',
     unlock: { kind: 'botMatches', n: 15 },
-    p: { m: '#1E3A2A', g: '#1E6B45', l: '#5CC08A', k: '#14120E', y: '#F5D547' },
-    d: [
-      'mgmgmgmgmgmg',
-      'gmkkggkkmgmg',
-      'mggllllggmgm',
-      'gmgllkkllgmg',
-      'mgglkyyklgmg',
-      'gmglkkkklgmg',
-      'mgglkyyklgmg',
-      'gmgllkkllgmg',
-      'mggllllggmgm',
-      'gmkkggkkmgmg',
-      'mgmgmgmgmgmg',
-      'gmgmgmgmgmgm',
-    ],
+    motif: 'coil',
+    light: { sky: '#D9E5D4', ground: '#C6D8C0', motif: '#B6CCAF', glow: '#E7EFE2' },
+    dark: { sky: '#121F18', ground: '#17281F', motif: '#1F3329', glow: '#2B4535' },
   },
   {
     id: 'dive',
@@ -162,21 +107,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Garuda',
     group: 'Victories',
     unlock: { kind: 'wins', n: 15 },
-    p: { s: '#C4402B', o: '#E07A2F', g: '#F0C13B', r: '#8A2E1C', k: '#14120E' },
-    d: [
-      'sosoosososos',
-      'ososggososos',
-      'sosokkgososo',
-      'osososososos',
-      'sosorrososos',
-      'ososososggos',
-      'sosososokkos',
-      'osososososos',
-      'sosoggososos',
-      'ososkkososos',
-      'sosososorros',
-      'osososososos',
-    ],
+    motif: 'cliffs',
+    light: { sky: '#F3DDC4', ground: '#E9C9A6', motif: '#DDB892', glow: '#F9E8CC' },
+    dark: { sky: '#291611', ground: '#331B14', motif: '#3F2219', glow: '#4C2A1D' },
   },
   {
     id: 'billabong',
@@ -184,21 +117,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Bunyip',
     group: 'Synergies',
     unlock: { kind: 'trait', trait: 'Guardian', n: 2 },
-    p: { d: '#1A3328', g: '#3E5233', b: '#2E6E8C', w: '#4A8AAA', k: '#14120E' },
-    d: [
-      'dgdgdgdgdgdg',
-      'gdgdbbdgdgdg',
-      'dgdgwwdgdgdg',
-      'gdgdgdgkdgdg',
-      'dgdbbdgdgdgd',
-      'gdgwwdgdgdgd',
-      'dgdgdgdgbdgd',
-      'gdgdgdgdwwgd',
-      'dgdgkdgdgdgd',
-      'gdgdgdbbdgdg',
-      'dgdgdgwwdgdg',
-      'gdgdgdgdgdgd',
-    ],
+    motif: 'deep',
+    light: { sky: '#D0DED4', ground: '#BACEC1', motif: '#AAC2B3', glow: '#DEE9E1' },
+    dark: { sky: '#0F1E19', ground: '#13261F', motif: '#1A3027', glow: '#223E32' },
   },
   {
     id: 'inferno',
@@ -206,22 +127,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Ifrit',
     group: 'Mastery',
     unlock: { kind: 'wins', n: 50 },
-    image: 'img/ifrit-battleground.png',
-    p: { k: '#14120E', a: '#2A1410', r: '#B4442B', o: '#FF6B35', y: '#F5C518' },
-    d: [
-      'kakakakakaka',
-      'akarorakakak',
-      'kakoyokakaka',
-      'akararakakak',
-      'kakakakakaka',
-      'akarorakakak',
-      'kakoyokakaka',
-      'akararakakak',
-      'kakakakakaka',
-      'akarorakakak',
-      'kakoyokakaka',
-      'akararakakak',
-    ],
+    motif: 'flames',
+    light: { sky: '#F0D8C8', ground: '#E4C0AA', motif: '#D8AD94', glow: '#F7E3D2' },
+    dark: { sky: '#1B100D', ground: '#241410', motif: '#301913', glow: '#4A2416' },
   },
   {
     id: 'throne',
@@ -229,21 +137,9 @@ export const BATTLEGROUNDS: BattlegroundDef[] = [
     theme: 'Inspired by Sphinx',
     group: 'Mastery',
     unlock: { kind: 'wins', n: 100 },
-    p: { s: '#D4B06A', g: '#E8C547', w: '#F5EFE0', k: '#14120E', b: '#8A6A32' },
-    d: [
-      'sbsbsbsbsbsb',
-      'bsgkkgsbsbsb',
-      'sbskwwksbsbs',
-      'bsgkkgsbsbsb',
-      'sbsbsbsbsbsb',
-      'bsbsgkkgsbsb',
-      'sbsbskwwksbs',
-      'bsbsgkkgsbsb',
-      'sbsbsbsbsbsb',
-      'bsgkkgsbsbsb',
-      'sbskwwksbsbs',
-      'bsgkkgsbsbsb',
-    ],
+    motif: 'pyramid',
+    light: { sky: '#F0E3C3', ground: '#E4D2A6', motif: '#D7C190', glow: '#F7ECD0' },
+    dark: { sky: '#28201A', ground: '#312718', motif: '#3C301D', glow: '#463823' },
   },
 ];
 
@@ -251,45 +147,6 @@ export const BATTLEGROUND_MAP = Object.fromEntries(BATTLEGROUNDS.map((b) => [b.i
   string,
   BattlegroundDef
 >;
-
-const tileCache: Record<string, string> = {};
-
-export function battlegroundImageUrl(id: string): string | undefined {
-  const s = BATTLEGROUND_MAP[id];
-  if (!s?.image) return undefined;
-  return `${import.meta.env.BASE_URL}${s.image}`;
-}
-
-export function battlegroundBackgroundUrl(id: string): string {
-  return battlegroundImageUrl(id) ?? battlegroundTileUrl(id);
-}
-
-export function battlegroundUsesImage(id: string): boolean {
-  return Boolean(BATTLEGROUND_MAP[id]?.image);
-}
-
-export function battlegroundTileUrl(id: string): string {
-  if (tileCache[id]) return tileCache[id];
-  const s = BATTLEGROUND_MAP[id];
-  if (!s) return '';
-  const cv = document.createElement('canvas');
-  cv.width = 12;
-  cv.height = 12;
-  const cx = cv.getContext('2d');
-  if (!cx) return '';
-  s.d.forEach((row, y) => {
-    for (let x = 0; x < 12; x++) {
-      const ch = row[x];
-      if (!ch) continue;
-      const col = s.p[ch];
-      if (!col) continue;
-      cx.fillStyle = col;
-      cx.fillRect(x, y, 1, 1);
-    }
-  });
-  tileCache[id] = cv.toDataURL();
-  return tileCache[id];
-}
 
 export function battlegroundUnlockNeed(bg: BattlegroundDef): number {
   if (bg.unlock.kind === 'always') return 0;

@@ -8,7 +8,7 @@ import { BOSS_KITS, type BossKitId } from '../../data/bosses';
 import { occupiesCell } from '../../game/engine';
 import type { Combatant, CombatFx, Floater, GameState, Unit } from '../../game/types';
 import { recent, type StampedUiEvent } from '../../game/uiEvents';
-import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
+import { BattlegroundArt } from '../BattlegroundArt';
 import { CombatFxLayer, getLungeTransform } from '../CombatFxLayer';
 import { BoardUnit } from './BoardUnit';
 import { CellGrid } from './CellGrid';
@@ -171,7 +171,7 @@ export function Board({
 
   return (
     <div className={`game-board${shake ? ' game-board--shake' : ''}`}>
-      <BattlegroundBoardBackground id={battlegroundId} />
+      <BattlegroundArt id={battlegroundId} />
       <CellGrid selKey={g.sel?.u ?? ''} occupiedKey={occupiedKey} plan={plan} onTapCell={onTapCell} />
       <div className="om-board__divider" />
 

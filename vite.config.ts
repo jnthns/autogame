@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png', 'img/*.png'],
+      includeAssets: ['icons/*.png'],
       manifest: {
         name: 'Twelve Omens',
         short_name: 'Omens',

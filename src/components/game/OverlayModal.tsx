@@ -5,7 +5,7 @@ import { RELIC_MAP } from '../../data/relics';
 import { GAUNTLET } from '../../data/constants';
 import { rewardLines } from '../../game/hyperRoll';
 import type { GameState, OverlayKind } from '../../game/types';
-import { BattlegroundPreview } from '../BattlegroundPreview';
+import { BattlegroundArt } from '../BattlegroundArt';
 import { HeroAvatar } from '../HeroAvatar';
 
 type BannerTone = 'good' | 'bad' | 'accent' | 'ink' | 'muted';
@@ -252,7 +252,7 @@ export function OverlayModal({
                       style={{ '--i': i } as CSSProperties}
                     >
                       <div className="om-unlock-row__thumb">
-                        <BattlegroundPreview id={id} />
+                        <BattlegroundArt id={id} />
                       </div>
                       <span style={{ flex: 1 }}>
                         <span className="slab om-unlock-row__name">{b?.name ?? id}</span>
