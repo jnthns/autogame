@@ -87,15 +87,17 @@ export function HeroAvatar({ heroId, size, alt = '', dimmed = false, className =
           fill={`url(#${rimId})`}
         />
         <path d={SHAPES[avatar.shape]} className="hero-avatar__outline" />
-        <text
-          x="50"
-          y={GLYPH_Y[avatar.shape]}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className={`hero-avatar__glyph ${glyphClass}`}
-        >
-          {avatar.glyph}
-        </text>
+        {avatar.glyph && (
+          <text
+            x="50"
+            y={GLYPH_Y[avatar.shape]}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className={`hero-avatar__glyph ${glyphClass}`}
+          >
+            {avatar.glyph}
+          </text>
+        )}
       </g>
     </svg>
   );
