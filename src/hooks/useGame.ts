@@ -44,6 +44,7 @@ import {
   scaleFoeCombatants,
   usesDifficulty,
 } from '../game/engine';
+import { randomDraft } from '../game/draft';
 import { pickGauntletRelics } from '../game/gauntlet';
 import { pruneUiEvents, stamp, type StampedUiEvent, type UiEvent } from '../game/uiEvents';
 import { debugRoundFromUrl, debugStateFromUrl } from '../game/debugUrl';
@@ -588,10 +589,7 @@ export function useGame() {
   }, []);
 
   const autoDraft = useCallback(() => {
-    const pool = unlockedHeroIds(progressRef.current)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, USER_DRAFT_MAX);
-    saveDraft(pool);
+    saveDraft(randomDraft(Math.random, unlockedHeroIds(progressRef.current)));
   }, [saveDraft]);
 
   useEffect(() => () => clearTimer(), [clearTimer]);

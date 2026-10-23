@@ -1,8 +1,9 @@
-import { BONE, INK, JADE, SAF, USER_DRAFT_MAX, costTone } from '../../data/constants';
+import { BONE, INK, JADE, MIN_DRAFT_TWO_COSTS, SAF, USER_DRAFT_MAX, costTone } from '../../data/constants';
 import { HEROES, HERO_MAP } from '../../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../../data/progress';
 import { spriteCss } from '../../data/sprites';
 import { CLASSES } from '../../data/classes';
+import { draftTwoCosts, isDraftLegal } from '../../game/draft';
 import { activeSynergies } from '../../game/engine';
 import { PixelSprite } from '../PixelSprite';
 
@@ -24,6 +25,8 @@ export function BuildScreen({
   onInspect,
 }: BuildScreenProps) {
   const full = draft.length >= USER_DRAFT_MAX;
+  const ready = isDraftLegal(draft);
+  const needsTwoCosts = draftTwoCosts(draft) < MIN_DRAFT_TWO_COSTS;
   /** Without a cheap creature the early shop rolls are almost all unaffordable. */
   const slowStart = draft.length > 0 && !draft.some((id) => (HERO_MAP[id]?.cost ?? 9) <= 3);
   const synergies = activeSynergies(draft).filter((t) => t.lvl > 0);
@@ -424,6 +427,7 @@ export function BuildScreen({
           background: 'var(--om-card)',
           borderTop: '3px solid var(--om-ink)',
           display: 'flex',
+          flexWrap: 'wrap',
           gap: 10,
           alignItems: 'center',
         }}
@@ -446,12 +450,12 @@ export function BuildScreen({
         <button
           type="button"
           className="btn-active-sm"
-          disabled={!full}
+          disabled={!ready}
           onClick={onToBattle}
           style={{
             flex: 1,
-            background: full ? JADE : 'var(--om-disabled)',
-            color: full ? BONE : 'var(--om-muted-2)',
+            background: ready ? JADE : 'var(--om-disabled)',
+            color: ready ? BONE : 'var(--om-muted-2)',
             border: '3px solid var(--om-ink)',
             boxShadow: '4px 4px 0 var(--om-ink)',
             padding: 12,
@@ -461,6 +465,11 @@ export function BuildScreen({
         >
           {full ? 'TO BATTLE' : `PICK ${USER_DRAFT_MAX - draft.length} MORE`}
         </button>
+        {needsTwoCosts && (
+          <div style={{ flexBasis: '100%' }}>
+            <span className="om-chip om-chip--warn">Pick at least 2 two-cost heroes.</span>
+          </div>
+        )}
       </div>
     </div>
   );
