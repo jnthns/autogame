@@ -12,10 +12,10 @@ export const VIOLET = 'var(--om-violet)';
 export const MUTED = 'var(--om-muted)';
 
 /**
- * Star multipliers. A 2★ is two copies and a 3★ is four, so the old 1.85/3.4
+ * Star multipliers. A 2★ is three copies and a 3★ is nine, so the old 1.85/3.4
  * made every merge strictly better than spending the same gold on breadth.
  */
-export const STARMUL = [1, 1, 1.65, 2.6] as const;
+export const STARMUL = [1, 1, 1.7, 2.75] as const;
 
 /** Columns per side (player and foe each occupy a 6×6 half). */
 export const BOARD_COLS = 6;
@@ -31,7 +31,7 @@ export const BOSS_ANCHOR = { r: 1, c: 1 } as const;
 /** Chebyshev range that covers the whole 12×6 board from the 4×4 boss. */
 export const BOSS_RANGE = 12;
 /** Same-star copies needed to combine into the next star (board + bench). */
-export const MERGE_COPIES = 2;
+export const MERGE_COPIES = 3;
 /**
  * Boss HP is set so the *reference* team for the round (src/data/bossCurve.ts)
  * burns it down in BOSS_BURN_SECONDS, never from the live board — see B5.
@@ -70,7 +70,7 @@ export const BOARD_CELL_WIDTH_PCT = 100 / BOARD_COLS;
 export const BOARD_CELL_HEIGHT_PCT = 100 / BOARD_ROWS;
 export const BOARD_BG_TILE_SIZE = `${BOARD_CELL_WIDTH_PCT}% ${BOARD_CELL_HEIGHT_PCT}%`;
 
-/** Slow board-cap ramp so 2-copy merges do not fill the field too early. */
+/** Slow board-cap ramp so 3-copy merges do not fill the field too early. */
 export const BOT_BOARD_CAPS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9, 10] as const;
 
 /** Marathon ramps a bit higher over 18 rounds (max 12 units). */
@@ -79,16 +79,18 @@ export const MARATHON_BOARD_CAPS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9,
 /** Practice sandbox allows the full 6×6 player board. */
 export const PRACTICE_BOARD_CAP = BOARD_SIDE_ROWS * BOARD_COLS;
 
-export const DEFAULT_DRAFT = ['jorm', 'anans', 'kitsu', 'taniw', 'ifrit', 'thund'];
+export const DEFAULT_DRAFT = ['jorm', 'anans', 'anzuu', 'taniw', 'ifrit', 'thund'];
 export const DRAFT_STORAGE_KEY = 'om_draft';
 
 /** Player shop pool cap for Hyper Roll, Marathon, and other ranked bot matches. */
 export const USER_DRAFT_MAX = 6;
+/** A full player draft must include at least this many 2-cost heroes. */
+export const MIN_DRAFT_TWO_COSTS = 2;
 /** Bot shop draws from a wider hero pool than the player. */
 export const BOT_DRAFT_SIZE = 12;
 
 /** Global combat HP multiplier — applied before mode-specific bonuses. */
-export const HERO_HP_MUL = 1.8;
+export const HERO_HP_MUL = 1.7;
 
 export const MARATHON = {
   matchRounds: 18,

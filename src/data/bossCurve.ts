@@ -17,13 +17,46 @@ export interface RefTeam {
 }
 
 /**
- * Medians of the `decent` policy on Mortal, re-measured in B7 at the final
- * dials, once the boss fix let matches routinely reach round 13 (n = 600).
+ * main's REF_ANCHORS trailed its real boards, so the boss difficulty players
+ * know (B8) was fitted to a team smaller than theirs. This keeps that
+ * difficulty: anchor / median board, per round and stat, measured on main at
+ * 268c18c with `scripts/balance-anchors.ts --mode bot --difficulty normal
+ * --n 1000 --seed 1,7 --legacy` (n = 2000). Round 16 uses the round-12 offset.
+ */
+export const LEGACY_ANCHOR_OFFSET: Record<number, RefTeam> = {
+  1: { hp: 1.057, dps: 1.241, avgHp: 0.938 },
+  4: { hp: 0.923, dps: 1.027, avgHp: 0.877 },
+  8: { hp: 0.874, dps: 1.032, avgHp: 0.861 },
+  12: { hp: 0.857, dps: 0.976, avgHp: 0.829 },
+};
+
+/**
+ * B8's realized damage per point of auto DPS at each anchor round: the player's
+ * total damage ÷ fight seconds ÷ auto DPS, median per fight. Three-copy merges
+ * shifted this ratio by round (lower at r4 without the early 3★, higher at r12),
+ * but the boss fit converts auto DPS with a fixed 1.6 uplift, so the DPS anchor
+ * is scaled by (this tree's ratio ÷ this one) to keep B8's real kill times.
+ * Measured with the same main run as LEGACY_ANCHOR_OFFSET. Round 1 has no boss,
+ * so its ratio is against ordinary foes. Round 16 uses the round-12 ratio.
+ */
+export const LEGACY_DPS_REALIZATION: Record<number, number> = {
+  1: 0.886,
+  4: 2.284,
+  8: 2.469,
+  12: 2.674,
+};
+
+/**
+ * Medians of the player's board under the `decent` policy on Mortal with random
+ * drafts, × LEGACY_ANCHOR_OFFSET and the realized-damage DPS factor (both
+ * applied only in `scripts/balance-anchors.ts`), from `scripts/balance-anchors.ts --seed 1,7`
+ * (n = 2000), re-measured after three-copy merges shrank boards. Round 12 is
+ * the 54% of matches still alive there, so it leans towards stronger boards.
  *
  * The B5 numbers came from the 39% of matches still alive at round 12, which
  * was survivorship-biased and oversized the round-12 boss. The curve is
  * self-referential — bosses are fitted to it and it is measured against them —
- * so it was re-derived twice until the anchors stopped moving.
+ * so the script iterates until the anchors stop moving.
  *
  * `dps` is auto-attack DPS only; ability damage is deliberately outside it, so
  * raising the ability budget makes bosses easier rather than rescaling them.
@@ -32,11 +65,11 @@ export interface RefTeam {
  * reach it often enough to take a median from.
  */
 export const REF_ANCHORS: Record<number, RefTeam> = {
-  1: { hp: 1663, dps: 144, avgHp: 832 },
-  4: { hp: 3574, dps: 299, avgHp: 1192 },
-  8: { hp: 7082, dps: 674, avgHp: 1416 },
-  12: { hp: 12783, dps: 1228, avgHp: 1420 },
-  16: { hp: 18484, dps: 1782, avgHp: 1424 },
+  1: { hp: 1186, dps: 123, avgHp: 637 },
+  4: { hp: 2667, dps: 231, avgHp: 899 },
+  8: { hp: 4984, dps: 526, avgHp: 1013 },
+  12: { hp: 8855, dps: 1023, avgHp: 1002 },
+  16: { hp: 12822, dps: 1512, avgHp: 1029 },
 };
 
 const ANCHOR_ROUNDS = Object.keys(REF_ANCHORS)

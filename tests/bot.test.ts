@@ -13,6 +13,7 @@ import {
   rollShopOffers,
   runBotTurn,
   scaleFoeCombatants,
+    unitCopies,
 } from '../src/game/engine';
 import { seeded, setRng } from '../src/game/rng';
 import type { Difficulty } from '../src/game/types';
@@ -78,15 +79,18 @@ describe('difficulty is bought with the bot wallet', () => {
     setRng(seeded(4));
     resetUidCounter();
     const g = createGame('bot');
+    g.foeDraft = [];
     for (let i = 0; i < rounds; i++) {
       g.phase = 'result';
       g.lastResult = { win: false, dmg: 0, boss: false };
       gameActions.nextRound(g, g.foeDraft, difficulty);
     }
-    return [...g.foe, ...g.foeBench].reduce((s, u) => s + HERO_MAP[u.hid].cost * u.star, 0) + g.foeGold;
+    return (
+      [...g.foe, ...g.foeBench].reduce((s, u) => s + HERO_MAP[u.hid].cost * unitCopies(u), 0) + g.foeGold
+    );
   }
 
-  it('a richer bot ends up with a richer board', () => {
+  it('a richer bot retains more gold when no purchases are available', () => {
     const normal = botPowerAfter('normal', 8);
     const mythic = botPowerAfter('mythic', 8);
     expect(mythic).toBeGreaterThan(normal);

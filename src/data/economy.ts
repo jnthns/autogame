@@ -30,12 +30,12 @@ export const SHOP_ODDS: Record<number, [c2: number, c3: number, c4: number, c5: 
   5: [40, 40, 18, 2],
   6: [40, 40, 18, 2],
   7: [30, 38, 25, 7],
-  8: [30, 38, 25, 7],
-  9: [22, 33, 30, 15],
-  10: [22, 33, 30, 15],
-  11: [15, 28, 35, 22],
-  12: [15, 28, 35, 22],
-  13: [12, 25, 35, 28],
+  8: [30, 38, 22, 10],
+  9: [22, 33, 19, 26],
+  10: [22, 33, 19, 26],
+  11: [15, 28, 11, 46],
+  12: [15, 28, 11, 46],
+  13: [12, 25, 11, 52],
 };
 
 /** Marathon rounds 14–18 and every gauntlet round past 13 use row 13. */
@@ -122,16 +122,14 @@ export const RELIC_PICKS_LOSS = 2;
  * pool: a hero the bot is buying genuinely dries up for you, which is what
  * makes scouting the opposing board worth doing.
  */
-export const COPIES_BY_COST: Record<number, number> = { 2: 12, 3: 10, 4: 8, 5: 6 };
+export const COPIES_BY_COST: Record<number, number> = { 2: 18, 3: 14, 4: 10, 5: 9 };
 
 /**
  * Copies of one hero a single shop roll may show.
  *
  * The pool alone does not stop the opening degeneracy: a 6-hero draft can put
  * one hero in a whole cost tier, so a 70/30 odds row would still hand out ~3.5
- * copies in one roll — and with pair-collapse and 2-copy merges that is a 3★
- * for 8 gold on round one. Two copies collapse into a single 2★ offer, which
- * is the most one roll can ever be worth.
+ * copies in one roll. The cap keeps that opening concentration bounded.
  */
 export const MAX_COPIES_PER_ROLL = 2;
 

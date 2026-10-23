@@ -44,6 +44,7 @@ import {
   scaleFoeCombatants,
   usesDifficulty,
 } from '../game/engine';
+import { isDraftLegal, randomDraft } from '../game/draft';
 import { pickGauntletRelics } from '../game/gauntlet';
 import { pruneUiEvents, stamp, type StampedUiEvent, type UiEvent } from '../game/uiEvents';
 import { debugRoundFromUrl, debugStateFromUrl } from '../game/debugUrl';
@@ -68,7 +69,7 @@ const PRUNE_INTERVAL_MS = 250;
 const HAPTIC_TAP_MS = 10;
 const HAPTIC_BOSS_MS = 25;
 
-function loadDraft(unlocked: string[]): string[] {
+export function loadDraft(unlocked: string[]): string[] {
   const allow = new Set(unlocked);
   try {
     const s = localStorage.getItem(DRAFT_STORAGE_KEY);
@@ -83,6 +84,11 @@ function loadDraft(unlocked: string[]): string[] {
     /* ignore */
   }
   return DEFAULT_DRAFT.filter((id) => allow.has(id)).slice(0, USER_DRAFT_MAX);
+}
+
+/** Where starting a match lands: an illegal draft is sent back to the build screen, not played. */
+export function matchStartScreen(draft: readonly string[]): Screen {
+  return isDraftLegal(draft) ? 'game' : 'build';
 }
 
 export function useGame() {
@@ -268,6 +274,10 @@ export function useGame() {
 
   const startGame = useCallback(
     (mode: GameMode) => {
+      if (matchStartScreen(draft) === 'build') {
+        setScreen('build');
+        return;
+      }
       clearTimer();
       resetUidCounter();
       engineRef.current = null;
@@ -588,10 +598,7 @@ export function useGame() {
   }, []);
 
   const autoDraft = useCallback(() => {
-    const pool = unlockedHeroIds(progressRef.current)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, USER_DRAFT_MAX);
-    saveDraft(pool);
+    saveDraft(randomDraft(Math.random, unlockedHeroIds(progressRef.current)));
   }, [saveDraft]);
 
   useEffect(() => () => clearTimer(), [clearTimer]);

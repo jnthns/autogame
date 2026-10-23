@@ -10,12 +10,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_DRAFT, USER_DRAFT_MAX } from '../src/data/constants';
+import { DEFAULT_DRAFT } from '../src/data/constants';
 import { HEROES } from '../src/data/heroes';
 import { runMatch, type MatchRecord } from '../src/sim/runMatch';
 import type { PolicyName } from '../src/sim/policies';
 import type { Difficulty, GameMode } from '../src/game/types';
 import { seeded } from '../src/game/rng';
+import { randomDraft } from '../src/game/draft';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE_DIR = resolve(HERE, '../docs/overhaul/baselines');
@@ -76,15 +77,6 @@ function f(x: number, w = 6, d = 1): string {
   return x.toFixed(d).padStart(w);
 }
 
-function randomDraft(rng: () => number): string[] {
-  const ids = HEROES.map((h) => h.id);
-  for (let i = ids.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [ids[i], ids[j]] = [ids[j], ids[i]];
-  }
-  return ids.slice(0, USER_DRAFT_MAX);
-}
-
 function bossWinPct(records: MatchRecord[], round: number): number {
   const rows = records.flatMap((m) => m.rounds.filter((r) => r.round === round && r.boss));
   return pct(rows.filter((r) => r.win).length, rows.length);
@@ -126,6 +118,15 @@ function main(): void {
   }
 
   const allRounds = records.flatMap((m) => m.rounds);
+  const timeoutCounts = records.reduce(
+    (sum, m) => ({
+      boss: sum.boss + m.timeoutCounts.boss,
+      bossTotal: sum.bossTotal + m.timeoutCounts.bossTotal,
+      nonBoss: sum.nonBoss + m.timeoutCounts.nonBoss,
+      nonBossTotal: sum.nonBossTotal + m.timeoutCounts.nonBossTotal,
+    }),
+    { boss: 0, bossTotal: 0, nonBoss: 0, nonBossTotal: 0 },
+  );
   const wins = records.filter((m) => m.win).length;
   const abilityDmg = allRounds.reduce(
     (s, r) => s + Object.values(r.dmgByHero).reduce((a, x) => a + x.ability, 0),
@@ -153,10 +154,35 @@ function main(): void {
   const noThreeStarBucket = threeStarBucket(null);
   const bucketWinPct = ({ count, winPct }: { count: number; winPct: number | null }) =>
     `${winPct == null ? 'n/a'.padStart(6) : f(winPct)} (n=${count})`;
+  const fightWinPctByTier = (cost: number) => {
+    const treated = records.flatMap((m) =>
+      m.rounds.filter((round) => m.threeStars.some((star) => star.cost === cost && star.round < round.round)),
+    );
+    const activeRounds = new Set(treated.map((round) => round.round));
+    const control = records.flatMap((m) =>
+      m.rounds.filter(
+        (round) =>
+          activeRounds.has(round.round) &&
+          !m.threeStars.some((star) => star.cost === cost && star.round < round.round),
+      ),
+    );
+    const treatedPct = pct(treated.filter((round) => round.win).length, treated.length);
+    const controlPct = pct(control.filter((round) => round.win).length, control.length);
+    return `${f(treatedPct)} (n=${treated.length}) vs ${f(controlPct)} (n=${control.length}) Δ${f(
+      treatedPct - controlPct,
+    )}`;
+  };
   const goldFlow = records.map((m) => m.rounds.reduce((s, r) => s + Math.max(0, r.income), 0));
   const interestFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeInterest, 0));
   const streakFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeStreak, 0));
   const deltas = args.randomDrafts ? heroDeltas(drafted) : [];
+  const fallbackMatches = records.filter((m) => m.shopFallbacks > 0);
+  const fallbackSlots = records.reduce((sum, m) => sum + m.shopSlots, 0);
+  const fallbackCount = records.reduce((sum, m) => sum + m.shopFallbacks, 0);
+  const fiveEarlyByFallback = (hitFallback: boolean) => {
+    const group = records.filter((m) => (m.shopFallbacks > 0) === hitFallback);
+    return `${group.filter((m) => m.threeStars.some((s) => s.cost === 5 && s.round < 8)).length}/${group.length}`;
+  };
 
   const head = `mode=${args.mode} diff=${args.difficulty} policy=${args.policy} n=${args.n} seed=${args.seed}`;
   const lines = [
@@ -164,6 +190,7 @@ function main(): void {
     `win%           ${f(pct(wins, records.length))}`,
     `medFightSec    ${f(median(allRounds.map((r) => r.fightSeconds)))}`,
     `timeout%       ${f(pct(allRounds.filter((r) => r.timedOut).length, allRounds.length))}`,
+    `timeout split  boss ${f(pct(timeoutCounts.boss, timeoutCounts.bossTotal))} (n=${timeoutCounts.boss}/${timeoutCounts.bossTotal})  non-boss ${f(pct(timeoutCounts.nonBoss, timeoutCounts.nonBossTotal))} (n=${timeoutCounts.nonBoss}/${timeoutCounts.nonBossTotal})`,
     `boss4 win%     ${f(bossWinPct(records, 4))}   boss8 win% ${f(bossWinPct(records, 8))}   boss12 win% ${f(bossWinPct(records, 12))}`,
     `abilityShare%  ${f(pct(abilityDmg, abilityDmg + autoDmg))}`,
     `3★<r4 %        ${f(pct(earlyThree, records.length))}`,
@@ -171,6 +198,9 @@ function main(): void {
     `5c3★ %  ${f(pct(fiveStarRounds.length, records.length))}   earliest r  ${fiveStarRounds.length ? Math.min(...fiveStarRounds) : 0}/${percentile(fiveStarRounds, 0.1)}/${median(fiveStarRounds)}`,
     `5c3★ <r8 count  ${fiveStarEarly}`,
     `3★ win% by tier  c2 ${bucketWinPct(threeStarBuckets[0])}  c3 ${bucketWinPct(threeStarBuckets[1])}  c4 ${bucketWinPct(threeStarBuckets[2])}  c5 ${bucketWinPct(threeStarBuckets[3])}  none ${bucketWinPct(noThreeStarBucket)}`,
+    `3★ fight win% by tier  c2 ${fightWinPctByTier(2)}  c3 ${fightWinPctByTier(3)}  c4 ${fightWinPctByTier(4)}  c5 ${fightWinPctByTier(5)}`,
+    `shop fallback%  drafts ${f(pct(fallbackMatches.length, records.length))} (${fallbackMatches.length}/${records.length})  slots ${f(pct(fallbackCount, fallbackSlots))} (${fallbackCount}/${fallbackSlots})`,
+    `5c3★ <r8 by fallback  hit ${fiveEarlyByFallback(true)}  no-hit ${fiveEarlyByFallback(false)}`,
     `heroDeltaAll   ${deltas.map(([id, d]) => `${id} ${d >= 0 ? '+' : ''}${d.toFixed(1)}`).join('  ')}`,
     `goldFlow avg   ${f(mean(goldFlow))}   interest avg ${f(mean(interestFlow))}   streakGold avg ${f(mean(streakFlow))}`,
     `medRounds      ${f(median(records.map((m) => m.rounds.length)))}`,

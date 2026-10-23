@@ -1,4 +1,4 @@
-import { PLAYER_ROW_START } from '../data/constants';
+import { MERGE_COPIES, PLAYER_ROW_START } from '../data/constants';
 import { INTEREST_MAX, INTEREST_PER, MATCH_DEFAULTS } from '../data/economy';
 import { HERO_MAP, isMeleeHero } from '../data/heroes';
 import {
@@ -139,7 +139,9 @@ const decent: Policy = {
         if (!offer) continue;
         const completes =
           ownsCopy(g, offer.hid, offer.star === 1 ? 1 : 2) ||
-          (offer.star === 1 && ownsCopy(g, offer.hid, 2) && countHeroStar(g, offer.hid, 2) >= 2);
+          (offer.star === 1 &&
+            ownsCopy(g, offer.hid, 2) &&
+            countHeroStar(g, offer.hid, 2) >= MERGE_COPIES - 1);
         if (!completes) continue;
         if (g.bench.length >= BENCH_MAX) sellWeakestBench(g);
         if (buyOffer(g, i)) acted = true;
@@ -163,7 +165,7 @@ const decent: Policy = {
       const rerollCost = g.freeRerolls > 0 ? 0 : MATCH_DEFAULTS.rerollCost;
       const wantsUnits = roster(g).length < capN;
       const chasingThree = [...g.board, ...g.bench].some(
-        (u) => u.star === 2 && countHeroStar(g, u.hid, 2) >= 1,
+        (u) => u.star === 2 && countHeroStar(g, u.hid, 2) >= MERGE_COPIES - 1,
       );
       // Rule 4: before round 10, never roll back below an interest threshold.
       const keepsInterest =

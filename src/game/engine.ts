@@ -52,9 +52,10 @@ import {
   lossDamage,
   MATCH_DEFAULTS,
   RELIC_ROUNDS,
+  SHOP_TIERS,
+  shopOdds,
 } from '../data/economy';
 import {
-  collapseShopOffers,
   getBossEncounter,
   isBossRound,
   makeBossUnits,
@@ -159,6 +160,8 @@ export function createGame(
     foeDraft: mode === 'practice' || mode === 'gauntlet' ? [] : pickBotDraft(),
     foeShop: [],
     shop: [],
+    shopSlots: 0,
+    shopFallbacks: 0,
     freeRerolls: 0,
     pool: mode === 'practice' ? null : createPool(HEROES.map((h) => h.id), (id) => HERO_MAP[id].cost),
     sel: null,
@@ -249,6 +252,8 @@ export function rollShopOffers(
   draft: string[],
   round = 1,
   pool: CopyPool | null = null,
+  onSlot?: () => void,
+  onLastResort?: () => void,
 ): (ShopOffer | null)[] {
   const base = playerShopPool(draft);
   const byTier = new Map<number, string[]>();
@@ -262,22 +267,25 @@ export function rollShopOffers(
   const shown: Record<string, number> = {};
   const left = (id: string) => (pool ? (pool[id] ?? 0) : Infinity) - (shown[id] ?? 0);
   const offerable = (id: string) => left(id) > 0 && (shown[id] ?? 0) < MAX_COPIES_PER_ROLL;
-  const has = (tier: number) => (byTier.get(tier) ?? []).some(offerable);
+  const inStock = (id: string) => left(id) > 0;
+  const tierHas = (pick: (id: string) => boolean) => (tier: number) => (byTier.get(tier) ?? []).some(pick);
 
-  const raw: (string | null)[] = [0, 0, 0, 0, 0].map(() => {
-    const tier = rollShopTier(round, has);
-    const candidates = (byTier.get(tier) ?? base).filter(offerable);
-    const from = candidates.length ? candidates : base.filter(offerable);
+  return [0, 0, 0, 0, 0].map(() => {
+    onSlot?.();
+    // A capped hero sends its slot down the normal tier fallback. The cap only
+    // gives way when no non-zero-odds tier has an uncapped hero left.
+    const capHolds = SHOP_TIERS.some((t, i) => shopOdds(round)[i] > 0 && tierHas(offerable)(t));
+    const pick = capHolds ? offerable : inStock;
+    const tier = rollShopTier(round, tierHas(pick), onLastResort);
+    const from = (byTier.get(tier) ?? []).filter(pick);
     if (!from.length) return null;
     const id = from[Math.floor(random() * from.length)];
     shown[id] = (shown[id] ?? 0) + 1;
-    return id;
+    return { hid: id, star: 1 as const };
   });
-  // A pair only collapses into a 2★ offer if the pool can actually pay for both.
-  return collapseShopOffers(raw, (id) => (pool ? (pool[id] ?? 0) : Infinity) >= MERGE_COPIES);
 }
 
-/** Copies of a hero this unit is holding: 1 at 1★, 2 at 2★, 4 at 3★. */
+/** Copies of a hero this unit is holding: 1 at 1★, 3 at 2★, 9 at 3★. */
 export function unitCopies(u: { star: 1 | 2 | 3 }): number {
   return u.star === 1 ? 1 : u.star === 2 ? MERGE_COPIES : MERGE_COPIES * MERGE_COPIES;
 }
@@ -293,7 +301,13 @@ export function returnToPool(g: GameState, hid: string, copies: number): void {
 }
 
 export function rollShop(g: GameState, draft: string[]): void {
-  g.shop = rollShopOffers(draft, g.round, g.pool);
+  g.shop = rollShopOffers(
+    draft,
+    g.round,
+    g.pool,
+    () => g.shopSlots++,
+    () => g.shopFallbacks++,
+  );
 }
 
 export function traitCounts(ids: string[]): Record<string, number> {
@@ -507,21 +521,19 @@ export function applyMerges(
   onPop?: (r: number, c: number, text: string) => void,
 ): void {
   mergeUnits(g, onPop);
-  if (opts?.boughtHid && (opts.twoStarBeforeBuy ?? 0) >= 2) {
+  if (opts?.boughtHid && (opts.twoStarBeforeBuy ?? 0) >= MERGE_COPIES) {
     pairMergeTwos(g, opts.boughtHid, onPop);
   }
 }
 
 /**
  * 1★ pays a one-gold scout tax so rolling through the shop and dumping the
- * misses costs something; combined units pay a combine tax so 2-copy merges do
+ * misses costs something; combined units pay a combine tax so 3-copy merges do
  * not print gold.
  */
 export function sellValue(u: Unit): number {
   const cost = HERO_MAP[u.hid].cost;
-  if (u.star === 1) return Math.max(1, cost - 1);
-  if (u.star === 2) return Math.max(1, cost * MERGE_COPIES - 1);
-  return Math.max(1, cost * 3);
+  return Math.max(1, cost * unitCopies(u) - 1);
 }
 
 export function combatOpponents(g: GameState): Unit[] {
@@ -585,7 +597,7 @@ function botBuy(g: GameState, i: number): boolean {
   if (g.foeGold < cost || g.foeBench.length >= 8) return false;
   g.foeGold -= cost;
   g.foeShop = g.foeShop.map((s, j) => (j === i ? null : s));
-  takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
+  takeFromPool(g, offer.hid, unitCopies(offer));
   g.foeBench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   return true;
 }
@@ -685,7 +697,7 @@ export function runBotTurn(g: GameState): void {
 }
 
 const FOE_SCALE: Record<Difficulty, { hp: number; atk: number }> = {
-  normal: { hp: 1, atk: 1 },
+  normal: { hp: 0.975, atk: 0.975 },
   hard: { hp: 1.1, atk: 1.06 },
   mythic: { hp: 1.18, atk: 1.1 },
 };
@@ -1577,7 +1589,7 @@ export const gameActions = {
     if (g.gold < cost || g.bench.length >= 8) return;
     g.gold -= cost;
     g.shop = g.shop.map((s, j) => (j === i ? null : s));
-    takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
+    takeFromPool(g, offer.hid, unitCopies(offer));
     g.bench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   },
 

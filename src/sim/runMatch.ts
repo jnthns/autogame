@@ -71,6 +71,9 @@ export interface MatchRecord {
   threeStarRound: number | null;
   /** Each hero's first round at 3★ on the player board or bench. */
   threeStars: { round: number; hid: string; cost: number }[];
+  shopSlots: number;
+  shopFallbacks: number;
+  timeoutCounts: { boss: number; bossTotal: number; nonBoss: number; nonBossTotal: number };
   roundsCleared: number;
   seed: number;
 }
@@ -150,6 +153,9 @@ export function runMatch(opts: MatchOptions): MatchRecord {
         foeFinalHp: g.foeHp,
         threeStarRound,
         threeStars,
+        shopSlots: g.shopSlots,
+        shopFallbacks: g.shopFallbacks,
+        timeoutCounts: timeoutCounts(rounds),
         roundsCleared,
         seed: opts.seed,
       };
@@ -179,8 +185,22 @@ export function runMatch(opts: MatchOptions): MatchRecord {
     foeFinalHp: g.foeHp,
     threeStarRound,
     threeStars,
+    shopSlots: g.shopSlots,
+    shopFallbacks: g.shopFallbacks,
+    timeoutCounts: timeoutCounts(rounds),
     roundsCleared,
     seed: opts.seed,
+  };
+}
+
+function timeoutCounts(rounds: RoundRecord[]): MatchRecord['timeoutCounts'] {
+  const boss = rounds.filter((round) => round.boss);
+  const nonBoss = rounds.filter((round) => !round.boss);
+  return {
+    boss: boss.filter((round) => round.timedOut).length,
+    bossTotal: boss.length,
+    nonBoss: nonBoss.filter((round) => round.timedOut).length,
+    nonBossTotal: nonBoss.length,
   };
 }
 
