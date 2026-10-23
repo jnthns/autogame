@@ -1,14 +1,14 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { BATTLEGROUND_MAP, BATTLEGROUNDS, type BattlegroundMotif } from '../data/battlegrounds';
 
-/** Sun/moon disc: centre in % of the box, radius in cqw so it stays round. */
+/** Sun/moon disc: centre in % of the box, radius in cqmin so it stays round. */
 type Disc = { x: string; y: string; r: string };
 
 const DISCS: Partial<Record<BattlegroundMotif, Disc>> = {
-  dunes: { x: '78%', y: '16%', r: '16cqw' },
-  grove: { x: '24%', y: '15%', r: '12cqw' },
-  cliffs: { x: '50%', y: '10%', r: '20cqw' },
-  pyramid: { x: '80%', y: '13%', r: '12cqw' },
+  dunes: { x: '78%', y: '16%', r: '16cqmin' },
+  grove: { x: '24%', y: '15%', r: '12cqmin' },
+  cliffs: { x: '50%', y: '10%', r: '20cqmin' },
+  pyramid: { x: '80%', y: '13%', r: '12cqmin' },
 };
 
 /** Drawn in a 100×100 box stretched to fit; ring strokes stay in screen space. */
@@ -47,20 +47,20 @@ const MOTIFS: Record<BattlegroundMotif, ReactNode> = {
   web: (
     <>
       {[35, 70, 105, 140].map((r) => (
-        <circle key={r} className="bg-art__ring" cx={92} cy={5} r={r} style={{ strokeWidth: '2.5cqw' }} />
+        <circle key={r} className="bg-art__ring" cx={92} cy={5} r={r} style={{ strokeWidth: '2.5cqmin' }} />
       ))}
     </>
   ),
   coil: (
     <>
-      <circle className="bg-art__ring" cx={50} cy={50} r={38} style={{ strokeWidth: '6.5cqw' }} />
+      <circle className="bg-art__ring" cx={50} cy={50} r={38} style={{ strokeWidth: '6.5cqmin' }} />
       <circle
         className="bg-art__ring bg-art__ring--g"
         opacity={0.7}
         cx={50}
         cy={50}
         r={38}
-        style={{ strokeWidth: '1cqw' }}
+        style={{ strokeWidth: '1cqmin' }}
       />
     </>
   ),
