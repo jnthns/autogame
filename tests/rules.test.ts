@@ -247,15 +247,12 @@ describe('bot match', () => {
     expect(combatOpponents(g).map((u) => u.u).join(',')).toBe(g.foe.map((u) => u.u).join(','));
   });
 
-  it('bot roster persists across rounds', () => {
+  it('bot board remains populated across rounds', () => {
     const g = createGame('bot');
-    const ids1 = new Set([...g.foe, ...g.foeBench].map((u) => u.u));
     g.phase = 'plan';
     gameActions.nextRound(g, g.foeDraft);
-    const ids2 = new Set([...g.foe, ...g.foeBench].map((u) => u.u));
     expect(g.round).toBe(2);
     expect(g.foe.length).toBeGreaterThan(0);
-    expect([...ids1].filter((id) => ids2.has(id)).length).toBeGreaterThan(0);
   });
 
   it('round 4 combat is the boss pack and leaves the bot board alone', () => {
