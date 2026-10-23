@@ -1,8 +1,7 @@
 import { useMemo, type CSSProperties } from 'react';
 import { INK, JADE, RUST, SAF, costTone } from '../data/constants';
 import { HEROES } from '../data/heroes';
-import { spriteCss } from '../data/sprites';
-import { PixelSprite } from './PixelSprite';
+import { HeroAvatar } from './HeroAvatar';
 
 const HERO_IDS = HEROES.map((h) => h.id);
 
@@ -48,7 +47,6 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
       >
         {track.map((id, i) => {
           const hero = HEROES.find((h) => h.id === id)!;
-          const src = spriteCss(id);
           const delay = (i % ids.length) * 0.18;
           return (
             <div
@@ -65,14 +63,7 @@ function MarqueeRow({ ids, direction, duration, spriteClass, strip, className = 
                   transform: `rotate(${i % 2 ? -2 : 2}deg)`,
                 }}
               >
-                {src && (
-                  <PixelSprite
-                    src={src}
-                    alt={hero.name}
-                    className={spriteClass}
-                    dimmed={!unbound.has(id)}
-                  />
-                )}
+                <HeroAvatar heroId={id} alt={hero.name} className={spriteClass} dimmed={!unbound.has(id)} />
               </div>
               <span
                 className="mono"

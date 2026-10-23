@@ -249,10 +249,6 @@ button:disabled {
   border: none;
 }
 
-.board-unit .pixel {
-  filter: drop-shadow(0 1px 0 rgba(20, 18, 14, 0.55)) drop-shadow(0 0 1px rgba(20, 18, 14, 0.35));
-}
-
 .board-unit--sel {
   filter: drop-shadow(0 0 0 2px #e8a317);
 }
@@ -268,8 +264,53 @@ button:disabled {
   border-color: transparent;
 }
 
-.bench-slot--filled .pixel {
-  filter: drop-shadow(0 1px 0 rgba(20, 18, 14, 0.55)) drop-shadow(0 0 1px rgba(20, 18, 14, 0.35));
+.hero-avatar {
+  display: block;
+  overflow: visible;
+}
+
+.hero-avatar__shape {
+  fill: var(--av-accent);
+  stroke: var(--om-ink);
+  stroke-width: var(--av-outline, 6);
+  stroke-linejoin: round;
+}
+
+.hero-avatar__base {
+  fill: black;
+  fill-opacity: 0.32;
+}
+
+.hero-avatar__rim {
+  stroke: none;
+}
+
+.hero-avatar__outline {
+  fill: none;
+  stroke: var(--om-ink);
+  stroke-width: var(--av-outline, 6);
+  stroke-linejoin: round;
+}
+
+.hero-avatar__glyph {
+  font-family: system-ui, sans-serif;
+  font-size: 50px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke-width: 7px;
+  stroke-linejoin: round;
+}
+
+.hero-avatar__glyph--ink {
+  fill: var(--om-ink);
+  stroke: var(--om-bone);
+  stroke-opacity: 0.6;
+}
+
+.hero-avatar__glyph--bone {
+  fill: var(--om-bone);
+  stroke: var(--om-ink);
+  stroke-opacity: 0.6;
 }
 
 .relic-strip {

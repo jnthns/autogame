@@ -16,10 +16,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const report = process.argv.includes('--report');
 
-/** Colors are data in these files (sprite art, FX profiles, wallpapers). */
+/** Colors are data in these files (FX profiles and wallpapers). */
 const ALLOW = new Set([
   'src/components/CombatFxLayer.tsx',
-  'src/components/PixelSprite.tsx',
   'src/components/BattlegroundPreview.tsx',
   'src/components/BattlegroundBoardBackground.tsx',
 ]);

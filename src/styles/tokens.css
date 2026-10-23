@@ -51,7 +51,7 @@
   --sp-7: 20px;
   --sp-8: 24px;
 
-  /* Borders and hard shadows (no blur, no radius) */
+  /* Borders and hard shadows (no blur, no radius; hero avatars alone use a soft gradient and ground shadow) */
   --bw-1: 1px;
   --bw-2: 2px;
   --bw-3: 3px;

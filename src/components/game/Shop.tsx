@@ -1,10 +1,9 @@
 import type { CSSProperties } from 'react';
 import { HERO_MAP } from '../../data/heroes';
-import { spriteCss } from '../../data/sprites';
 import { shopPrice } from '../../game/hyperRoll';
 import type { GameState } from '../../game/types';
 import { recent, type StampedUiEvent } from '../../game/uiEvents';
-import { PixelSprite } from '../PixelSprite';
+import { HeroAvatar } from '../HeroAvatar';
 
 interface ShopProps {
   game: GameState;
@@ -71,7 +70,7 @@ export function Shop({
               style={{ '--i': i } as CSSProperties}
               onClick={() => onBuy(i)}
             >
-              <PixelSprite src={spriteCss(offer.hid)} />
+              <HeroAvatar heroId={offer.hid} />
               <span className="om-shop-card__name">
                 {h.name.split(' ')[0]}
                 {offer.star > 1 ? ` ${'★'.repeat(offer.star)}` : ''}

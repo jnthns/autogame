@@ -1,9 +1,8 @@
 import { BOSS_FOOTPRINT } from '../../data/constants';
 import type { CSSProperties } from 'react';
 import { RELIC_MAP } from '../../data/relics';
-import { spriteCss } from '../../data/sprites';
 import type { Combatant, Unit } from '../../game/types';
-import { PixelSprite } from '../PixelSprite';
+import { HeroAvatar } from '../HeroAvatar';
 
 interface BoardUnitProps {
   unit: Combatant;
@@ -99,7 +98,7 @@ export function BoardUnit({
       }
     >
       <button type="button" className={bodyClass} onClick={onTap} style={{ transform: lunge }}>
-        <PixelSprite src={spriteCss(u.hid)} size={isBoss ? 132 : undefined} />
+        <HeroAvatar heroId={u.hid} size={isBoss ? 132 : undefined} />
         {boardUnit && boardUnit.relics.length > 0 && (
           <span className="om-relic-strip" aria-hidden>
             {boardUnit.relics.slice(0, 3).map((rid) => {

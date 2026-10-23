@@ -1,10 +1,9 @@
 import { STARMUL } from '../../data/constants';
 import { attackLabel, HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
-import { spriteCss } from '../../data/sprites';
 import { classCard, classCounts, traitCard, traitCounts } from '../../game/engine';
 import type { GameState, SheetState } from '../../game/types';
-import { PixelSprite } from '../PixelSprite';
+import { HeroAvatar } from '../HeroAvatar';
 
 export function SheetModal({
   sheet,
@@ -60,7 +59,7 @@ export function SheetModal({
           title={`${h.name} ${'★'.repeat(sheet.star)}`}
           subtitle={`${sheet.side === 'foe' ? 'Adversary · ' : ''}${h.origin} · ${h.creature}`}
           onClose={onClose}
-          sprite={spriteCss(sheet.hid)}
+          heroId={sheet.hid}
         />
         <div className="om-sheet__body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
@@ -132,19 +131,19 @@ function SheetHeader({
   title,
   subtitle,
   onClose,
-  sprite,
+  heroId,
   isTraits,
 }: {
   title: string;
   subtitle: string;
   onClose: () => void;
-  sprite?: string;
+  heroId?: string;
   isTraits?: boolean;
 }) {
   return (
     <div className="om-sheet__header">
       <div className="om-sheet__avatar">
-        {isTraits ? <span aria-hidden>✦</span> : sprite && <PixelSprite src={sprite} size={48} />}
+        {isTraits ? <span aria-hidden>✦</span> : heroId && <HeroAvatar heroId={heroId} size={48} />}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="slab om-sheet__title">{title}</div>
