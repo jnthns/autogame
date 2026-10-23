@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { BONE, JADE } from '../../data/constants';
-import { BattlegroundBoardBackground } from '../BattlegroundBoardBackground';
-import { BattlegroundPreview } from '../BattlegroundPreview';
+import { BattlegroundArt } from '../BattlegroundArt';
 import {
   BATTLEGROUNDS,
   BATTLEGROUND_MAP,
@@ -326,11 +325,7 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                   }}
                 >
                   <div className="settings-bg-preview">
-                    <BattlegroundPreview
-                      id={b.id}
-                      animate={!settings.reduceMotion}
-                      locked={!open}
-                    />
+                    <BattlegroundArt id={b.id} locked={!open} />
                     {selected && (
                       <span className="settings-bg-badge">
                         ✓
@@ -360,7 +355,7 @@ export function SettingsScreen({ progress, settings, onChange, onBack }: Setting
                   background: 'var(--om-board, var(--om-surface-2))',
                 }}
               >
-                <BattlegroundBoardBackground id={shown.id} animate={!settings.reduceMotion} />
+                <BattlegroundArt id={shown.id} />
                 {!shownOpen && (
                   <div
                     style={{

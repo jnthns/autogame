@@ -8,6 +8,8 @@
  * Colors belong in src/styles/tokens.css and reach components as `var(--om-*)`;
  * durations belong to the `--dur-*` scale so reduced motion can zero them.
  * src/data/** and src/game/** are not scanned — palette handles live there.
+ * Battleground art takes every colour from src/data/battlegrounds.ts, so
+ * BattlegroundArt.tsx and the `.bg-art` CSS rules may not carry rgb() either.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -16,14 +18,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const report = process.argv.includes('--report');
 
-/** Colors are data in these files (FX profiles and wallpapers). */
-const ALLOW = new Set([
-  'src/components/CombatFxLayer.tsx',
-  'src/components/BattlegroundPreview.tsx',
-  'src/components/BattlegroundBoardBackground.tsx',
-]);
+/** Colors are data in these files (FX profiles). */
+const ALLOW = new Set(['src/components/CombatFxLayer.tsx']);
+const NO_RGB = new Set(['src/components/BattlegroundArt.tsx']);
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
+const RGB = /\brgba?\(/g;
+const BG_ART_RULE = /[^{}]*\.bg-art[^{}]*\{[^}]*\}/g;
 const INLINE_DURATION = /(animation|transition)\s*:\s*['"`][^'"`]*\d+(\.\d+)?m?s/g;
 
 function walk(dir) {
@@ -44,12 +45,19 @@ for (const file of files) {
   const rel = relative(ROOT, file).split('\\').join('/');
   if (ALLOW.has(rel)) continue;
   const src = readFileSync(file, 'utf8');
-  const hex = src.match(HEX) ?? [];
+  const hex = [...(src.match(HEX) ?? []), ...(NO_RGB.has(rel) ? (src.match(RGB) ?? []) : [])];
   const dur = src.match(INLINE_DURATION) ?? [];
   if (hex.length || dur.length) {
     rows.push({ rel, hex: hex.length, dur: dur.length, samples: [...hex.slice(0, 3), ...dur.slice(0, 2)] });
     total += hex.length + dur.length;
   }
+}
+
+const css = readFileSync(resolve(ROOT, 'src/index.css'), 'utf8').match(BG_ART_RULE)?.join('') ?? '';
+const cssHex = [...(css.match(HEX) ?? []), ...(css.match(RGB) ?? [])];
+if (cssHex.length) {
+  rows.push({ rel: 'src/index.css (.bg-art)', hex: cssHex.length, dur: 0, samples: cssHex.slice(0, 3) });
+  total += cssHex.length;
 }
 
 if (!rows.length) {
