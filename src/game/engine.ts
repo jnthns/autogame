@@ -124,7 +124,11 @@ export function pickBotDraft(): string[] {
   const mid = shuffle(HEROES.filter((h) => h.cost === 3));
   const high = shuffle(HEROES.filter((h) => h.cost >= 4));
   const pick = (arr: typeof HEROES, n: number) => arr.slice(0, Math.min(n, arr.length));
-  return [...pick(low, perTier), ...pick(mid, perTier), ...pick(high, perTier)]
+  const tiers = [pick(low, perTier), pick(mid, perTier), pick(high, perTier)];
+  const draft = Array.from({ length: perTier }, (_, i) => tiers.map((tier) => tier[i]))
+    .flat()
+    .filter((h): h is (typeof HEROES)[number] => h != null);
+  return draft
     .map((h) => h.id)
     .slice(0, BOT_DRAFT_SIZE);
 }
@@ -283,7 +287,7 @@ function takeFromPool(g: GameState, hid: string, copies: number): void {
   g.pool[hid] = Math.max(0, (g.pool[hid] ?? 0) - copies);
 }
 
-function returnToPool(g: GameState, hid: string, copies: number): void {
+export function returnToPool(g: GameState, hid: string, copies: number): void {
   if (!g.pool) return;
   g.pool[hid] = (g.pool[hid] ?? 0) + copies;
 }

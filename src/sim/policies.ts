@@ -1,7 +1,16 @@
 import { PLAYER_ROW_START } from '../data/constants';
 import { INTEREST_MAX, INTEREST_PER, MATCH_DEFAULTS } from '../data/economy';
 import { HERO_MAP, isMeleeHero } from '../data/heroes';
-import { applyMerges, cap, countHeroStar, gameActions, rollShop, sellValue } from '../game/engine';
+import {
+  applyMerges,
+  cap,
+  countHeroStar,
+  gameActions,
+  returnToPool,
+  rollShop,
+  sellValue,
+  unitCopies,
+} from '../game/engine';
 import { shopPrice, unitPower } from '../game/hyperRoll';
 import { random } from '../game/rng';
 import type { GameState, Unit } from '../game/types';
@@ -61,7 +70,7 @@ function buyOffer(g: GameState, i: number): boolean {
   return true;
 }
 
-function sellWeakestBench(g: GameState): boolean {
+export function sellWeakestBench(g: GameState): boolean {
   if (!g.bench.length) return false;
   let worst = g.bench[0];
   g.bench.forEach((u) => {
@@ -70,6 +79,7 @@ function sellWeakestBench(g: GameState): boolean {
   const i = g.bench.findIndex((u) => u.u === worst.u);
   if (i < 0) return false;
   g.gold += sellValue(worst);
+  returnToPool(g, worst.hid, unitCopies(worst));
   g.bench.splice(i, 1);
   return true;
 }
