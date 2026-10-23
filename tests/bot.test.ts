@@ -3,7 +3,6 @@ import { BOSS_INCOMING_MULT, HERO_HP_MUL } from '../src/data/constants';
 import { BOT_INCOME_BONUS, RELIC_ROUNDS } from '../src/data/economy';
 import { isMeleeHero, HERO_MAP } from '../src/data/heroes';
 import {
-  applyTraits,
   combatant,
   combatOpponents,
   createGame,
@@ -95,20 +94,22 @@ describe('boss difficulty is one lever', () => {
   function bossAt(difficulty: Difficulty) {
     const g = createGame('bot');
     g.round = 8;
-    g.board = [
-      { u: 'a', hid: 'anans', star: 1, relics: [], r: 8, c: 1 },
-      { u: 'b', hid: 'golem', star: 1, relics: [], r: 8, c: 2 },
-    ];
-    const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
-    applyTraits(mine);
     const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
-    fitBossToTeam(theirs, mine, g.round);
+    fitBossToTeam(theirs, g.round);
     scaleFoeCombatants(theirs, difficulty);
     return theirs.find((u) => u.boss)!;
   }
 
   it('mythic HP is 1.45× mortal', () => {
     expect(bossAt('mythic').maxHp).toBe(Math.round(bossAt('normal').maxHp * 1.45));
+  });
+
+  it('has finite, positive HP at every difficulty', () => {
+    for (const difficulty of ['normal', 'hard', 'mythic'] as const) {
+      const boss = bossAt(difficulty);
+      expect(Number.isFinite(boss.maxHp)).toBe(true);
+      expect(boss.maxHp).toBeGreaterThan(0);
+    }
   });
 
   it('bossTaken is identical at every difficulty', () => {
