@@ -142,17 +142,17 @@ function main(): void {
     .map((m) => Math.min(...m.threeStars.filter((s) => s.cost === 5).map((s) => s.round)))
     .filter(Number.isFinite);
   const fiveStarEarly = records.filter((m) => m.threeStars.some((s) => s.cost === 5 && s.round < 8)).length;
-  const threeStarWinPct = (cost: number | null) =>
-    pct(
-      records.filter((m) => {
-        const highest = Math.max(...m.threeStars.map((s) => s.cost));
-        return cost == null ? !m.threeStars.length : highest === cost;
-      }).filter((m) => m.win).length,
-      records.filter((m) => {
-        const highest = Math.max(...m.threeStars.map((s) => s.cost));
-        return cost == null ? !m.threeStars.length : highest === cost;
-      }).length,
-    );
+  const threeStarBucket = (cost: number | null) => {
+    const matches = records.filter((m) => {
+      const highest = Math.max(...m.threeStars.map((s) => s.cost));
+      return cost == null ? !m.threeStars.length : highest === cost;
+    });
+    return { count: matches.length, winPct: matches.length ? pct(matches.filter((m) => m.win).length, matches.length) : null };
+  };
+  const threeStarBuckets = [2, 3, 4, 5].map(threeStarBucket);
+  const noThreeStarBucket = threeStarBucket(null);
+  const bucketWinPct = ({ count, winPct }: { count: number; winPct: number | null }) =>
+    `${winPct == null ? 'n/a'.padStart(6) : f(winPct)} (n=${count})`;
   const goldFlow = records.map((m) => m.rounds.reduce((s, r) => s + Math.max(0, r.income), 0));
   const interestFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeInterest, 0));
   const streakFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeStreak, 0));
@@ -170,7 +170,7 @@ function main(): void {
     `3★ by tier %  c2 ${f(threeStarTierPct(2))}  c3 ${f(threeStarTierPct(3))}  c4 ${f(threeStarTierPct(4))}  c5 ${f(threeStarTierPct(5))}`,
     `5c3★ %  ${f(pct(fiveStarRounds.length, records.length))}   earliest r  ${fiveStarRounds.length ? Math.min(...fiveStarRounds) : 0}/${percentile(fiveStarRounds, 0.1)}/${median(fiveStarRounds)}`,
     `5c3★ <r8 count  ${fiveStarEarly}`,
-    `3★ win% by tier  c2 ${f(threeStarWinPct(2))}  c3 ${f(threeStarWinPct(3))}  c4 ${f(threeStarWinPct(4))}  c5 ${f(threeStarWinPct(5))}  none ${f(threeStarWinPct(null))}`,
+    `3★ win% by tier  c2 ${bucketWinPct(threeStarBuckets[0])}  c3 ${bucketWinPct(threeStarBuckets[1])}  c4 ${bucketWinPct(threeStarBuckets[2])}  c5 ${bucketWinPct(threeStarBuckets[3])}  none ${bucketWinPct(noThreeStarBucket)}`,
     `heroDeltaAll   ${deltas.map(([id, d]) => `${id} ${d >= 0 ? '+' : ''}${d.toFixed(1)}`).join('  ')}`,
     `goldFlow avg   ${f(mean(goldFlow))}   interest avg ${f(mean(interestFlow))}   streakGold avg ${f(mean(streakFlow))}`,
     `medRounds      ${f(median(records.map((m) => m.rounds.length)))}`,
