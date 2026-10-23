@@ -122,7 +122,7 @@ export const RELIC_PICKS_LOSS = 2;
  * pool: a hero the bot is buying genuinely dries up for you, which is what
  * makes scouting the opposing board worth doing.
  */
-export const COPIES_BY_COST: Record<number, number> = { 2: 18, 3: 14, 4: 12, 5: 10 };
+export const COPIES_BY_COST: Record<number, number> = { 2: 18, 3: 14, 4: 10, 5: 9 };
 
 /**
  * Copies of one hero a single shop roll may show.
