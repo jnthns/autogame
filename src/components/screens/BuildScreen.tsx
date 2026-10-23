@@ -1,11 +1,10 @@
 import { BONE, INK, JADE, MIN_DRAFT_TWO_COSTS, SAF, USER_DRAFT_MAX, costTone } from '../../data/constants';
 import { HEROES } from '../../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../../data/progress';
-import { spriteCss } from '../../data/sprites';
 import { CLASSES } from '../../data/classes';
 import { draftTwoCosts, isDraftLegal } from '../../game/draft';
 import { activeSynergies } from '../../game/engine';
-import { PixelSprite } from '../PixelSprite';
+import { HeroAvatar } from '../HeroAvatar';
 
 interface BuildScreenProps {
   draft: string[];
@@ -121,7 +120,7 @@ export function BuildScreen({
               }}
             >
               {h ? (
-                <PixelSprite src={spriteCss(h.id)} size={24} />
+                <HeroAvatar heroId={h.id} size={24} />
               ) : (
                 <span style={{ fontSize: 20, lineHeight: '24px', color: 'var(--om-muted-2)' }}>+</span>
               )}
@@ -247,7 +246,7 @@ export function BuildScreen({
                   height: 62,
                 }}
               >
-                <PixelSprite src={spriteCss(h.id)} size={48} />
+                <HeroAvatar heroId={h.id} size={48} />
               </div>
               <div style={{ padding: '0 9px 9px' }}>
                 <div className="slab" style={{ fontSize: 15, lineHeight: 1.05, color: on ? BONE : INK }}>
@@ -366,7 +365,7 @@ export function BuildScreen({
                   position: 'relative',
                 }}
               >
-                <PixelSprite src={spriteCss(h.id)} size={48} dimmed />
+                <HeroAvatar heroId={h.id} size={48} dimmed />
               </div>
               <div style={{ padding: '0 9px 9px' }}>
                 <div className="slab" style={{ fontSize: 15, lineHeight: 1.05, color: 'var(--om-muted)' }}>

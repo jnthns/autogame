@@ -2,12 +2,11 @@ import type { CSSProperties } from 'react';
 import { BATTLEGROUND_MAP } from '../../data/battlegrounds';
 import { HERO_MAP } from '../../data/heroes';
 import { RELIC_MAP } from '../../data/relics';
-import { spriteCss } from '../../data/sprites';
 import { GAUNTLET } from '../../data/constants';
 import { rewardLines } from '../../game/hyperRoll';
 import type { GameState, OverlayKind } from '../../game/types';
 import { BattlegroundPreview } from '../BattlegroundPreview';
-import { PixelSprite } from '../PixelSprite';
+import { HeroAvatar } from '../HeroAvatar';
 
 type BannerTone = 'good' | 'bad' | 'accent' | 'ink' | 'muted';
 
@@ -226,7 +225,7 @@ export function OverlayModal({
                     className="om-tile om-unlock-row om-unlock-row--deal"
                     style={{ '--i': i } as CSSProperties}
                   >
-                    <PixelSprite src={spriteCss(id)} size={28} />
+                    <HeroAvatar heroId={id} size={28} />
                     <span style={{ flex: 1 }}>
                       <span className="slab om-unlock-row__name">{HERO_MAP[id].name}</span>
                       <span className="om-unlock-row__meta">{HERO_MAP[id].traits.join(' · ')}</span>
