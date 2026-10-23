@@ -15,7 +15,7 @@ export const MUTED = 'var(--om-muted)';
  * Star multipliers. A 2★ is three copies and a 3★ is nine, so the old 1.85/3.4
  * made every merge strictly better than spending the same gold on breadth.
  */
-export const STARMUL = [1, 1, 1.65, 2.6] as const;
+export const STARMUL = [1, 1, 1.7, 2.75] as const;
 
 /** Columns per side (player and foe each occupy a 6×6 half). */
 export const BOARD_COLS = 6;
