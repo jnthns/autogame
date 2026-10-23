@@ -267,7 +267,6 @@ export function rollShopOffers(
   const shown: Record<string, number> = {};
   const left = (id: string) => (pool ? (pool[id] ?? 0) : Infinity) - (shown[id] ?? 0);
   const offerable = (id: string) => left(id) > 0 && (shown[id] ?? 0) < MAX_COPIES_PER_ROLL;
-  const has = (tier: number) => (byTier.get(tier) ?? []).some(offerable);
   const hasDraftedTier = (tier: number) => (byTier.get(tier) ?? []).some((id) => left(id) > 0);
 
   return [0, 0, 0, 0, 0].map(() => {
