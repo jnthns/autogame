@@ -31,8 +31,25 @@ export const LEGACY_ANCHOR_OFFSET: Record<number, RefTeam> = {
 };
 
 /**
+ * B8's realized damage per point of auto DPS at each anchor round: the player's
+ * total damage ÷ fight seconds ÷ auto DPS, median per fight. Three-copy merges
+ * shifted this ratio by round (lower at r4 without the early 3★, higher at r12),
+ * but the boss fit converts auto DPS with a fixed 1.6 uplift, so the DPS anchor
+ * is scaled by (this tree's ratio ÷ this one) to keep B8's real kill times.
+ * Measured with the same main run as LEGACY_ANCHOR_OFFSET. Round 1 has no boss,
+ * so its ratio is against ordinary foes. Round 16 uses the round-12 ratio.
+ */
+export const LEGACY_DPS_REALIZATION: Record<number, number> = {
+  1: 0.886,
+  4: 2.284,
+  8: 2.469,
+  12: 2.674,
+};
+
+/**
  * Medians of the player's board under the `decent` policy on Mortal with random
- * drafts, × LEGACY_ANCHOR_OFFSET, from `scripts/balance-anchors.ts --seed 1,7`
+ * drafts, × LEGACY_ANCHOR_OFFSET and the realized-damage DPS factor (both
+ * applied only in `scripts/balance-anchors.ts`), from `scripts/balance-anchors.ts --seed 1,7`
  * (n = 2000), re-measured after three-copy merges shrank boards. Round 12 is
  * the 54% of matches still alive there, so it leans towards stronger boards.
  *
@@ -48,11 +65,11 @@ export const LEGACY_ANCHOR_OFFSET: Record<number, RefTeam> = {
  * reach it often enough to take a median from.
  */
 export const REF_ANCHORS: Record<number, RefTeam> = {
-  1: { hp: 1186, dps: 120, avgHp: 637 },
-  4: { hp: 2667, dps: 245, avgHp: 899 },
-  8: { hp: 5002, dps: 513, avgHp: 1007 },
-  12: { hp: 8928, dps: 927, avgHp: 1011 },
-  16: { hp: 12952, dps: 1369, avgHp: 1053 },
+  1: { hp: 1186, dps: 123, avgHp: 637 },
+  4: { hp: 2667, dps: 231, avgHp: 899 },
+  8: { hp: 4984, dps: 526, avgHp: 1013 },
+  12: { hp: 8855, dps: 1023, avgHp: 1002 },
+  16: { hp: 12822, dps: 1512, avgHp: 1029 },
 };
 
 const ANCHOR_ROUNDS = Object.keys(REF_ANCHORS)
