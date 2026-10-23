@@ -12,7 +12,7 @@ export const VIOLET = 'var(--om-violet)';
 export const MUTED = 'var(--om-muted)';
 
 /**
- * Star multipliers. A 2★ is two copies and a 3★ is four, so the old 1.85/3.4
+ * Star multipliers. A 2★ is three copies and a 3★ is nine, so the old 1.85/3.4
  * made every merge strictly better than spending the same gold on breadth.
  */
 export const STARMUL = [1, 1, 1.65, 2.6] as const;
@@ -31,7 +31,7 @@ export const BOSS_ANCHOR = { r: 1, c: 1 } as const;
 /** Chebyshev range that covers the whole 12×6 board from the 4×4 boss. */
 export const BOSS_RANGE = 12;
 /** Same-star copies needed to combine into the next star (board + bench). */
-export const MERGE_COPIES = 2;
+export const MERGE_COPIES = 3;
 /**
  * Boss HP is set so the *reference* team for the round (src/data/bossCurve.ts)
  * burns it down in BOSS_BURN_SECONDS, never from the live board — see B5.
@@ -70,7 +70,7 @@ export const BOARD_CELL_WIDTH_PCT = 100 / BOARD_COLS;
 export const BOARD_CELL_HEIGHT_PCT = 100 / BOARD_ROWS;
 export const BOARD_BG_TILE_SIZE = `${BOARD_CELL_WIDTH_PCT}% ${BOARD_CELL_HEIGHT_PCT}%`;
 
-/** Slow board-cap ramp so 2-copy merges do not fill the field too early. */
+/** Slow board-cap ramp so 3-copy merges do not fill the field too early. */
 export const BOT_BOARD_CAPS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9, 10] as const;
 
 /** Marathon ramps a bit higher over 18 rounds (max 12 units). */

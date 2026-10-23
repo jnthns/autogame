@@ -54,7 +54,6 @@ import {
   RELIC_ROUNDS,
 } from '../data/economy';
 import {
-  collapseShopOffers,
   getBossEncounter,
   isBossRound,
   makeBossUnits,
@@ -264,20 +263,17 @@ export function rollShopOffers(
   const offerable = (id: string) => left(id) > 0 && (shown[id] ?? 0) < MAX_COPIES_PER_ROLL;
   const has = (tier: number) => (byTier.get(tier) ?? []).some(offerable);
 
-  const raw: (string | null)[] = [0, 0, 0, 0, 0].map(() => {
+  return [0, 0, 0, 0, 0].map(() => {
     const tier = rollShopTier(round, has);
-    const candidates = (byTier.get(tier) ?? base).filter(offerable);
-    const from = candidates.length ? candidates : base.filter(offerable);
-    if (!from.length) return null;
-    const id = from[Math.floor(random() * from.length)];
+    const candidates = tier == null ? [] : (byTier.get(tier) ?? []).filter(offerable);
+    if (!candidates.length) return null;
+    const id = candidates[Math.floor(random() * candidates.length)];
     shown[id] = (shown[id] ?? 0) + 1;
-    return id;
+    return { hid: id, star: 1 as const };
   });
-  // A pair only collapses into a 2★ offer if the pool can actually pay for both.
-  return collapseShopOffers(raw, (id) => (pool ? (pool[id] ?? 0) : Infinity) >= MERGE_COPIES);
 }
 
-/** Copies of a hero this unit is holding: 1 at 1★, 2 at 2★, 4 at 3★. */
+/** Copies of a hero this unit is holding: 1 at 1★, 3 at 2★, 9 at 3★. */
 export function unitCopies(u: { star: 1 | 2 | 3 }): number {
   return u.star === 1 ? 1 : u.star === 2 ? MERGE_COPIES : MERGE_COPIES * MERGE_COPIES;
 }
@@ -507,21 +503,19 @@ export function applyMerges(
   onPop?: (r: number, c: number, text: string) => void,
 ): void {
   mergeUnits(g, onPop);
-  if (opts?.boughtHid && (opts.twoStarBeforeBuy ?? 0) >= 2) {
+  if (opts?.boughtHid && (opts.twoStarBeforeBuy ?? 0) >= MERGE_COPIES) {
     pairMergeTwos(g, opts.boughtHid, onPop);
   }
 }
 
 /**
  * 1★ pays a one-gold scout tax so rolling through the shop and dumping the
- * misses costs something; combined units pay a combine tax so 2-copy merges do
+ * misses costs something; combined units pay a combine tax so 3-copy merges do
  * not print gold.
  */
 export function sellValue(u: Unit): number {
   const cost = HERO_MAP[u.hid].cost;
-  if (u.star === 1) return Math.max(1, cost - 1);
-  if (u.star === 2) return Math.max(1, cost * MERGE_COPIES - 1);
-  return Math.max(1, cost * 3);
+  return Math.max(1, cost * unitCopies(u) - 1);
 }
 
 export function combatOpponents(g: GameState): Unit[] {
@@ -585,7 +579,7 @@ function botBuy(g: GameState, i: number): boolean {
   if (g.foeGold < cost || g.foeBench.length >= 8) return false;
   g.foeGold -= cost;
   g.foeShop = g.foeShop.map((s, j) => (j === i ? null : s));
-  takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
+  takeFromPool(g, offer.hid, unitCopies(offer));
   g.foeBench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   return true;
 }
@@ -1577,7 +1571,7 @@ export const gameActions = {
     if (g.gold < cost || g.bench.length >= 8) return;
     g.gold -= cost;
     g.shop = g.shop.map((s, j) => (j === i ? null : s));
-    takeFromPool(g, offer.hid, offer.star === 1 ? 1 : MERGE_COPIES);
+    takeFromPool(g, offer.hid, unitCopies(offer));
     g.bench.push({ u: uid(), hid: offer.hid, star: offer.star, relics: [] });
   },
 

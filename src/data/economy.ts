@@ -122,16 +122,14 @@ export const RELIC_PICKS_LOSS = 2;
  * pool: a hero the bot is buying genuinely dries up for you, which is what
  * makes scouting the opposing board worth doing.
  */
-export const COPIES_BY_COST: Record<number, number> = { 2: 12, 3: 10, 4: 8, 5: 6 };
+export const COPIES_BY_COST: Record<number, number> = { 2: 18, 3: 14, 4: 12, 5: 10 };
 
 /**
  * Copies of one hero a single shop roll may show.
  *
  * The pool alone does not stop the opening degeneracy: a 6-hero draft can put
  * one hero in a whole cost tier, so a 70/30 odds row would still hand out ~3.5
- * copies in one roll — and with pair-collapse and 2-copy merges that is a 3★
- * for 8 gold on round one. Two copies collapse into a single 2★ offer, which
- * is the most one roll can ever be worth.
+ * copies in one roll. The cap keeps that opening concentration bounded.
  */
 export const MAX_COPIES_PER_ROLL = 2;
 

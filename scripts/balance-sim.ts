@@ -153,6 +153,24 @@ function main(): void {
   const noThreeStarBucket = threeStarBucket(null);
   const bucketWinPct = ({ count, winPct }: { count: number; winPct: number | null }) =>
     `${winPct == null ? 'n/a'.padStart(6) : f(winPct)} (n=${count})`;
+  const fightWinPctByTier = (cost: number) => {
+    const treated = records.flatMap((m) =>
+      m.rounds.filter((round) => m.threeStars.some((star) => star.cost === cost && star.round < round.round)),
+    );
+    const activeRounds = new Set(treated.map((round) => round.round));
+    const control = records.flatMap((m) =>
+      m.rounds.filter(
+        (round) =>
+          activeRounds.has(round.round) &&
+          !m.threeStars.some((star) => star.cost === cost && star.round < round.round),
+      ),
+    );
+    const treatedPct = pct(treated.filter((round) => round.win).length, treated.length);
+    const controlPct = pct(control.filter((round) => round.win).length, control.length);
+    return `${f(treatedPct)} (n=${treated.length}) vs ${f(controlPct)} (n=${control.length}) Δ${f(
+      treatedPct - controlPct,
+    )}`;
+  };
   const goldFlow = records.map((m) => m.rounds.reduce((s, r) => s + Math.max(0, r.income), 0));
   const interestFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeInterest, 0));
   const streakFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeStreak, 0));
@@ -171,6 +189,7 @@ function main(): void {
     `5c3★ %  ${f(pct(fiveStarRounds.length, records.length))}   earliest r  ${fiveStarRounds.length ? Math.min(...fiveStarRounds) : 0}/${percentile(fiveStarRounds, 0.1)}/${median(fiveStarRounds)}`,
     `5c3★ <r8 count  ${fiveStarEarly}`,
     `3★ win% by tier  c2 ${bucketWinPct(threeStarBuckets[0])}  c3 ${bucketWinPct(threeStarBuckets[1])}  c4 ${bucketWinPct(threeStarBuckets[2])}  c5 ${bucketWinPct(threeStarBuckets[3])}  none ${bucketWinPct(noThreeStarBucket)}`,
+    `3★ fight win% by tier  c2 ${fightWinPctByTier(2)}  c3 ${fightWinPctByTier(3)}  c4 ${fightWinPctByTier(4)}  c5 ${fightWinPctByTier(5)}`,
     `heroDeltaAll   ${deltas.map(([id, d]) => `${id} ${d >= 0 ? '+' : ''}${d.toFixed(1)}`).join('  ')}`,
     `goldFlow avg   ${f(mean(goldFlow))}   interest avg ${f(mean(interestFlow))}   streakGold avg ${f(mean(streakFlow))}`,
     `medRounds      ${f(median(records.map((m) => m.rounds.length)))}`,

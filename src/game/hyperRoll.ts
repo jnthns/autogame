@@ -177,31 +177,6 @@ export function shopPrice(offer: ShopOffer): number {
   return offer.star === 1 ? cost : cost * MERGE_COPIES;
 }
 
-/**
- * Collapse duplicate 1★ shop rolls into a single 2★ offer (pay for both copies).
- * `canPair` lets the caller refuse when the shared pool cannot cover two copies.
- */
-export function collapseShopOffers(
-  hids: (string | null)[],
-  canPair: (hid: string) => boolean = () => true,
-): (ShopOffer | null)[] {
-  const slots: (ShopOffer | null)[] = hids.map((hid) => (hid ? { hid, star: 1 as const } : null));
-  const pending = new Map<string, number>();
-  for (let i = 0; i < slots.length; i++) {
-    const s = slots[i];
-    if (!s || s.star !== 1) continue;
-    const prev = pending.get(s.hid);
-    if (prev != null && slots[prev] && canPair(s.hid)) {
-      slots[prev] = { hid: s.hid, star: 2 };
-      slots[i] = null;
-      pending.delete(s.hid);
-    } else {
-      pending.set(s.hid, i);
-    }
-  }
-  return slots;
-}
-
 export function rewardLines(reward: BossRewardGrant): string[] {
   const lines = [`◈${reward.gold}`];
   if (reward.freeRerolls > 0) {
@@ -213,9 +188,9 @@ export function rewardLines(reward: BossRewardGrant): string[] {
 
 /**
  * Roll one cost tier from the round's odds row, then fall back to the nearest
- * tier the draft actually contains: −1, +1, −2, +2, −3 (bounded to 2..5).
+ * non-zero-odds tier the draft actually contains.
  */
-export function rollShopTier(round: number, has: (tier: number) => boolean): number {
+export function rollShopTier(round: number, has: (tier: number) => boolean): number | null {
   const odds = shopOdds(round);
   let roll = random() * 100;
   let tier: number = SHOP_TIERS[0];
@@ -230,9 +205,10 @@ export function rollShopTier(round: number, has: (tier: number) => boolean): num
   if (has(tier)) return tier;
   for (const step of [-1, 1, -2, 2, -3]) {
     const t = tier + step;
-    if (t >= 2 && t <= 5 && has(t)) return t;
+    const oddsIndex = SHOP_TIERS.indexOf(t as (typeof SHOP_TIERS)[number]);
+    if (t >= 2 && t <= 5 && oddsIndex >= 0 && odds[oddsIndex] > 0 && has(t)) return t;
   }
-  return tier;
+  return null;
 }
 
 export function unitPower(u: Unit): number {

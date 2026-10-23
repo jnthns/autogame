@@ -31,10 +31,10 @@ describe('the pool', () => {
     expect(createGame('practice').pool).toBeNull();
   });
 
-  it('counts copies by star: 1, 2, 4', () => {
+  it('counts copies by star: 1, 3, 9', () => {
     expect(unitCopies({ star: 1 })).toBe(1);
-    expect(unitCopies({ star: 2 })).toBe(2);
-    expect(unitCopies({ star: 3 })).toBe(4);
+    expect(unitCopies({ star: 2 })).toBe(3);
+    expect(unitCopies({ star: 3 })).toBe(9);
   });
 });
 
@@ -52,24 +52,24 @@ describe('buying and selling move the pool', () => {
     expect(g.pool!.anans).toBe(before);
   });
 
-  it('a 2★ offer takes two copies', () => {
+  it('a 2★ offer takes three copies', () => {
     const g = createGame('bot');
     g.phase = 'plan';
     g.gold = 50;
     g.shop = [{ hid: 'anans', star: 2 }, null, null, null, null];
     const before = g.pool!.anans;
     gameActions.buy(g, 0);
-    expect(g.pool!.anans).toBe(before - 2);
+    expect(g.pool!.anans).toBe(before - 3);
   });
 
-  it('selling a 3★ returns all four copies', () => {
+  it('selling a 3★ returns all nine copies', () => {
     const g = createGame('bot');
     g.phase = 'plan';
     g.pool!.anans = 0;
     g.bench = [{ u: 'three', hid: 'anans', star: 3, relics: [] }];
     g.sel = { u: 'three', from: 'bench' };
     gameActions.sell(g);
-    expect(g.pool!.anans).toBe(4);
+    expect(g.pool!.anans).toBe(9);
   });
 
   it('the sim sell returns copies to the pool', () => {
@@ -77,7 +77,7 @@ describe('buying and selling move the pool', () => {
     g.pool!.anans = 0;
     g.bench = [{ u: 'sim-three', hid: 'anans', star: 3, relics: [] }];
     expect(sellWeakestBench(g)).toBe(true);
-    expect(g.pool!.anans).toBe(4);
+    expect(g.pool!.anans).toBe(9);
   });
 
   it('is shared: the bot drawing a hero drains it for the player too', () => {
@@ -114,17 +114,6 @@ describe('the shop respects the pool', () => {
     expect(rollShopOffers(DEFAULT_DRAFT, 6, pool).every((o) => o === null)).toBe(true);
   });
 
-  it('will not collapse a pair the pool cannot pay for', () => {
-    const pool = createPool(DEFAULT_DRAFT, (id) => HERO_MAP[id].cost);
-    DEFAULT_DRAFT.forEach((id) => {
-      pool[id] = id === 'anans' ? 1 : 0;
-    });
-    for (let i = 0; i < 50; i++) {
-      rollShopOffers(DEFAULT_DRAFT, 1, pool).forEach((o) => {
-        if (o) expect(o.star).toBe(1);
-      });
-    }
-  });
 });
 
 describe('the per-roll copy cap', () => {
@@ -134,8 +123,7 @@ describe('the per-roll copy cap', () => {
       const counts: Record<string, number> = {};
       rollShopOffers(DEFAULT_DRAFT, 1, pool).forEach((o) => {
         if (!o) return;
-        // A 2★ offer is a collapsed pair, so it is worth two of the cap.
-        counts[o.hid] = (counts[o.hid] ?? 0) + (o.star === 1 ? 1 : 2);
+        counts[o.hid] = (counts[o.hid] ?? 0) + 1;
       });
       Object.entries(counts).forEach(([hid, n]) => {
         expect(n, `${hid} on roll ${i}`).toBeLessThanOrEqual(MAX_COPIES_PER_ROLL);
@@ -143,15 +131,11 @@ describe('the per-roll copy cap', () => {
     }
   });
 
-  it('caps a one-hero tier at a single 2★ offer, not two', () => {
-    // The old failure: five slots of Anansi collapsed into two 4-gold 2★ offers,
-    // which merge straight into a 3★ for 8 gold on round one.
+  it('caps a one-hero tier at two offers', () => {
     const pool = createPool(DEFAULT_DRAFT, (id) => HERO_MAP[id].cost);
     for (let i = 0; i < 200; i++) {
-      const twos = rollShopOffers(DEFAULT_DRAFT, 1, pool).filter(
-        (o) => o && o.hid === 'anans' && o.star === 2,
-      );
-      expect(twos.length).toBeLessThanOrEqual(1);
+      const anansi = rollShopOffers(DEFAULT_DRAFT, 1, pool).filter((o) => o && o.hid === 'anans');
+      expect(anansi.length).toBeLessThanOrEqual(MAX_COPIES_PER_ROLL);
     }
   });
 });

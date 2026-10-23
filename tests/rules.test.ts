@@ -39,7 +39,6 @@ import {
   BOSS_ENCOUNTERS,
   BOSS_ROUNDS,
   HYPER_ROLL_ROUNDS,
-  collapseShopOffers,
   getBossEncounter,
   isBossRound,
   periodInfo,
@@ -122,8 +121,8 @@ describe('selling', () => {
     expect(sellValue({ u: 'b', hid: 'anans', star: 2, relics: [] })).toBe(cost * MERGE_COPIES - 1);
   });
 
-  it('3★ sells for 3×cost', () => {
-    expect(sellValue({ u: 'c', hid: 'anans', star: 3, relics: [] })).toBe(cost * 3);
+  it('3★ sells with combine tax', () => {
+    expect(sellValue({ u: 'c', hid: 'anans', star: 3, relics: [] })).toBe(cost * MERGE_COPIES * MERGE_COPIES - 1);
   });
 
   it('sell removes the roster unit, refunds immediately, clears selection', () => {
@@ -151,8 +150,9 @@ describe('selling', () => {
 });
 
 describe('merging', () => {
-  it('2×1★ on bench → 2★', () => {
+  it('3×1★ on bench → 2★', () => {
     const bench: Unit[] = [
+      { u: uid(), hid: 'anans', star: 1, relics: [] },
       { u: uid(), hid: 'anans', star: 1, relics: [] },
       { u: uid(), hid: 'anans', star: 1, relics: [] },
     ];
@@ -163,10 +163,11 @@ describe('merging', () => {
     expect(board.length).toBe(0);
   });
 
-  it('2×2★ on board → 3★ with no duplicate 2★', () => {
+  it('3×2★ on board → 3★ with no duplicate 2★', () => {
     const board: Unit[] = [
       { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
       { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
+      { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 2 },
     ];
     const bench: Unit[] = [];
     mergeUnitLists(board, bench);
@@ -175,11 +176,12 @@ describe('merging', () => {
     expect([...board, ...bench].some((u) => u.hid === 'anans' && u.star === 2)).toBe(false);
   });
 
-  it('2×2★ + buy 1★ → 1×3★ + 1×1★', () => {
+  it('3×2★ + buy 1★ → 1×3★ + 1×1★', () => {
     const g = createGame('practice');
     g.board = [
       { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
       { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
+      { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 2 },
     ];
     g.bench = [];
     g.shop = [{ hid: 'anans', star: 1 }, null, null, null, null];
@@ -193,9 +195,12 @@ describe('merging', () => {
     expect(all.filter((u) => u.star === 2).length).toBe(0);
   });
 
-  it('bench+board 2×2★ merges across deck and board', () => {
+  it('bench+board 3×2★ merges across deck and board', () => {
     const g = createGame('practice');
-    g.board = [{ u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 }];
+    g.board = [
+      { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 0 },
+      { u: uid(), hid: 'anans', star: 2, relics: [], r: 4, c: 1 },
+    ];
     g.bench = [{ u: uid(), hid: 'anans', star: 2, relics: [] }];
     mergeUnitLists(g.board, g.bench);
     expect(g.board.length).toBe(1);
@@ -203,8 +208,9 @@ describe('merging', () => {
     expect(g.bench.length).toBe(0);
   });
 
-  it('3×1★ → 1×2★ + leftover 1★', () => {
+  it('4×1★ → 1×2★ + leftover 1★', () => {
     const bench: Unit[] = [
+      { u: uid(), hid: 'anans', star: 1, relics: [] },
       { u: uid(), hid: 'anans', star: 1, relics: [] },
       { u: uid(), hid: 'anans', star: 1, relics: [] },
       { u: uid(), hid: 'anans', star: 1, relics: [] },
@@ -216,13 +222,7 @@ describe('merging', () => {
 });
 
 describe('shop offers', () => {
-  it('duplicate shop copies collapse to one offer', () => {
-    const slots = collapseShopOffers(['anans', 'anans', 'jorm', null, 'kitsu']);
-    expect(slots.filter(Boolean).length).toBe(3);
-    expect(slots.some((s) => s && s.hid === 'anans' && s.star === 2)).toBe(true);
-  });
-
-  it('2★ shop costs two copies', () => {
+  it('2★ shop costs three copies', () => {
     expect(shopPrice({ hid: 'anans', star: 2 })).toBe(HERO_MAP.anans.cost * MERGE_COPIES);
   });
 

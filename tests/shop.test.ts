@@ -48,13 +48,20 @@ describe('rollShopOffers', () => {
     expect(counts.anans / total).toBeLessThan(0.9);
   });
 
-  it('falls back down and up when a tier is empty', () => {
+  it('leaves slots empty when the draft has no non-zero-odds tier', () => {
     const fives = ['quetz', 'zirni', 'sphin', 'simur', 'levia', 'wendi'];
     for (let i = 0; i < 50; i++) {
       const slots = rollShopOffers(fives, 1);
-      expect(slots.some(Boolean)).toBe(true);
-      slots.forEach((o) => {
-        if (o) expect(HERO_MAP[o.hid].cost).toBe(5);
+      expect(slots.every((o) => o === null)).toBe(true);
+    }
+  });
+
+  it('never falls forward to a zero-odds 5-cost', () => {
+    setRng(seeded(71));
+    const draft = ['anans', 'quetz'];
+    for (let i = 0; i < 100; i++) {
+      rollShopOffers(draft, 1).forEach((offer) => {
+        if (offer) expect(HERO_MAP[offer.hid].cost).toBe(2);
       });
     }
   });
@@ -78,8 +85,8 @@ describe('sell tax', () => {
     expect(sellValue({ u: 'a', hid: 'quetz', star: 1, relics: [] })).toBe(4);
   });
 
-  it('2★ and 3★ are unchanged', () => {
-    expect(sellValue({ u: 'b', hid: 'anans', star: 2, relics: [] })).toBe(3);
-    expect(sellValue({ u: 'c', hid: 'anans', star: 3, relics: [] })).toBe(6);
+  it('2★ and 3★ refund their copies less the combine tax', () => {
+    expect(sellValue({ u: 'b', hid: 'anans', star: 2, relics: [] })).toBe(5);
+    expect(sellValue({ u: 'c', hid: 'anans', star: 3, relics: [] })).toBe(17);
   });
 });
