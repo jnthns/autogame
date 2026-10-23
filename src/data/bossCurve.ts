@@ -17,10 +17,24 @@ export interface RefTeam {
 }
 
 /**
+ * main's REF_ANCHORS trailed its real boards, so the boss difficulty players
+ * know (B8) was fitted to a team smaller than theirs. This keeps that
+ * difficulty: anchor / median board, per round and stat, measured on main at
+ * 268c18c with `scripts/balance-anchors.ts --mode bot --difficulty normal
+ * --n 1000 --seed 1,7 --legacy` (n = 2000). Round 16 uses the round-12 offset.
+ */
+export const LEGACY_ANCHOR_OFFSET: Record<number, RefTeam> = {
+  1: { hp: 1.057, dps: 1.241, avgHp: 0.938 },
+  4: { hp: 0.923, dps: 1.027, avgHp: 0.877 },
+  8: { hp: 0.874, dps: 1.032, avgHp: 0.861 },
+  12: { hp: 0.857, dps: 0.976, avgHp: 0.829 },
+};
+
+/**
  * Medians of the player's board under the `decent` policy on Mortal with random
- * drafts, from `scripts/balance-anchors.ts --seed 1,7` (n = 2000), re-measured
- * after three-copy merges shrank boards. Round 12 is the 52% of matches still
- * alive there, so it leans towards stronger boards.
+ * drafts, × LEGACY_ANCHOR_OFFSET, from `scripts/balance-anchors.ts --seed 1,7`
+ * (n = 2000), re-measured after three-copy merges shrank boards. Round 12 is
+ * the 54% of matches still alive there, so it leans towards stronger boards.
  *
  * The B5 numbers came from the 39% of matches still alive at round 12, which
  * was survivorship-biased and oversized the round-12 boss. The curve is
@@ -34,11 +48,11 @@ export interface RefTeam {
  * reach it often enough to take a median from.
  */
 export const REF_ANCHORS: Record<number, RefTeam> = {
-  1: { hp: 1122, dps: 97, avgHp: 679 },
-  4: { hp: 2890, dps: 239, avgHp: 1025 },
-  8: { hp: 5678, dps: 500, avgHp: 1167 },
-  12: { hp: 10279, dps: 939, avgHp: 1233 },
-  16: { hp: 14880, dps: 1378, avgHp: 1299 },
+  1: { hp: 1186, dps: 120, avgHp: 637 },
+  4: { hp: 2667, dps: 245, avgHp: 899 },
+  8: { hp: 5002, dps: 513, avgHp: 1007 },
+  12: { hp: 8928, dps: 927, avgHp: 1011 },
+  16: { hp: 12952, dps: 1369, avgHp: 1053 },
 };
 
 const ANCHOR_ROUNDS = Object.keys(REF_ANCHORS)
