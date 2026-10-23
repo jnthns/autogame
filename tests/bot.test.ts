@@ -111,6 +111,14 @@ describe('boss difficulty is one lever', () => {
     expect(bossAt('mythic').maxHp).toBe(Math.round(bossAt('normal').maxHp * 1.45));
   });
 
+  it('has finite, positive HP at every difficulty', () => {
+    for (const difficulty of ['normal', 'hard', 'mythic'] as const) {
+      const boss = bossAt(difficulty);
+      expect(Number.isFinite(boss.maxHp)).toBe(true);
+      expect(boss.maxHp).toBeGreaterThan(0);
+    }
+  });
+
   it('bossTaken is identical at every difficulty', () => {
     expect(bossAt('normal').bossTaken).toBe(BOSS_INCOMING_MULT);
     expect(bossAt('hard').bossTaken).toBe(BOSS_INCOMING_MULT);

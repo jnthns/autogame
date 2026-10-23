@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   BOSS_ANCHOR,
   BOSS_AS,
-  BOSS_AUTO_SHARE,
   BOSS_BOARD_SURVIVAL,
   BOSS_BURN_SECONDS,
   BOSS_CAST_PERIOD_SECONDS,
