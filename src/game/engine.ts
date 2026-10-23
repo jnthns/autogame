@@ -52,6 +52,8 @@ import {
   lossDamage,
   MATCH_DEFAULTS,
   RELIC_ROUNDS,
+  SHOP_TIERS,
+  shopOdds,
 } from '../data/economy';
 import {
   getBossEncounter,
@@ -266,13 +268,18 @@ export function rollShopOffers(
   const left = (id: string) => (pool ? (pool[id] ?? 0) : Infinity) - (shown[id] ?? 0);
   const offerable = (id: string) => left(id) > 0 && (shown[id] ?? 0) < MAX_COPIES_PER_ROLL;
   const has = (tier: number) => (byTier.get(tier) ?? []).some(offerable);
+  const hasDraftedTier = (tier: number) => (byTier.get(tier) ?? []).some((id) => left(id) > 0);
 
   return [0, 0, 0, 0, 0].map(() => {
     onSlot?.();
-    const tier = rollShopTier(round, has, onLastResort);
+    const tier = rollShopTier(round, hasDraftedTier, onLastResort);
     const candidates = (byTier.get(tier) ?? []).filter(offerable);
-    if (!candidates.length) return null;
-    const id = candidates[Math.floor(random() * candidates.length)];
+    const from =
+      candidates.length || SHOP_TIERS.filter((t, i) => shopOdds(round)[i] > 0 && hasDraftedTier(t)).length > 1
+        ? candidates
+        : (byTier.get(tier) ?? []).filter((id) => left(id) > 0);
+    if (!from.length) return null;
+    const id = from[Math.floor(random() * from.length)];
     shown[id] = (shown[id] ?? 0) + 1;
     return { hid: id, star: 1 as const };
   });
