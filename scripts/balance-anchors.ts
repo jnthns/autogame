@@ -3,6 +3,7 @@
  * the `decent` policy with random drafts — not the bot's board.
  *
  *   npx tsx scripts/balance-anchors.ts --mode bot --difficulty normal --n 1000 --seed 1,7
+ *   npx tsx scripts/balance-anchors.ts --mode bot --difficulty normal --n 1000 --seed 1,7 --legacy
  *
  * Several comma-separated seeds are pooled into one median, n matches each.
  *
@@ -11,24 +12,37 @@
  * read from RoundRecord after traits and the mode HP multiplier. Round 16 is
  * extrapolated on the 8→12 slope.
  *
- * The curve is self-referential — bosses are fitted to it, and it is measured
- * against them — so it is iterated in-process until no anchor moves by more than
- * --tol, using the same match seeds each pass. Prints the REF_ANCHORS it would
- * write; it does not edit any file.
+ * The final anchors are those medians × LEGACY_ANCHOR_OFFSET (round 16 takes
+ * the round-12 offset). The curve is self-referential — bosses are fitted to
+ * it, and it is measured against them — so it is iterated in-process until no
+ * anchor moves by more than --tol, using the same match seeds each pass.
+ *
+ * --legacy measures one pass against the tree's own REF_ANCHORS and prints
+ * REF_ANCHORS / median as the offset instead. It is run on a checkout of main.
+ *
+ * Prints tables only; it does not edit any file.
  */
 import { USER_DRAFT_MAX } from '../src/data/constants';
 import { HEROES } from '../src/data/heroes';
-import { REF_ANCHORS, type RefTeam } from '../src/data/bossCurve';
+import * as curve from '../src/data/bossCurve';
 import { runMatch, type MatchRecord } from '../src/sim/runMatch';
 import type { PolicyName } from '../src/sim/policies';
 import type { Difficulty, GameMode } from '../src/game/types';
 import { seeded } from '../src/game/rng';
 
+type RefTeam = curve.RefTeam;
+type Anchors = Record<number, RefTeam>;
+
 const MEASURED_ROUNDS = [1, 4, 8, 12] as const;
 const EXTRAPOLATED_ROUND = 16;
+const STATS = ['hp', 'dps', 'avgHp'] as const;
 
 /** Must match balance-sim so both scripts see the same matches per seed. */
 const SEED_STRIDE = 100_003;
+
+const { REF_ANCHORS } = curve;
+/** Read through the namespace so --legacy still runs on main, which has no offset. */
+const offsets: Anchors | undefined = (curve as { LEGACY_ANCHOR_OFFSET?: Anchors }).LEGACY_ANCHOR_OFFSET;
 
 function argValue(argv: string[], flag: string): string | undefined {
   const i = argv.indexOf(`--${flag}`);
@@ -51,8 +65,8 @@ function randomDraft(rng: () => number): string[] {
   return ids.slice(0, USER_DRAFT_MAX);
 }
 
-function measure(records: MatchRecord[]): { anchors: Record<number, RefTeam>; samples: Record<number, number> } {
-  const anchors: Record<number, RefTeam> = {};
+function measure(records: MatchRecord[]): { anchors: Anchors; samples: Record<number, number> } {
+  const anchors: Anchors = {};
   const samples: Record<number, number> = {};
   for (const round of MEASURED_ROUNDS) {
     const rows = records.flatMap((m) => m.rounds.filter((r) => r.round === round && r.boardStars.length));
@@ -73,23 +87,36 @@ function measure(records: MatchRecord[]): { anchors: Record<number, RefTeam>; sa
   return { anchors, samples };
 }
 
-function maxRelativeChange(next: Record<number, RefTeam>): number {
+function withOffset(measured: Anchors, offset: Anchors): Anchors {
+  const out: Anchors = {};
+  for (const round of [...MEASURED_ROUNDS, EXTRAPOLATED_ROUND]) {
+    const o = offset[round === EXTRAPOLATED_ROUND ? 12 : round];
+    out[round] = {
+      hp: Math.round(measured[round].hp * o.hp),
+      dps: Math.round(measured[round].dps * o.dps),
+      avgHp: Math.round(measured[round].avgHp * o.avgHp),
+    };
+  }
+  return out;
+}
+
+function maxRelativeChange(next: Anchors): number {
   let worst = 0;
   for (const [round, team] of Object.entries(next)) {
     const prev = REF_ANCHORS[Number(round)];
-    for (const key of ['hp', 'dps', 'avgHp'] as const) {
+    for (const key of STATS) {
       worst = Math.max(worst, Math.abs(team[key] - prev[key]) / prev[key]);
     }
   }
   return worst;
 }
 
-function format(anchors: Record<number, RefTeam>): string {
-  const rows = Object.keys(anchors)
+function format(name: string, table: Anchors): string {
+  const rows = Object.keys(table)
     .map(Number)
     .sort((x, y) => x - y)
-    .map((r) => `  ${r}: { hp: ${anchors[r].hp}, dps: ${anchors[r].dps}, avgHp: ${anchors[r].avgHp} },`);
-  return ['export const REF_ANCHORS: Record<number, RefTeam> = {', ...rows, '};'].join('\n');
+    .map((r) => `  ${r}: { hp: ${table[r].hp}, dps: ${table[r].dps}, avgHp: ${table[r].avgHp} },`);
+  return [`export const ${name}: Record<number, RefTeam> = {`, ...rows, '};'].join('\n');
 }
 
 function main(): void {
@@ -99,30 +126,52 @@ function main(): void {
   const policy = (argValue(argv, 'policy') ?? 'decent') as PolicyName;
   const n = Number(argValue(argv, 'n') ?? 1000);
   const seeds = (argValue(argv, 'seed') ?? '1').split(',').map(Number);
-  const iters = Number(argValue(argv, 'iters') ?? 6);
+  const legacy = argv.includes('--legacy');
+  const iters = legacy ? 1 : Number(argValue(argv, 'iters') ?? 6);
   const tol = Number(argValue(argv, 'tol') ?? 0.01);
 
   const matches = seeds.flatMap((seed) => {
     const draftRng = seeded(seed * 7919 + 13);
     return Array.from({ length: n }, (_, i) => ({ draft: randomDraft(draftRng), seed: seed * SEED_STRIDE + i }));
   });
+  const unit: Anchors = Object.fromEntries(MEASURED_ROUNDS.map((r) => [r, { hp: 1, dps: 1, avgHp: 1 }]));
+  const offset = legacy ? unit : (offsets ?? unit);
 
   console.log(
-    `mode=${mode} diff=${difficulty} policy=${policy} n=${n} seeds=${seeds.join(',')} drafts=random board=player`,
+    `mode=${mode} diff=${difficulty} policy=${policy} n=${n} seeds=${seeds.join(',')} drafts=random board=player${legacy ? ' legacy' : ''}`,
   );
-  console.log(`start\n${format(REF_ANCHORS)}`);
+  console.log(format('START_ANCHORS', REF_ANCHORS));
 
+  let measured: Anchors = {};
   for (let pass = 1; pass <= iters; pass++) {
     const records = matches.map(({ draft, seed }) => runMatch({ mode, difficulty, draft, policy, seed }));
-    const { anchors, samples } = measure(records);
-    const change = maxRelativeChange(anchors);
-    const alive = MEASURED_ROUNDS.map((r) => `r${r} ${samples[r]}/${matches.length}`).join('  ');
+    const result = measure(records);
+    measured = result.anchors;
+    const alive = MEASURED_ROUNDS.map((r) => `r${r} ${result.samples[r]}/${matches.length}`).join('  ');
+    if (legacy) {
+      console.log(`pass ${pass}  sampled ${alive}`);
+      break;
+    }
+    const next = withOffset(measured, offset);
+    const change = maxRelativeChange(next);
     console.log(`pass ${pass}  max change ${(change * 100).toFixed(1)}%  sampled ${alive}`);
-    for (const [round, team] of Object.entries(anchors)) Object.assign(REF_ANCHORS[Number(round)], team);
+    for (const [round, team] of Object.entries(next)) Object.assign(REF_ANCHORS[Number(round)], team);
     if (change < tol) break;
   }
 
-  console.log(format(REF_ANCHORS));
+  console.log(format('MEASURED_ANCHORS', measured));
+  if (legacy) {
+    const legacyOffset: Anchors = {};
+    for (const round of MEASURED_ROUNDS) {
+      const ratio = (key: (typeof STATS)[number]) =>
+        Math.round((REF_ANCHORS[round][key] / measured[round][key]) * 1000) / 1000;
+      legacyOffset[round] = { hp: ratio('hp'), dps: ratio('dps'), avgHp: ratio('avgHp') };
+    }
+    console.log(format('LEGACY_ANCHOR_OFFSET', legacyOffset));
+    return;
+  }
+  console.log(format('LEGACY_ANCHOR_OFFSET', offset));
+  console.log(format('REF_ANCHORS', REF_ANCHORS));
 }
 
 main();
