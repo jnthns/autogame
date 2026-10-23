@@ -33,9 +33,9 @@ export const SHOP_ODDS: Record<number, [c2: number, c3: number, c4: number, c5: 
   8: [30, 38, 22, 10],
   9: [22, 33, 19, 26],
   10: [22, 33, 19, 26],
-  11: [15, 10, 29, 46],
-  12: [15, 10, 29, 46],
-  13: [12, 3, 33, 52],
+  11: [15, 28, 11, 46],
+  12: [15, 28, 11, 46],
+  13: [12, 25, 11, 52],
 };
 
 /** Marathon rounds 14–18 and every gauntlet round past 13 use row 13. */
