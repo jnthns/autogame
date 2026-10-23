@@ -697,7 +697,7 @@ export function runBotTurn(g: GameState): void {
 }
 
 const FOE_SCALE: Record<Difficulty, { hp: number; atk: number }> = {
-  normal: { hp: 1, atk: 1 },
+  normal: { hp: 0.975, atk: 0.975 },
   hard: { hp: 1.1, atk: 1.06 },
   mythic: { hp: 1.18, atk: 1.1 },
 };
