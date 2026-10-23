@@ -17,13 +17,15 @@ export interface RefTeam {
 }
 
 /**
- * Medians of the `decent` policy on Mortal, re-measured in B7 at the final
- * dials, once the boss fix let matches routinely reach round 13 (n = 600).
+ * Medians of the player's board under the `decent` policy on Mortal with random
+ * drafts, from `scripts/balance-anchors.ts --seed 1,7` (n = 2000), re-measured
+ * after three-copy merges shrank boards. Round 12 is the 52% of matches still
+ * alive there, so it leans towards stronger boards.
  *
  * The B5 numbers came from the 39% of matches still alive at round 12, which
  * was survivorship-biased and oversized the round-12 boss. The curve is
  * self-referential — bosses are fitted to it and it is measured against them —
- * so it was re-derived twice until the anchors stopped moving.
+ * so the script iterates until the anchors stop moving.
  *
  * `dps` is auto-attack DPS only; ability damage is deliberately outside it, so
  * raising the ability budget makes bosses easier rather than rescaling them.
@@ -32,11 +34,11 @@ export interface RefTeam {
  * reach it often enough to take a median from.
  */
 export const REF_ANCHORS: Record<number, RefTeam> = {
-  1: { hp: 1663, dps: 144, avgHp: 832 },
-  4: { hp: 3574, dps: 299, avgHp: 1192 },
-  8: { hp: 7082, dps: 674, avgHp: 1416 },
-  12: { hp: 12783, dps: 1228, avgHp: 1420 },
-  16: { hp: 18484, dps: 1782, avgHp: 1424 },
+  1: { hp: 1122, dps: 97, avgHp: 679 },
+  4: { hp: 2890, dps: 239, avgHp: 1025 },
+  8: { hp: 5678, dps: 500, avgHp: 1167 },
+  12: { hp: 10279, dps: 939, avgHp: 1233 },
+  16: { hp: 14880, dps: 1378, avgHp: 1299 },
 };
 
 const ANCHOR_ROUNDS = Object.keys(REF_ANCHORS)
