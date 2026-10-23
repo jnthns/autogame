@@ -88,7 +88,7 @@ export const USER_DRAFT_MAX = 6;
 export const BOT_DRAFT_SIZE = 12;
 
 /** Global combat HP multiplier — applied before mode-specific bonuses. */
-export const HERO_HP_MUL = 1.8;
+export const HERO_HP_MUL = 1.7;
 
 export const MARATHON = {
   matchRounds: 18,
