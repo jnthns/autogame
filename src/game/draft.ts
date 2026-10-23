@@ -17,6 +17,21 @@ export function isDraftLegal(draft: readonly string[]): boolean {
 }
 
 /**
+ * The draft to resume from a saved value: its unlocked ids, or `fallback` when
+ * nothing usable is left. A full saved draft that breaks the 2-cost rule (saved
+ * before the rule existed) is replaced, never resumed.
+ */
+export function restoreDraft(saved: unknown, unlocked: readonly string[], fallback: readonly string[]): string[] {
+  const allow = new Set(unlocked);
+  const fresh = fallback.filter((id) => allow.has(id)).slice(0, USER_DRAFT_MAX);
+  if (!Array.isArray(saved)) return fresh;
+  const kept = saved
+    .filter((id: unknown): id is string => typeof id === 'string' && allow.has(id))
+    .slice(0, USER_DRAFT_MAX);
+  return kept.length && (kept.length < USER_DRAFT_MAX || isDraftLegal(kept)) ? kept : fresh;
+}
+
+/**
  * Uniform over legal drafts drawn from `ids`. If `ids` cannot form a legal
  * draft (too few heroes or 2-costs), returns an unconstrained draft instead.
  */

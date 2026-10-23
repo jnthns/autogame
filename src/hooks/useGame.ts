@@ -44,7 +44,7 @@ import {
   scaleFoeCombatants,
   usesDifficulty,
 } from '../game/engine';
-import { randomDraft } from '../game/draft';
+import { isDraftLegal, randomDraft, restoreDraft } from '../game/draft';
 import { pickGauntletRelics } from '../game/gauntlet';
 import { pruneUiEvents, stamp, type StampedUiEvent, type UiEvent } from '../game/uiEvents';
 import { debugRoundFromUrl, debugStateFromUrl } from '../game/debugUrl';
@@ -70,20 +70,14 @@ const HAPTIC_TAP_MS = 10;
 const HAPTIC_BOSS_MS = 25;
 
 function loadDraft(unlocked: string[]): string[] {
-  const allow = new Set(unlocked);
+  let saved: unknown = null;
   try {
     const s = localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (s) {
-      const d = JSON.parse(s);
-      if (Array.isArray(d) && d.length) {
-        const kept = d.filter((id: unknown): id is string => typeof id === 'string' && allow.has(id));
-        if (kept.length) return kept.slice(0, USER_DRAFT_MAX);
-      }
-    }
+    if (s) saved = JSON.parse(s);
   } catch {
     /* ignore */
   }
-  return DEFAULT_DRAFT.filter((id) => allow.has(id)).slice(0, USER_DRAFT_MAX);
+  return restoreDraft(saved, unlocked, DEFAULT_DRAFT);
 }
 
 export function useGame() {
@@ -269,6 +263,10 @@ export function useGame() {
 
   const startGame = useCallback(
     (mode: GameMode) => {
+      if (!isDraftLegal(draft)) {
+        setScreen('build');
+        return;
+      }
       clearTimer();
       resetUidCounter();
       engineRef.current = null;
