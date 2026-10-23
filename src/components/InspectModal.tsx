@@ -2,8 +2,7 @@ import { CLASSES } from '../data/classes';
 import { BONE, INK, JADE, RUST, SAF, USER_DRAFT_MAX, costTone } from '../data/constants';
 import { attackLabel, HERO_MAP } from '../data/heroes';
 import { heroUnlocked, unlockCurrent, unlockLabel, unlockReq, type ProgressState } from '../data/progress';
-import { spriteCss } from '../data/sprites';
-import { PixelSprite } from './PixelSprite';
+import { HeroAvatar } from './HeroAvatar';
 
 interface InspectModalProps {
   heroId: string;
@@ -59,7 +58,7 @@ export function InspectModal({ heroId, draft, progress, onClose, onToggle }: Ins
               justifyContent: 'center',
             }}
           >
-            <PixelSprite src={spriteCss(h.id)} size={48} dimmed={!unlocked} />
+            <HeroAvatar heroId={h.id} size={48} dimmed={!unlocked} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="slab" style={{ fontSize: 24, lineHeight: 1 }}>
