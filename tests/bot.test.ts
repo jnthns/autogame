@@ -3,7 +3,6 @@ import { BOSS_INCOMING_MULT, HERO_HP_MUL } from '../src/data/constants';
 import { BOT_INCOME_BONUS, RELIC_ROUNDS } from '../src/data/economy';
 import { isMeleeHero, HERO_MAP } from '../src/data/heroes';
 import {
-  applyTraits,
   combatant,
   combatOpponents,
   createGame,
@@ -95,14 +94,8 @@ describe('boss difficulty is one lever', () => {
   function bossAt(difficulty: Difficulty) {
     const g = createGame('bot');
     g.round = 8;
-    g.board = [
-      { u: 'a', hid: 'anans', star: 1, relics: [], r: 8, c: 1 },
-      { u: 'b', hid: 'golem', star: 1, relics: [], r: 8, c: 2 },
-    ];
-    const mine = g.board.map((u) => combatant(u, 'me', g.heroHpMul));
-    applyTraits(mine);
     const theirs = combatOpponents(g).map((u) => combatant(u, 'foe', g.heroHpMul));
-    fitBossToTeam(theirs, mine, g.round);
+    fitBossToTeam(theirs, g.round);
     scaleFoeCombatants(theirs, difficulty);
     return theirs.find((u) => u.boss)!;
   }
