@@ -79,7 +79,7 @@ export const MARATHON_BOARD_CAPS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9,
 /** Practice sandbox allows the full 6×6 player board. */
 export const PRACTICE_BOARD_CAP = BOARD_SIDE_ROWS * BOARD_COLS;
 
-export const DEFAULT_DRAFT = ['jorm', 'anans', 'kitsu', 'taniw', 'ifrit', 'thund'];
+export const DEFAULT_DRAFT = ['jorm', 'anans', 'anzuu', 'taniw', 'ifrit', 'thund'];
 export const DRAFT_STORAGE_KEY = 'om_draft';
 
 /** Player shop pool cap for Hyper Roll, Marathon, and other ranked bot matches. */

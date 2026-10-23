@@ -42,6 +42,10 @@ describe('draft rule', () => {
     }
   });
 
+  it('DEFAULT_DRAFT is legal', () => {
+    expect(isDraftLegal(DEFAULT_DRAFT)).toBe(true);
+  });
+
   it('rejects drafts with fewer than two 2-costs, and wrong sizes', () => {
     expect(isDraftLegal(['anans', 'bunyi', 'thund', 'kitsu', 'jorm', 'quetz'])).toBe(true);
     expect(isDraftLegal(['anans', 'thund', 'kitsu', 'taniw', 'jorm', 'quetz'])).toBe(false);
@@ -51,7 +55,8 @@ describe('draft rule', () => {
   });
 
   it('pre-rule drafts with 0 or 1 two-costs still load and play', () => {
-    const legacy = [DEFAULT_DRAFT, ['thund', 'kitsu', 'taniw', 'jorm', 'ifrit', 'quetz']];
+    const preRuleDefault = ['jorm', 'anans', 'kitsu', 'taniw', 'ifrit', 'thund'];
+    const legacy = [preRuleDefault, ['thund', 'kitsu', 'taniw', 'jorm', 'ifrit', 'quetz']];
     expect(legacy.map(draftTwoCosts)).toEqual([1, 0]);
     for (const draft of legacy) {
       expect(isDraftLegal(draft)).toBe(false);
