@@ -69,6 +69,8 @@ export interface MatchRecord {
   foeFinalHp: number;
   /** First round a 3★ existed on the player board or bench. */
   threeStarRound: number | null;
+  /** Each hero's first round at 3★ on the player board or bench. */
+  threeStars: { round: number; hid: string; cost: number }[];
   roundsCleared: number;
   seed: number;
 }
@@ -92,6 +94,8 @@ export function runMatch(opts: MatchOptions): MatchRecord {
 
   const rounds: RoundRecord[] = [];
   let threeStarRound: number | null = null;
+  const threeStars: MatchRecord['threeStars'] = [];
+  const threeStarHids = new Set<string>();
   let roundsCleared = 0;
   const maxRound = opts.mode === 'gauntlet' ? GAUNTLET_ROUND_LIMIT : g.matchRounds;
 
@@ -101,7 +105,12 @@ export function runMatch(opts: MatchOptions): MatchRecord {
 
     policy.plan(g, { draft, cap: cap(round, g.matchRounds, g.mode), round });
 
-    if (threeStarRound == null && [...g.board, ...g.bench].some((u) => u.star === 3)) {
+    for (const u of [...g.board, ...g.bench]) {
+      if (u.star !== 3 || threeStarHids.has(u.hid)) continue;
+      threeStarHids.add(u.hid);
+      threeStars.push({ round, hid: u.hid, cost: HERO_MAP[u.hid]?.cost ?? 0 });
+    }
+    if (threeStarRound == null && threeStars.length) {
       threeStarRound = round;
     }
     if (!g.board.length) {
@@ -140,6 +149,7 @@ export function runMatch(opts: MatchOptions): MatchRecord {
         finalHp: g.myHp,
         foeFinalHp: g.foeHp,
         threeStarRound,
+        threeStars,
         roundsCleared,
         seed: opts.seed,
       };
@@ -168,6 +178,7 @@ export function runMatch(opts: MatchOptions): MatchRecord {
     finalHp: g.myHp,
     foeFinalHp: g.foeHp,
     threeStarRound,
+    threeStars,
     roundsCleared,
     seed: opts.seed,
   };

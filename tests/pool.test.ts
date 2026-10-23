@@ -10,6 +10,7 @@ import {
   unitCopies,
 } from '../src/game/engine';
 import { seeded, setRng } from '../src/game/rng';
+import { sellWeakestBench } from '../src/sim/policies';
 
 beforeEach(() => {
   setRng(seeded(1));
@@ -68,6 +69,14 @@ describe('buying and selling move the pool', () => {
     g.bench = [{ u: 'three', hid: 'anans', star: 3, relics: [] }];
     g.sel = { u: 'three', from: 'bench' };
     gameActions.sell(g);
+    expect(g.pool!.anans).toBe(4);
+  });
+
+  it('the sim sell returns copies to the pool', () => {
+    const g = createGame('bot');
+    g.pool!.anans = 0;
+    g.bench = [{ u: 'sim-three', hid: 'anans', star: 3, relics: [] }];
+    expect(sellWeakestBench(g)).toBe(true);
     expect(g.pool!.anans).toBe(4);
   });
 

@@ -58,6 +58,12 @@ function median(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+function percentile(xs: number[], p: number): number {
+  if (!xs.length) return 0;
+  const s = xs.slice().sort((a, b) => a - b);
+  return s[Math.floor((s.length - 1) * p)];
+}
+
 function mean(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 }
@@ -130,9 +136,27 @@ function main(): void {
     0,
   );
   const earlyThree = records.filter((m) => m.threeStarRound != null && m.threeStarRound < 4).length;
+  const threeStarTierPct = (cost: number) =>
+    pct(records.filter((m) => m.threeStars.some((s) => s.cost === cost)).length, records.length);
+  const fiveStarRounds = records
+    .map((m) => Math.min(...m.threeStars.filter((s) => s.cost === 5).map((s) => s.round)))
+    .filter(Number.isFinite);
+  const fiveStarEarly = records.filter((m) => m.threeStars.some((s) => s.cost === 5 && s.round < 8)).length;
+  const threeStarWinPct = (cost: number | null) =>
+    pct(
+      records.filter((m) => {
+        const highest = Math.max(...m.threeStars.map((s) => s.cost));
+        return cost == null ? !m.threeStars.length : highest === cost;
+      }).filter((m) => m.win).length,
+      records.filter((m) => {
+        const highest = Math.max(...m.threeStars.map((s) => s.cost));
+        return cost == null ? !m.threeStars.length : highest === cost;
+      }).length,
+    );
   const goldFlow = records.map((m) => m.rounds.reduce((s, r) => s + Math.max(0, r.income), 0));
   const interestFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeInterest, 0));
   const streakFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeStreak, 0));
+  const deltas = args.randomDrafts ? heroDeltas(drafted) : [];
 
   const head = `mode=${args.mode} diff=${args.difficulty} policy=${args.policy} n=${args.n} seed=${args.seed}`;
   const lines = [
@@ -143,13 +167,17 @@ function main(): void {
     `boss4 win%     ${f(bossWinPct(records, 4))}   boss8 win% ${f(bossWinPct(records, 8))}   boss12 win% ${f(bossWinPct(records, 12))}`,
     `abilityShare%  ${f(pct(abilityDmg, abilityDmg + autoDmg))}`,
     `3★<r4 %        ${f(pct(earlyThree, records.length))}`,
+    `3★ by tier %  c2 ${f(threeStarTierPct(2))}  c3 ${f(threeStarTierPct(3))}  c4 ${f(threeStarTierPct(4))}  c5 ${f(threeStarTierPct(5))}`,
+    `5c3★ %  ${f(pct(fiveStarRounds.length, records.length))}   earliest r  ${fiveStarRounds.length ? Math.min(...fiveStarRounds) : 0}/${percentile(fiveStarRounds, 0.1)}/${median(fiveStarRounds)}`,
+    `5c3★ <r8 count  ${fiveStarEarly}`,
+    `3★ win% by tier  c2 ${f(threeStarWinPct(2))}  c3 ${f(threeStarWinPct(3))}  c4 ${f(threeStarWinPct(4))}  c5 ${f(threeStarWinPct(5))}  none ${f(threeStarWinPct(null))}`,
+    `heroDeltaAll   ${deltas.map(([id, d]) => `${id} ${d >= 0 ? '+' : ''}${d.toFixed(1)}`).join('  ')}`,
     `goldFlow avg   ${f(mean(goldFlow))}   interest avg ${f(mean(interestFlow))}   streakGold avg ${f(mean(streakFlow))}`,
     `medRounds      ${f(median(records.map((m) => m.rounds.length)))}`,
     `medRoundsClear ${f(median(records.map((m) => m.roundsCleared)))}`,
   ];
 
   if (args.randomDrafts) {
-    const deltas = heroDeltas(drafted);
     const top = deltas.slice(0, 3).map(([id, d]) => `${id} ${d >= 0 ? '+' : ''}${d.toFixed(1)} ▲`);
     const bot = deltas
       .slice(-3)

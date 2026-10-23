@@ -8,7 +8,10 @@ import {
   createGame,
   fitBossToTeam,
   gameActions,
+  pickBotDraft,
   resetUidCounter,
+  rollShopOffers,
+  runBotTurn,
   scaleFoeCombatants,
 } from '../src/game/engine';
 import { seeded, setRng } from '../src/game/rng';
@@ -137,6 +140,26 @@ describe('bot placement', () => {
       expect(u.r).toBeGreaterThanOrEqual(0);
       expect(u.r).toBeLessThan(6);
     });
+  });
+});
+
+describe('bot shop tiers', () => {
+  it('offers and buys 4/5-cost heroes when their odds allow it', () => {
+    const g = createGame('bot');
+    g.round = 13;
+    g.foe = [];
+    g.foeBench = [];
+    g.foeGold = 50;
+
+    setRng(seeded(1));
+    const draft = pickBotDraft();
+    const offers = rollShopOffers(draft, g.round, g.pool);
+    expect(offers.some((offer) => offer && HERO_MAP[offer.hid].cost >= 4)).toBe(true);
+
+    setRng(seeded(1));
+    g.foeDraft = pickBotDraft();
+    runBotTurn(g);
+    expect([...g.foe, ...g.foeBench].some((unit) => HERO_MAP[unit.hid].cost >= 4)).toBe(true);
   });
 });
 
