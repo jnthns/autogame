@@ -12,13 +12,19 @@
  * read from RoundRecord after traits and the mode HP multiplier. Round 16 is
  * extrapolated on the 8→12 slope.
  *
- * The final anchors are those medians × LEGACY_ANCHOR_OFFSET (round 16 takes
- * the round-12 offset). The curve is self-referential — bosses are fitted to
+ * The final anchors are those medians × LEGACY_ANCHOR_OFFSET, with the DPS
+ * anchor also × (this tree's realized damage per auto DPS ÷ LEGACY_DPS_REALIZATION).
+ * Both corrections are applied here and nowhere else; round 16 takes the
+ * round-12 corrections. The curve is self-referential — bosses are fitted to
  * it, and it is measured against them — so it is iterated in-process until no
  * anchor moves by more than --tol, using the same match seeds each pass.
  *
+ * Realized damage per auto DPS is, per fight at that round, the player's total
+ * damage dealt ÷ fight seconds ÷ auto DPS at fight start; the median is used.
+ *
  * --legacy measures one pass against the tree's own REF_ANCHORS and prints
- * REF_ANCHORS / median as the offset instead. It is run on a checkout of main.
+ * REF_ANCHORS / median as the offset, and the realized ratio, instead. It is
+ * run on a checkout of main.
  *
  * Prints tables only; it does not edit any file.
  */
@@ -42,7 +48,9 @@ const SEED_STRIDE = 100_003;
 
 const { REF_ANCHORS } = curve;
 /** Read through the namespace so --legacy still runs on main, which has no offset. */
-const offsets: Anchors | undefined = (curve as { LEGACY_ANCHOR_OFFSET?: Anchors }).LEGACY_ANCHOR_OFFSET;
+const legacyCurve = curve as { LEGACY_ANCHOR_OFFSET?: Anchors; LEGACY_DPS_REALIZATION?: Record<number, number> };
+const offsets = legacyCurve.LEGACY_ANCHOR_OFFSET;
+const legacyRealization = legacyCurve.LEGACY_DPS_REALIZATION;
 
 function argValue(argv: string[], flag: string): string | undefined {
   const i = argv.indexOf(`--${flag}`);
@@ -87,13 +95,27 @@ function measure(records: MatchRecord[]): { anchors: Anchors; samples: Record<nu
   return { anchors, samples };
 }
 
-function withOffset(measured: Anchors, offset: Anchors): Anchors {
+function realization(records: MatchRecord[]): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const round of MEASURED_ROUNDS) {
+    const rows = records.flatMap((m) =>
+      m.rounds.filter((r) => r.round === round && r.fightSeconds > 0 && r.teamDps > 0),
+    );
+    const dealt = (r: (typeof rows)[number]) =>
+      Object.values(r.dmgByHero).reduce((a, x) => a + x.auto + x.ability, 0);
+    out[round] = Math.round(median(rows.map((r) => dealt(r) / r.fightSeconds / r.teamDps)) * 1000) / 1000;
+  }
+  return out;
+}
+
+function withCorrections(measured: Anchors, offset: Anchors, dpsFactor: Record<number, number>): Anchors {
   const out: Anchors = {};
   for (const round of [...MEASURED_ROUNDS, EXTRAPOLATED_ROUND]) {
-    const o = offset[round === EXTRAPOLATED_ROUND ? 12 : round];
+    const from = round === EXTRAPOLATED_ROUND ? 12 : round;
+    const o = offset[from];
     out[round] = {
       hp: Math.round(measured[round].hp * o.hp),
-      dps: Math.round(measured[round].dps * o.dps),
+      dps: Math.round(measured[round].dps * o.dps * dpsFactor[from]),
       avgHp: Math.round(measured[round].avgHp * o.avgHp),
     };
   }
@@ -109,6 +131,14 @@ function maxRelativeChange(next: Anchors): number {
     }
   }
   return worst;
+}
+
+function formatRounds(name: string, table: Record<number, number>): string {
+  const rows = Object.keys(table)
+    .map(Number)
+    .sort((x, y) => x - y)
+    .map((r) => `  ${r}: ${table[r]},`);
+  return [`export const ${name}: Record<number, number> = {`, ...rows, '};'].join('\n');
 }
 
 function format(name: string, table: Anchors): string {
@@ -143,16 +173,24 @@ function main(): void {
   console.log(format('START_ANCHORS', REF_ANCHORS));
 
   let measured: Anchors = {};
+  let realized: Record<number, number> = {};
+  let dpsFactor: Record<number, number> = Object.fromEntries(MEASURED_ROUNDS.map((r) => [r, 1]));
   for (let pass = 1; pass <= iters; pass++) {
     const records = matches.map(({ draft, seed }) => runMatch({ mode, difficulty, draft, policy, seed }));
     const result = measure(records);
     measured = result.anchors;
+    realized = realization(records);
     const alive = MEASURED_ROUNDS.map((r) => `r${r} ${result.samples[r]}/${matches.length}`).join('  ');
     if (legacy) {
       console.log(`pass ${pass}  sampled ${alive}`);
       break;
     }
-    const next = withOffset(measured, offset);
+    if (legacyRealization) {
+      dpsFactor = Object.fromEntries(
+        MEASURED_ROUNDS.map((r) => [r, Math.round((realized[r] / legacyRealization[r]) * 1000) / 1000]),
+      );
+    }
+    const next = withCorrections(measured, offset, dpsFactor);
     const change = maxRelativeChange(next);
     console.log(`pass ${pass}  max change ${(change * 100).toFixed(1)}%  sampled ${alive}`);
     for (const [round, team] of Object.entries(next)) Object.assign(REF_ANCHORS[Number(round)], team);
@@ -168,9 +206,12 @@ function main(): void {
       legacyOffset[round] = { hp: ratio('hp'), dps: ratio('dps'), avgHp: ratio('avgHp') };
     }
     console.log(format('LEGACY_ANCHOR_OFFSET', legacyOffset));
+    console.log(formatRounds('LEGACY_DPS_REALIZATION', realized));
     return;
   }
   console.log(format('LEGACY_ANCHOR_OFFSET', offset));
+  console.log(formatRounds('MEASURED_DPS_REALIZATION', realized));
+  console.log(formatRounds('DPS_ANCHOR_FACTOR', dpsFactor));
   console.log(format('REF_ANCHORS', REF_ANCHORS));
 }
 
