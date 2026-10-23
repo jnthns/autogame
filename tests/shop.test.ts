@@ -48,11 +48,11 @@ describe('rollShopOffers', () => {
     expect(counts.anans / total).toBeLessThan(0.9);
   });
 
-  it('leaves slots empty when the draft has no non-zero-odds tier', () => {
+  it('uses the nearest drafted tier when none has non-zero odds', () => {
     const fives = ['quetz', 'zirni', 'sphin', 'simur', 'levia', 'wendi'];
     for (let i = 0; i < 50; i++) {
       const slots = rollShopOffers(fives, 1);
-      expect(slots.every((o) => o === null)).toBe(true);
+      expect(slots.every((o) => o?.hid && HERO_MAP[o.hid].cost === 5)).toBe(true);
     }
   });
 
@@ -61,6 +61,7 @@ describe('rollShopOffers', () => {
     const draft = ['anans', 'quetz'];
     for (let i = 0; i < 100; i++) {
       rollShopOffers(draft, 1).forEach((offer) => {
+        expect(offer).not.toBeNull();
         if (offer) expect(HERO_MAP[offer.hid].cost).toBe(2);
       });
     }

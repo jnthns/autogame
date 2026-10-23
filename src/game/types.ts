@@ -58,6 +58,8 @@ export interface GameState {
   foeDraft: string[];
   foeShop: (ShopOffer | null)[];
   shop: (ShopOffer | null)[];
+  shopSlots: number;
+  shopFallbacks: number;
   freeRerolls: number;
   /**
    * Copies of each hero left in the shared pool, or null in the practice

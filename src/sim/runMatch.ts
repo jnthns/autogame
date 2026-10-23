@@ -71,6 +71,8 @@ export interface MatchRecord {
   threeStarRound: number | null;
   /** Each hero's first round at 3★ on the player board or bench. */
   threeStars: { round: number; hid: string; cost: number }[];
+  shopSlots: number;
+  shopFallbacks: number;
   roundsCleared: number;
   seed: number;
 }
@@ -150,6 +152,8 @@ export function runMatch(opts: MatchOptions): MatchRecord {
         foeFinalHp: g.foeHp,
         threeStarRound,
         threeStars,
+        shopSlots: g.shopSlots,
+        shopFallbacks: g.shopFallbacks,
         roundsCleared,
         seed: opts.seed,
       };
@@ -179,6 +183,8 @@ export function runMatch(opts: MatchOptions): MatchRecord {
     foeFinalHp: g.foeHp,
     threeStarRound,
     threeStars,
+    shopSlots: g.shopSlots,
+    shopFallbacks: g.shopFallbacks,
     roundsCleared,
     seed: opts.seed,
   };

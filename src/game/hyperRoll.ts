@@ -190,7 +190,11 @@ export function rewardLines(reward: BossRewardGrant): string[] {
  * Roll one cost tier from the round's odds row, then fall back to the nearest
  * non-zero-odds tier the draft actually contains.
  */
-export function rollShopTier(round: number, has: (tier: number) => boolean): number | null {
+export function rollShopTier(
+  round: number,
+  has: (tier: number) => boolean,
+  onLastResort?: () => void,
+): number {
   const odds = shopOdds(round);
   let roll = random() * 100;
   let tier: number = SHOP_TIERS[0];
@@ -203,12 +207,21 @@ export function rollShopTier(round: number, has: (tier: number) => boolean): num
     tier = SHOP_TIERS[i];
   }
   if (has(tier)) return tier;
-  for (const step of [-1, 1, -2, 2, -3]) {
-    const t = tier + step;
+  for (let distance = 1; distance < SHOP_TIERS.length; distance++) {
+    for (const t of [tier - distance, tier + distance]) {
     const oddsIndex = SHOP_TIERS.indexOf(t as (typeof SHOP_TIERS)[number]);
     if (t >= 2 && t <= 5 && oddsIndex >= 0 && odds[oddsIndex] > 0 && has(t)) return t;
+    }
   }
-  return null;
+  for (let distance = 0; distance < SHOP_TIERS.length; distance++) {
+    for (const t of [tier - distance, tier + distance]) {
+      if (t >= 2 && t <= 5 && has(t)) {
+        onLastResort?.();
+        return t;
+      }
+    }
+  }
+  return tier;
 }
 
 export function unitPower(u: Unit): number {

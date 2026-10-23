@@ -175,6 +175,13 @@ function main(): void {
   const interestFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeInterest, 0));
   const streakFlow = records.map((m) => m.rounds.reduce((s, r) => s + r.incomeStreak, 0));
   const deltas = args.randomDrafts ? heroDeltas(drafted) : [];
+  const fallbackMatches = records.filter((m) => m.shopFallbacks > 0);
+  const fallbackSlots = records.reduce((sum, m) => sum + m.shopSlots, 0);
+  const fallbackCount = records.reduce((sum, m) => sum + m.shopFallbacks, 0);
+  const fiveEarlyByFallback = (hitFallback: boolean) => {
+    const group = records.filter((m) => (m.shopFallbacks > 0) === hitFallback);
+    return `${group.filter((m) => m.threeStars.some((s) => s.cost === 5 && s.round < 8)).length}/${group.length}`;
+  };
 
   const head = `mode=${args.mode} diff=${args.difficulty} policy=${args.policy} n=${args.n} seed=${args.seed}`;
   const lines = [
@@ -190,6 +197,8 @@ function main(): void {
     `5c3★ <r8 count  ${fiveStarEarly}`,
     `3★ win% by tier  c2 ${bucketWinPct(threeStarBuckets[0])}  c3 ${bucketWinPct(threeStarBuckets[1])}  c4 ${bucketWinPct(threeStarBuckets[2])}  c5 ${bucketWinPct(threeStarBuckets[3])}  none ${bucketWinPct(noThreeStarBucket)}`,
     `3★ fight win% by tier  c2 ${fightWinPctByTier(2)}  c3 ${fightWinPctByTier(3)}  c4 ${fightWinPctByTier(4)}  c5 ${fightWinPctByTier(5)}`,
+    `shop fallback%  drafts ${f(pct(fallbackMatches.length, records.length))} (${fallbackMatches.length}/${records.length})  slots ${f(pct(fallbackCount, fallbackSlots))} (${fallbackCount}/${fallbackSlots})`,
+    `5c3★ <r8 by fallback  hit ${fiveEarlyByFallback(true)}  no-hit ${fiveEarlyByFallback(false)}`,
     `heroDeltaAll   ${deltas.map(([id, d]) => `${id} ${d >= 0 ? '+' : ''}${d.toFixed(1)}`).join('  ')}`,
     `goldFlow avg   ${f(mean(goldFlow))}   interest avg ${f(mean(interestFlow))}   streakGold avg ${f(mean(streakFlow))}`,
     `medRounds      ${f(median(records.map((m) => m.rounds.length)))}`,

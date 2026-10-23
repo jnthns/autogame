@@ -158,6 +158,8 @@ export function createGame(
     foeDraft: mode === 'practice' || mode === 'gauntlet' ? [] : pickBotDraft(),
     foeShop: [],
     shop: [],
+    shopSlots: 0,
+    shopFallbacks: 0,
     freeRerolls: 0,
     pool: mode === 'practice' ? null : createPool(HEROES.map((h) => h.id), (id) => HERO_MAP[id].cost),
     sel: null,
@@ -248,6 +250,8 @@ export function rollShopOffers(
   draft: string[],
   round = 1,
   pool: CopyPool | null = null,
+  onSlot?: () => void,
+  onLastResort?: () => void,
 ): (ShopOffer | null)[] {
   const base = playerShopPool(draft);
   const byTier = new Map<number, string[]>();
@@ -264,8 +268,9 @@ export function rollShopOffers(
   const has = (tier: number) => (byTier.get(tier) ?? []).some(offerable);
 
   return [0, 0, 0, 0, 0].map(() => {
-    const tier = rollShopTier(round, has);
-    const candidates = tier == null ? [] : (byTier.get(tier) ?? []).filter(offerable);
+    onSlot?.();
+    const tier = rollShopTier(round, has, onLastResort);
+    const candidates = (byTier.get(tier) ?? []).filter(offerable);
     if (!candidates.length) return null;
     const id = candidates[Math.floor(random() * candidates.length)];
     shown[id] = (shown[id] ?? 0) + 1;
@@ -289,7 +294,13 @@ export function returnToPool(g: GameState, hid: string, copies: number): void {
 }
 
 export function rollShop(g: GameState, draft: string[]): void {
-  g.shop = rollShopOffers(draft, g.round, g.pool);
+  g.shop = rollShopOffers(
+    draft,
+    g.round,
+    g.pool,
+    () => g.shopSlots++,
+    () => g.shopFallbacks++,
+  );
 }
 
 export function traitCounts(ids: string[]): Record<string, number> {
