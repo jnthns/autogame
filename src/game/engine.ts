@@ -267,16 +267,17 @@ export function rollShopOffers(
   const shown: Record<string, number> = {};
   const left = (id: string) => (pool ? (pool[id] ?? 0) : Infinity) - (shown[id] ?? 0);
   const offerable = (id: string) => left(id) > 0 && (shown[id] ?? 0) < MAX_COPIES_PER_ROLL;
-  const hasDraftedTier = (tier: number) => (byTier.get(tier) ?? []).some((id) => left(id) > 0);
+  const inStock = (id: string) => left(id) > 0;
+  const tierHas = (pick: (id: string) => boolean) => (tier: number) => (byTier.get(tier) ?? []).some(pick);
 
   return [0, 0, 0, 0, 0].map(() => {
     onSlot?.();
-    const tier = rollShopTier(round, hasDraftedTier, onLastResort);
-    const candidates = (byTier.get(tier) ?? []).filter(offerable);
-    const from =
-      candidates.length || SHOP_TIERS.filter((t, i) => shopOdds(round)[i] > 0 && hasDraftedTier(t)).length > 1
-        ? candidates
-        : (byTier.get(tier) ?? []).filter((id) => left(id) > 0);
+    // A capped hero sends its slot down the normal tier fallback. The cap only
+    // gives way when no non-zero-odds tier has an uncapped hero left.
+    const capHolds = SHOP_TIERS.some((t, i) => shopOdds(round)[i] > 0 && tierHas(offerable)(t));
+    const pick = capHolds ? offerable : inStock;
+    const tier = rollShopTier(round, tierHas(pick), onLastResort);
+    const from = (byTier.get(tier) ?? []).filter(pick);
     if (!from.length) return null;
     const id = from[Math.floor(random() * from.length)];
     shown[id] = (shown[id] ?? 0) + 1;
